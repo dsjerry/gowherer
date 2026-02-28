@@ -4,12 +4,21 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemePreferenceProvider } from '@/hooks/theme-preference';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
+  return (
+    <ThemePreferenceProvider>
+      <RootNavigator />
+    </ThemePreferenceProvider>
+  );
+}
+
+function RootNavigator() {
   const colorScheme = useColorScheme();
 
   return (
@@ -18,7 +27,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
   );
 }

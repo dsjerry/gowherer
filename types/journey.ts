@@ -6,12 +6,14 @@ export type TimelineLocation = {
   latitude: number;
   longitude: number;
   accuracy?: number | null;
+  placeName?: string;
 };
 
 export type TimelineMedia = {
   id: string;
   type: MediaType;
   uri: string;
+  thumbnailUri?: string;
 };
 
 export type TimelineEntry = {
@@ -20,6 +22,7 @@ export type TimelineEntry = {
   text: string;
   location?: TimelineLocation;
   media: TimelineMedia[];
+  tags: string[];
 };
 
 export type Journey = {
@@ -29,5 +32,6 @@ export type Journey = {
   createdAt: string;
   endedAt?: string;
   status: JourneyStatus;
+  tags: string[];
   entries: TimelineEntry[];
 };

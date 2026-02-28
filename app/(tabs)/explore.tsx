@@ -1,21 +1,28 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Video, ResizeMode } from 'expo-av';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { useCallback, useMemo, useState } from 'react';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  LayoutAnimation,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  UIManager,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ThemeToggle } from '@/components/theme-toggle';
 import { TrackMap } from '@/components/track-map';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { Journey, JourneyKind, TimelineLocation, TimelineMedia } from '@/types/journey';
 
@@ -25,16 +32,90 @@ function formatDateTime(iso?: string) {
   if (!iso) {
     return '-';
   }
-  return new Date(iso).toLocaleString('zh-CN', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const date = new Date(iso);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${mm}/${dd} ${hh}:${min}`;
 }
 
 function kindLabel(kind: JourneyKind) {
   return kind === 'travel' ? '旅行' : '通勤';
+}
+
+function formatDuration(durationMs: number) {
+  const totalMinutes = Math.max(0, Math.floor(durationMs / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} 分钟`;
+  }
+  if (minutes === 0) {
+    return `${hours} 小时`;
+  }
+  return `${hours} 小时 ${minutes} 分钟`;
+}
+
+function haversineKm(a: TimelineLocation, b: TimelineLocation) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthKm = 6371;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return earthKm * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function computeJourneyStats(journey: Journey) {
+  const locations = journey.entries
+    .filter((entry) => Boolean(entry.location))
+    .map((entry) => entry.location!);
+
+  let distanceKm = 0;
+  for (let i = 1; i < locations.length; i += 1) {
+    distanceKm += haversineKm(locations[i - 1], locations[i]);
+  }
+
+  const endMs = journey.endedAt
+    ? new Date(journey.endedAt).getTime()
+    : journey.entries.length > 0
+      ? new Date(journey.entries[journey.entries.length - 1].createdAt).getTime()
+      : new Date(journey.createdAt).getTime();
+  const startMs = new Date(journey.createdAt).getTime();
+  const durationMs = Number.isFinite(endMs - startMs) ? Math.max(0, endMs - startMs) : 0;
+  const avgSpeedKmh = durationMs > 0 ? distanceKm / (durationMs / 3600000) : 0;
+
+  return {
+    locationPoints: locations.length,
+    distanceKm,
+    durationMs,
+    avgSpeedKmh,
+  };
+}
+
+function formatLocationLabel(location: TimelineLocation) {
+  const coords = `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`;
+  return location.placeName ? `${location.placeName} · ${coords}` : coords;
+}
+
+function includesQueryText(source: string | undefined, query: string) {
+  if (!source) {
+    return false;
+  }
+  return source.toLowerCase().includes(query);
+}
+
+function mediaPreviewUri(media: TimelineMedia) {
+  if (media.type === 'video') {
+    return media.thumbnailUri;
+  }
+  return media.uri;
 }
 
 function escapeHtml(text: string) {
@@ -87,6 +168,7 @@ function buildTrackSvgDataUri(locations: TimelineLocation[]) {
 }
 
 function journeyToHtml(journey: Journey) {
+  const stats = computeJourneyStats(journey);
   const locations = journey.entries
     .filter((entry) => Boolean(entry.location))
     .map((entry) => entry.location!)
@@ -98,6 +180,14 @@ function journeyToHtml(journey: Journey) {
       <h1 style="margin:0;font-size:38px;color:#0f172a;">${escapeHtml(journey.title)}</h1>
       <p style="margin:14px 0 0;color:#475569;font-size:16px;">
         ${kindLabel(journey.kind)} · ${formatDateTime(journey.createdAt)} - ${formatDateTime(journey.endedAt)}
+      </p>
+      ${
+        journey.tags.length > 0
+          ? `<p style="margin:8px 0 0;color:#334155;font-size:13px;">标签：${journey.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ')}</p>`
+          : ''
+      }
+      <p style="margin:8px 0 0;color:#334155;font-size:13px;">
+        里程：${stats.distanceKm.toFixed(2)} km · 时长：${escapeHtml(formatDuration(stats.durationMs))} · 均速：${stats.avgSpeedKmh.toFixed(2)} km/h · 定位点：${stats.locationPoints}
       </p>
       <p style="margin:6px 0 16px;color:#64748b;">共 ${journey.entries.length} 条记录</p>
       ${
@@ -112,14 +202,18 @@ function journeyToHtml(journey: Journey) {
   const items = journey.entries
     .map((entry) => {
       const location = entry.location
-        ? `<div style="color:#475569;">定位：${entry.location.latitude.toFixed(5)}, ${entry.location.longitude.toFixed(5)}</div>`
+        ? `<div style="color:#475569;">定位：${escapeHtml(formatLocationLabel(entry.location))}</div>`
         : '';
       const mediaCount = entry.media.length
         ? `<div style="color:#475569;">媒体：${entry.media.filter((m) => m.type === 'photo').length} 张照片 / ${entry.media.filter((m) => m.type === 'video').length} 段视频</div>`
         : '';
+      const tags = entry.tags.length
+        ? `<div style="color:#334155;">标签：${entry.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ')}</div>`
+        : '';
       return `<div style="margin-bottom:12px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;">
         <div style="font-size:12px;color:#64748b;">${formatDateTime(entry.createdAt)}</div>
         <div style="margin-top:6px;line-height:1.6;color:#0f172a;">${escapeHtml(entry.text || '(无文案)')}</div>
+        ${tags}
         ${location}
         ${mediaCount}
       </div>`;
@@ -137,10 +231,153 @@ function journeyToHtml(journey: Journey) {
   </html>`;
 }
 
+function PreviewVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer({ uri }, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.previewMedia}
+      nativeControls
+      contentFit="contain"
+    />
+  );
+}
+
+function MediaVideoCover({ uri }: { uri: string }) {
+  const player = useVideoPlayer({ uri }, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.muted = true;
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.mediaPreview}
+      nativeControls={false}
+      contentFit="cover"
+    />
+  );
+}
+
 export default function JourneyHistoryScreen() {
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const themed = {
+    title: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    subTitle: {
+      color: isDark ? '#94a3b8' : '#475569',
+    },
+    card: {
+      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    searchInput: {
+      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+      borderColor: isDark ? '#334155' : '#cbd5e1',
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    placeholder: isDark ? '#94a3b8' : '#64748b',
+    tagChip: {
+      backgroundColor: isDark ? '#334155' : '#e0f2fe',
+    },
+    tagChipText: {
+      color: isDark ? '#e2e8f0' : '#0c4a6e',
+    },
+    tagFilterChip: {
+      backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
+      borderColor: isDark ? '#334155' : '#cbd5e1',
+    },
+    tagFilterText: {
+      color: isDark ? '#cbd5e1' : '#334155',
+    },
+    filterButton: {
+      backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
+      borderColor: isDark ? '#334155' : '#cbd5e1',
+    },
+    filterButtonText: {
+      color: isDark ? '#cbd5e1' : '#0f172a',
+    },
+    statsWrap: {
+      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    statItem: {
+      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    statLabel: {
+      color: isDark ? '#94a3b8' : '#64748b',
+    },
+    statValue: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    journeyTitle: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    journeyMeta: {
+      color: isDark ? '#94a3b8' : '#64748b',
+    },
+    mapTitle: {
+      color: isDark ? '#cbd5e1' : '#334155',
+    },
+    emptyTitle: {
+      color: isDark ? '#e2e8f0' : '#334155',
+    },
+    emptyText: {
+      color: isDark ? '#94a3b8' : '#64748b',
+    },
+    divider: {
+      backgroundColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    entryItem: {
+      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+    },
+    entryTime: {
+      color: isDark ? '#94a3b8' : '#64748b',
+    },
+    entryText: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    metaLine: {
+      color: isDark ? '#cbd5e1' : '#334155',
+    },
+    mediaSectionTitle: {
+      color: isDark ? '#cbd5e1' : '#334155',
+    },
+    mediaPreviewBox: {
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#0f172a' : '#ffffff',
+    },
+    mediaBadge: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+    },
+    mediaPlaceholder: {
+      backgroundColor: isDark ? '#334155' : '#0f172a',
+    },
+    mediaPlaceholderText: {
+      color: '#ffffff',
+    },
+  };
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [filter, setFilter] = useState<JourneyFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
+  const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -163,17 +400,103 @@ export default function JourneyHistoryScreen() {
     [journeys]
   );
 
+  const availableTags = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          completedJourneys.flatMap((journey) => [
+            ...journey.tags,
+            ...journey.entries.flatMap((entry) => entry.tags),
+          ])
+        )
+      ).sort((a, b) => a.localeCompare(b, 'zh-CN')),
+    [completedJourneys]
+  );
+
   const filteredJourneys = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
     if (filter === 'all') {
-      return completedJourneys;
+      return completedJourneys.filter((journey) => {
+        const tagMatch =
+          !selectedTag ||
+          journey.tags.includes(selectedTag) ||
+          journey.entries.some((entry) => entry.tags.includes(selectedTag));
+
+        if (!tagMatch) {
+          return false;
+        }
+
+        if (!query) {
+          return true;
+        }
+
+        const journeyMatch =
+          includesQueryText(journey.title, query) ||
+          includesQueryText(kindLabel(journey.kind), query) ||
+          journey.tags.some((tag) => includesQueryText(tag, query));
+
+        if (journeyMatch) {
+          return true;
+        }
+
+        return journey.entries.some(
+          (entry) =>
+            includesQueryText(entry.text, query) ||
+            includesQueryText(entry.location?.placeName, query) ||
+            entry.tags.some((tag) => includesQueryText(tag, query))
+        );
+      });
     }
-    return completedJourneys.filter((item) => item.kind === filter);
-  }, [completedJourneys, filter]);
+    return completedJourneys.filter((journey) => {
+      if (journey.kind !== filter) {
+        return false;
+      }
+
+      const tagMatch =
+        !selectedTag ||
+        journey.tags.includes(selectedTag) ||
+        journey.entries.some((entry) => entry.tags.includes(selectedTag));
+      if (!tagMatch) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const journeyMatch =
+        includesQueryText(journey.title, query) ||
+        includesQueryText(kindLabel(journey.kind), query) ||
+        journey.tags.some((tag) => includesQueryText(tag, query));
+
+      if (journeyMatch) {
+        return true;
+      }
+
+      return journey.entries.some(
+        (entry) =>
+          includesQueryText(entry.text, query) ||
+          includesQueryText(entry.location?.placeName, query) ||
+          entry.tags.some((tag) => includesQueryText(tag, query))
+      );
+    });
+  }, [completedJourneys, filter, searchQuery, selectedTag]);
 
   async function removeJourney(journeyId: string) {
     const next = journeys.filter((item) => item.id !== journeyId);
     setJourneys(next);
     await saveJourneys(next);
+    setCollapsedJourneyIds((prev) => prev.filter((id) => id !== journeyId));
+  }
+
+  function toggleJourneyCollapsed(journeyId: string) {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCollapsedJourneyIds((prev) =>
+      prev.includes(journeyId)
+        ? prev.filter((id) => id !== journeyId)
+        : [...prev, journeyId]
+    );
   }
 
   async function exportJourneyPdf(journey: Journey) {
@@ -205,61 +528,162 @@ export default function JourneyHistoryScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>旅程回顾</Text>
-      <Text style={styles.subTitle}>结束后的旅程会按时间展示在这里，方便复盘每一段路。</Text>
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { paddingTop: insets.top + 12 },
+      ]}>
+      <View style={styles.pageHeader}>
+        <Text style={[styles.title, themed.title]}>旅程回顾</Text>
+        <ThemeToggle />
+      </View>
+      <Text style={[styles.subTitle, themed.subTitle]}>
+        结束后的旅程会按时间展示在这里，方便复盘每一段路。
+      </Text>
+      <TextInput
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="搜索标题、记录文案、地点或标签"
+        placeholderTextColor={themed.placeholder}
+        style={[styles.searchInput, themed.searchInput]}
+      />
 
       <View style={styles.filterRow}>
         <Pressable
-          style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
+          style={[styles.filterButton, themed.filterButton, filter === 'all' && styles.filterButtonActive]}
           onPress={() => setFilter('all')}>
-          <Text style={[styles.filterButtonText, filter === 'all' && styles.filterButtonTextActive]}>
+          <Text
+            style={[
+              styles.filterButtonText,
+              themed.filterButtonText,
+              filter === 'all' && styles.filterButtonTextActive,
+            ]}>
             全部
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.filterButton, filter === 'travel' && styles.filterButtonActive]}
+          style={[styles.filterButton, themed.filterButton, filter === 'travel' && styles.filterButtonActive]}
           onPress={() => setFilter('travel')}>
-          <Text style={[styles.filterButtonText, filter === 'travel' && styles.filterButtonTextActive]}>
+          <Text
+            style={[
+              styles.filterButtonText,
+              themed.filterButtonText,
+              filter === 'travel' && styles.filterButtonTextActive,
+            ]}>
             旅行
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.filterButton, filter === 'commute' && styles.filterButtonActive]}
+          style={[styles.filterButton, themed.filterButton, filter === 'commute' && styles.filterButtonActive]}
           onPress={() => setFilter('commute')}>
-          <Text style={[styles.filterButtonText, filter === 'commute' && styles.filterButtonTextActive]}>
+          <Text
+            style={[
+              styles.filterButtonText,
+              themed.filterButtonText,
+              filter === 'commute' && styles.filterButtonTextActive,
+            ]}>
             通勤
           </Text>
         </Pressable>
       </View>
+      {availableTags.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.tagFilterRow}>
+            <Pressable
+              style={[
+                styles.tagFilterChip,
+                themed.tagFilterChip,
+                !selectedTag && styles.tagFilterChipActive,
+              ]}
+              onPress={() => setSelectedTag(null)}>
+              <Text
+                style={[
+                  styles.tagFilterText,
+                  themed.tagFilterText,
+                  !selectedTag && styles.tagFilterTextActive,
+                ]}>
+                全部标签
+              </Text>
+            </Pressable>
+            {availableTags.map((tag) => (
+              <Pressable
+                key={tag}
+                style={[
+                  styles.tagFilterChip,
+                  themed.tagFilterChip,
+                  selectedTag === tag && styles.tagFilterChipActive,
+                ]}
+                onPress={() => setSelectedTag(tag)}>
+                <Text
+                  style={[
+                    styles.tagFilterText,
+                    themed.tagFilterText,
+                    selectedTag === tag && styles.tagFilterTextActive,
+                  ]}>
+                  #{tag}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      ) : null}
 
       {filteredJourneys.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.emptyTitle}>没有匹配的已完成旅程</Text>
-          <Text style={styles.emptyText}>换个筛选条件，或先在「旅程」页完成一次记录。</Text>
+        <View style={[styles.card, themed.card]}>
+          <Text style={[styles.emptyTitle, themed.emptyTitle]}>没有匹配的已完成旅程</Text>
+          <Text style={[styles.emptyText, themed.emptyText]}>
+            换个筛选条件，或先在「旅程」页完成一次记录。
+          </Text>
         </View>
       ) : (
         filteredJourneys.map((journey) => {
+          const isCollapsed = collapsedJourneyIds.includes(journey.id);
+          const stats = computeJourneyStats(journey);
           const locations = journey.entries
             .filter((entry) => Boolean(entry.location))
             .map((entry) => entry.location!)
             .filter(Boolean);
 
           return (
-            <View key={journey.id} style={styles.card}>
+            <View key={journey.id} style={[styles.card, themed.card]}>
               <View style={styles.journeyHeader}>
                 <View>
-                  <Text style={styles.journeyTitle}>{journey.title}</Text>
-                  <Text style={styles.journeyMeta}>
+                  <Text style={[styles.journeyTitle, themed.journeyTitle]}>{journey.title}</Text>
+                  <Text style={[styles.journeyMeta, themed.journeyMeta]}>
                     {kindLabel(journey.kind)} · {formatDateTime(journey.createdAt)} -{' '}
                     {formatDateTime(journey.endedAt)}
                   </Text>
-                  <Text style={styles.journeyMeta}>记录数：{journey.entries.length}</Text>
+                  <Text style={[styles.journeyMeta, themed.journeyMeta]}>
+                    记录数：{journey.entries.length}
+                  </Text>
+                  {journey.tags.length > 0 ? (
+                    <View style={styles.tagRow}>
+                      {journey.tags.map((tag) => (
+                        <View key={tag} style={[styles.tagChip, themed.tagChip]}>
+                          <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
                 </View>
                 <View style={styles.journeyHeaderActions}>
-                  <Pressable onPress={() => void exportJourneyPdf(journey)}>
-                    <Text style={styles.exportText}>导出 PDF</Text>
+                  <Pressable onPress={() => toggleJourneyCollapsed(journey.id)}>
+                    <MaterialIcons
+                      name={isCollapsed ? 'expand-more' : 'expand-less'}
+                      size={22}
+                      color={isDark ? '#cbd5e1' : '#334155'}
+                    />
                   </Pressable>
+                  {!isCollapsed ? (
+                  <Pressable onPress={() => void exportJourneyPdf(journey)}>
+                    <MaterialIcons
+                      name="picture-as-pdf"
+                      size={20}
+                      color={isDark ? '#7dd3fc' : '#0369a1'}
+                    />
+                  </Pressable>
+                  ) : null}
+                  {!isCollapsed ? (
                   <Pressable
                     onPress={() =>
                       Alert.alert('删除这条旅程？', '将同时删除该旅程下所有记录。', [
@@ -273,59 +697,146 @@ export default function JourneyHistoryScreen() {
                         },
                       ])
                     }>
-                    <Text style={styles.deleteText}>删除旅程</Text>
+                    <MaterialIcons
+                      name="delete-outline"
+                      size={20}
+                      color={isDark ? '#fca5a5' : '#b91c1c'}
+                    />
                   </Pressable>
+                  ) : null}
+                </View>
+              </View>
+              {isCollapsed ? null : (
+                <>
+              <View style={[styles.statsWrap, themed.statsWrap]}>
+                <View style={[styles.statItem, themed.statItem]}>
+                  <Text style={[styles.statLabel, themed.statLabel]}>总里程</Text>
+                  <Text style={[styles.statValue, themed.statValue]}>{stats.distanceKm.toFixed(2)} km</Text>
+                </View>
+                <View style={[styles.statItem, themed.statItem]}>
+                  <Text style={[styles.statLabel, themed.statLabel]}>总时长</Text>
+                  <Text style={[styles.statValue, themed.statValue]}>{formatDuration(stats.durationMs)}</Text>
+                </View>
+                <View style={[styles.statItem, themed.statItem]}>
+                  <Text style={[styles.statLabel, themed.statLabel]}>平均速度</Text>
+                  <Text style={[styles.statValue, themed.statValue]}>{stats.avgSpeedKmh.toFixed(2)} km/h</Text>
+                </View>
+                <View style={[styles.statItem, themed.statItem]}>
+                  <Text style={[styles.statLabel, themed.statLabel]}>定位点数</Text>
+                  <Text style={[styles.statValue, themed.statValue]}>{stats.locationPoints}</Text>
                 </View>
               </View>
 
               {locations.length > 0 ? (
                 <View>
-                  <Text style={styles.mapTitle}>轨迹地图</Text>
+                  <Text style={[styles.mapTitle, themed.mapTitle]}>轨迹地图</Text>
                   <TrackMap locations={locations} />
                 </View>
               ) : (
-                <Text style={styles.emptyText}>该旅程没有定位点，暂无法生成轨迹。</Text>
+                <Text style={[styles.emptyText, themed.emptyText]}>
+                  该旅程没有定位点，暂无法生成轨迹。
+                </Text>
               )}
 
-              <View style={styles.divider} />
+              <View style={[styles.divider, themed.divider]} />
 
               {journey.entries.length === 0 ? (
-                <Text style={styles.emptyText}>这条旅程还没有记录内容。</Text>
+                <Text style={[styles.emptyText, themed.emptyText]}>这条旅程还没有记录内容。</Text>
               ) : (
                 journey.entries.map((entry) => (
-                  <View key={entry.id} style={styles.entryItem}>
-                    <Text style={styles.entryTime}>{formatDateTime(entry.createdAt)}</Text>
-                    {entry.text ? <Text style={styles.entryText}>{entry.text}</Text> : null}
-                    {entry.location ? (
-                      <Text style={styles.metaLine}>
-                        定位：{entry.location.latitude.toFixed(5)}, {entry.location.longitude.toFixed(5)}
-                      </Text>
-                    ) : null}
-                    {entry.media.length > 0 ? (
-                      <>
-                        <Text style={styles.metaLine}>
-                          媒体：{entry.media.filter((m) => m.type === 'photo').length} 张照片 /{' '}
-                          {entry.media.filter((m) => m.type === 'video').length} 段视频
-                        </Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                          {entry.media.map((media) => (
-                            <Pressable
-                              key={media.id}
-                              style={styles.mediaPreviewBox}
-                              onPress={() => setPreviewMedia(media)}>
-                              <Image
-                                source={{ uri: media.uri }}
-                                style={styles.mediaPreview}
-                                contentFit="cover"
-                              />
-                              <Text style={styles.mediaBadge}>{media.type === 'video' ? '视频' : '照片'}</Text>
-                            </Pressable>
-                          ))}
-                        </ScrollView>
-                      </>
-                    ) : null}
+                  <View key={entry.id} style={[styles.entryItem, themed.entryItem]}>
+                    {(() => {
+                      const photos = entry.media.filter((media) => media.type === 'photo');
+                      const videos = entry.media.filter((media) => media.type === 'video');
+
+                      return (
+                        <>
+                          <Text style={[styles.entryTime, themed.entryTime]}>
+                            {formatDateTime(entry.createdAt)}
+                          </Text>
+                          {entry.text ? <Text style={[styles.entryText, themed.entryText]}>{entry.text}</Text> : null}
+                          {entry.tags.length > 0 ? (
+                            <View style={styles.tagRow}>
+                                {entry.tags.map((tag) => (
+                                <View key={tag} style={[styles.tagChip, themed.tagChip]}>
+                                  <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          ) : null}
+                          {entry.location ? (
+                            <Text style={[styles.metaLine, themed.metaLine]}>
+                              定位：{formatLocationLabel(entry.location)}
+                            </Text>
+                          ) : null}
+                          {entry.media.length > 0 ? (
+                            <>
+                              <Text style={[styles.metaLine, themed.metaLine]}>
+                                媒体：{photos.length} 张照片 / {videos.length} 段视频
+                              </Text>
+                              {photos.length > 0 ? (
+                                <>
+                                  <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>照片</Text>
+                                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                    {photos.map((media) => (
+                                      <Pressable
+                                        key={media.id}
+                                        style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
+                                        onPress={() => setPreviewMedia(media)}>
+                                        <Image
+                                          source={{ uri: media.uri }}
+                                          style={styles.mediaPreview}
+                                          contentFit="cover"
+                                        />
+                                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>照片</Text>
+                                      </Pressable>
+                                    ))}
+                                  </ScrollView>
+                                </>
+                              ) : null}
+                              {videos.length > 0 ? (
+                                <>
+                                  <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>视频</Text>
+                                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                    {videos.map((media) => (
+                                      <Pressable
+                                        key={media.id}
+                                        style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
+                                        onPress={() => setPreviewMedia(media)}>
+                                        {mediaPreviewUri(media) ? (
+                                          <Image
+                                            source={{ uri: mediaPreviewUri(media) }}
+                                            style={styles.mediaPreview}
+                                            contentFit="cover"
+                                          />
+                                        ) : media.type === 'video' ? (
+                                          <MediaVideoCover uri={media.uri} />
+                                        ) : (
+                                          <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                                            <Text
+                                              style={[
+                                                styles.mediaPlaceholderText,
+                                                themed.mediaPlaceholderText,
+                                              ]}>
+                                              视频
+                                            </Text>
+                                          </View>
+                                        )}
+                                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>视频</Text>
+                                      </Pressable>
+                                    ))}
+                                  </ScrollView>
+                                </>
+                              ) : null}
+                            </>
+                          ) : null}
+                        </>
+                      );
+                    })()}
                   </View>
                 ))
+              )}
+                </>
               )}
             </View>
           );
@@ -338,13 +849,7 @@ export default function JourneyHistoryScreen() {
             <Text style={styles.previewCloseText}>关闭</Text>
           </Pressable>
           {previewMedia?.type === 'video' ? (
-            <Video
-              source={{ uri: previewMedia.uri }}
-              style={styles.previewMedia}
-              useNativeControls
-              shouldPlay
-              resizeMode={ResizeMode.CONTAIN}
-            />
+            <PreviewVideo uri={previewMedia.uri} />
           ) : previewMedia ? (
             <Image source={{ uri: previewMedia.uri }} style={styles.previewMedia} contentFit="contain" />
           ) : null}
@@ -364,15 +869,54 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#0f172a',
-    marginTop: 12,
+  },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   subTitle: {
     color: '#475569',
     marginBottom: 4,
   },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    backgroundColor: '#f8fafc',
+  },
   filterRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  tagFilterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 6,
+  },
+  tagFilterChip: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  tagFilterChipActive: {
+    backgroundColor: '#0f766e',
+    borderColor: '#0f766e',
+  },
+  tagFilterText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  tagFilterTextActive: {
+    color: '#ffffff',
   },
   filterButton: {
     backgroundColor: '#f1f5f9',
@@ -411,6 +955,35 @@ const styles = StyleSheet.create({
   journeyHeaderActions: {
     alignItems: 'flex-end',
     gap: 6,
+  },
+  statsWrap: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statItem: {
+    minWidth: '47%',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  statValue: {
+    fontSize: 14,
+    color: '#0f172a',
+    fontWeight: '600',
   },
   journeyTitle: {
     fontSize: 18,
@@ -468,6 +1041,23 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontSize: 12,
   },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+  },
+  tagChip: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#e0f2fe',
+  },
+  tagChipText: {
+    fontSize: 11,
+    color: '#0c4a6e',
+    fontWeight: '600',
+  },
   mediaPreviewBox: {
     marginRight: 10,
     borderRadius: 10,
@@ -479,6 +1069,24 @@ const styles = StyleSheet.create({
   mediaPreview: {
     width: 110,
     height: 80,
+  },
+  mediaPlaceholder: {
+    width: 110,
+    height: 80,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaPlaceholderText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  mediaSectionTitle: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   mediaBadge: {
     fontSize: 11,

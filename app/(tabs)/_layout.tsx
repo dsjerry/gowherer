@@ -20,7 +20,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: '旅程',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="map.fill" color={color} />,
         }}
       />
       <Tabs.Screen

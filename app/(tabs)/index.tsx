@@ -1,4 +1,4 @@
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -14,7 +14,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ThemeToggle } from '@/components/theme-toggle';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import {
   Journey,
@@ -30,19 +33,197 @@ function createId(prefix: string) {
 }
 
 function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString('zh-CN', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const date = new Date(iso);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${mm}/${dd} ${hh}:${min}`;
 }
 
 function kindLabel(kind: JourneyKind) {
   return kind === 'travel' ? '旅行' : '通勤';
 }
 
+function parseTagsInput(raw: string) {
+  return Array.from(
+    new Set(
+      raw
+        .split(/[,\n，、]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function formatPlaceName(address?: Location.LocationGeocodedAddress) {
+  if (!address) {
+    return undefined;
+  }
+
+  const parts = [
+    address.name,
+    address.street,
+    address.district,
+    address.city,
+    address.region,
+    address.country,
+  ]
+    .filter((item): item is string => Boolean(item && item.trim()))
+    .map((item) => item.trim());
+
+  if (parts.length === 0) {
+    return undefined;
+  }
+
+  return Array.from(new Set(parts)).join(' · ');
+}
+
+function mediaPreviewUri(media: TimelineMedia) {
+  if (media.type === 'video') {
+    return media.thumbnailUri;
+  }
+  return media.uri;
+}
+
+function buildTimelineMedia(asset: ImagePicker.ImagePickerAsset): TimelineMedia {
+  const type: MediaType = asset.type === 'video' ? 'video' : 'photo';
+
+  return {
+    id: createId('media'),
+    uri: asset.uri,
+    type,
+    thumbnailUri: undefined,
+  };
+}
+
+function PreviewVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer({ uri }, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.previewMedia}
+      nativeControls
+      contentFit="contain"
+    />
+  );
+}
+
+function MediaVideoCover({ uri }: { uri: string }) {
+  const player = useVideoPlayer({ uri }, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.muted = true;
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.mediaPreview}
+      nativeControls={false}
+      contentFit="cover"
+    />
+  );
+}
+
 export default function JourneyScreen() {
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const themed = {
+    pageTitle: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    pageSubTitle: {
+      color: isDark ? '#94a3b8' : '#475569',
+    },
+    card: {
+      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    sectionTitle: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    mutedText: {
+      color: isDark ? '#94a3b8' : '#64748b',
+    },
+    input: {
+      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+      borderColor: isDark ? '#334155' : '#cbd5e1',
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    inputPlaceholder: isDark ? '#94a3b8' : '#64748b',
+    tagChip: {
+      backgroundColor: isDark ? '#334155' : '#e0f2fe',
+    },
+    tagChipText: {
+      color: isDark ? '#e2e8f0' : '#0c4a6e',
+    },
+    kindButton: {
+      backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
+      borderColor: isDark ? '#334155' : '#cbd5e1',
+    },
+    kindButtonText: {
+      color: isDark ? '#cbd5e1' : '#0f172a',
+    },
+    ghostButton: {
+      borderColor: isDark ? '#f59e0b' : '#f59e0b',
+      backgroundColor: isDark ? '#1f2937' : '#ffffff',
+    },
+    ghostButtonText: {
+      color: isDark ? '#fbbf24' : '#b45309',
+    },
+    editorLabel: {
+      color: isDark ? '#cbd5e1' : '#334155',
+    },
+    secondaryButton: {
+      backgroundColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    secondaryButtonText: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    cancelButton: {
+      borderColor: isDark ? '#334155' : '#cbd5e1',
+      backgroundColor: isDark ? '#0f172a' : '#ffffff',
+    },
+    cancelButtonText: {
+      color: isDark ? '#cbd5e1' : '#334155',
+    },
+    locationText: {
+      color: isDark ? '#cbd5e1' : '#334155',
+    },
+    timelineDot: {
+      backgroundColor: isDark ? '#22d3ee' : '#0f766e',
+    },
+    timelineLine: {
+      backgroundColor: isDark ? '#475569' : '#cbd5e1',
+    },
+    timelineTime: {
+      color: isDark ? '#94a3b8' : '#64748b',
+    },
+    timelineText: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    mediaPreviewBox: {
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#0f172a' : '#ffffff',
+    },
+    mediaFooter: {
+      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+    },
+    mediaBadge: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    mediaPlaceholder: {
+      backgroundColor: isDark ? '#334155' : '#0f172a',
+    },
+    mediaPlaceholderText: {
+      color: '#ffffff',
+    },
+  };
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -52,8 +233,10 @@ export default function JourneyScreen() {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
   const [journeyTitle, setJourneyTitle] = useState('');
+  const [journeyTagsInput, setJourneyTagsInput] = useState('');
   const [journeyKind, setJourneyKind] = useState<JourneyKind>('travel');
   const [entryText, setEntryText] = useState('');
+  const [entryTagsInput, setEntryTagsInput] = useState('');
   const [draftLocation, setDraftLocation] = useState<TimelineLocation>();
   const [draftMedia, setDraftMedia] = useState<TimelineMedia[]>([]);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
@@ -87,6 +270,7 @@ export default function JourneyScreen() {
   function resetDraft() {
     setEditingEntryId(null);
     setEntryText('');
+    setEntryTagsInput('');
     setDraftLocation(undefined);
     setDraftMedia([]);
   }
@@ -111,17 +295,20 @@ export default function JourneyScreen() {
     setCreating(true);
     try {
       const now = new Date().toISOString();
+      const tags = parseTagsInput(journeyTagsInput);
       const nextJourney: Journey = {
         id: createId('journey'),
         title,
         kind: journeyKind,
         createdAt: now,
         status: 'active',
+        tags,
         entries: [],
       };
 
       await updateJourneys([nextJourney, ...journeys]);
       setJourneyTitle('');
+      setJourneyTagsInput('');
       setJourneyKind('travel');
     } finally {
       setCreating(false);
@@ -164,11 +351,7 @@ export default function JourneyScreen() {
         return;
       }
 
-      const picked: TimelineMedia[] = result.assets.map((asset) => ({
-        id: createId('media'),
-        uri: asset.uri,
-        type: asset.type === 'video' ? 'video' : 'photo',
-      }));
+      const picked = result.assets.map((asset) => buildTimelineMedia(asset));
       setDraftMedia((prev) => [...prev, ...picked]);
     } finally {
       setPickingMedia(false);
@@ -195,11 +378,7 @@ export default function JourneyScreen() {
         return;
       }
 
-      const captured: TimelineMedia[] = result.assets.map((asset) => ({
-        id: createId('media'),
-        uri: asset.uri,
-        type: asset.type === 'video' ? 'video' : 'photo',
-      }));
+      const captured = result.assets.map((asset) => buildTimelineMedia(asset));
       setDraftMedia((prev) => [...prev, ...captured]);
     } finally {
       setPickingMedia(false);
@@ -218,10 +397,21 @@ export default function JourneyScreen() {
       const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+      let placeName: string | undefined;
+      try {
+        const addresses = await Location.reverseGeocodeAsync({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        placeName = formatPlaceName(addresses[0]);
+      } catch {
+        placeName = undefined;
+      }
       setDraftLocation({
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
+        placeName,
       });
     } finally {
       setLoadingLocation(false);
@@ -231,6 +421,7 @@ export default function JourneyScreen() {
   function startEditEntry(entry: TimelineEntry) {
     setEditingEntryId(entry.id);
     setEntryText(entry.text);
+    setEntryTagsInput(entry.tags.join(', '));
     setDraftLocation(entry.location);
     setDraftMedia(entry.media);
   }
@@ -261,8 +452,9 @@ export default function JourneyScreen() {
     }
 
     const text = entryText.trim();
-    if (!text && draftMedia.length === 0 && !draftLocation) {
-      Alert.alert('记录为空', '至少添加文案、定位、照片或视频中的一项。');
+    const tags = parseTagsInput(entryTagsInput);
+    if (!text && draftMedia.length === 0 && !draftLocation && tags.length === 0) {
+      Alert.alert('记录为空', '至少添加文案、标签、定位、照片或视频中的一项。');
       return;
     }
 
@@ -281,6 +473,7 @@ export default function JourneyScreen() {
                 ? {
                     ...entry,
                     text,
+                    tags,
                     location: draftLocation,
                     media: draftMedia,
                   }
@@ -293,6 +486,7 @@ export default function JourneyScreen() {
           id: createId('entry'),
           createdAt: new Date().toISOString(),
           text,
+          tags,
           location: draftLocation,
           media: draftMedia,
         };
@@ -318,30 +512,53 @@ export default function JourneyScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.pageTitle}>GoWherer 旅程时间线</Text>
-      <Text style={styles.pageSubTitle}>
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { paddingTop: insets.top + 12 },
+      ]}>
+      <View style={styles.pageHeader}>
+        <Text style={[styles.pageTitle, themed.pageTitle]}>GoWherer 旅程时间线</Text>
+        <ThemeToggle />
+      </View>
+      <Text style={[styles.pageSubTitle, themed.pageSubTitle]}>
         已完成旅程 {completedJourneysCount} 条，当前
         {activeJourney ? '有进行中旅程' : '暂无进行中旅程'}
       </Text>
 
       {!activeJourney ? (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>开始新的旅程</Text>
+        <View style={[styles.card, themed.card]}>
+          <Text style={[styles.sectionTitle, themed.sectionTitle]}>开始新的旅程</Text>
           <View style={styles.actionRow}>
             <Pressable
-              style={[styles.kindButton, journeyKind === 'travel' && styles.kindButtonActive]}
+              style={[
+                styles.kindButton,
+                themed.kindButton,
+                journeyKind === 'travel' && styles.kindButtonActive,
+              ]}
               onPress={() => setJourneyKind('travel')}>
               <Text
-                style={[styles.kindButtonText, journeyKind === 'travel' && styles.kindButtonTextActive]}>
+                style={[
+                  styles.kindButtonText,
+                  themed.kindButtonText,
+                  journeyKind === 'travel' && styles.kindButtonTextActive,
+                ]}>
                 旅行
               </Text>
             </Pressable>
             <Pressable
-              style={[styles.kindButton, journeyKind === 'commute' && styles.kindButtonActive]}
+              style={[
+                styles.kindButton,
+                themed.kindButton,
+                journeyKind === 'commute' && styles.kindButtonActive,
+              ]}
               onPress={() => setJourneyKind('commute')}>
               <Text
-                style={[styles.kindButtonText, journeyKind === 'commute' && styles.kindButtonTextActive]}>
+                style={[
+                  styles.kindButtonText,
+                  themed.kindButtonText,
+                  journeyKind === 'commute' && styles.kindButtonTextActive,
+                ]}>
                 通勤
               </Text>
             </Pressable>
@@ -350,40 +567,69 @@ export default function JourneyScreen() {
             value={journeyTitle}
             onChangeText={setJourneyTitle}
             placeholder="例如：厦门周末旅行 / 周一通勤"
-            style={styles.input}
+            placeholderTextColor={themed.inputPlaceholder}
+            style={[styles.input, themed.input]}
+          />
+          <TextInput
+            value={journeyTagsInput}
+            onChangeText={setJourneyTagsInput}
+            placeholder="旅程标签（逗号分隔）：周末, 海边, 自驾"
+            placeholderTextColor={themed.inputPlaceholder}
+            style={[styles.input, themed.input]}
           />
           <Pressable style={styles.primaryButton} onPress={createJourney} disabled={creating}>
             <Text style={styles.primaryButtonText}>{creating ? '创建中...' : '创建旅程'}</Text>
           </Pressable>
         </View>
       ) : (
-        <View style={styles.card}>
+        <View style={[styles.card, themed.card]}>
           <View style={styles.cardHeader}>
             <View>
-              <Text style={styles.sectionTitle}>{activeJourney.title}</Text>
-              <Text style={styles.mutedText}>
+              <Text style={[styles.sectionTitle, themed.sectionTitle]}>{activeJourney.title}</Text>
+              <Text style={[styles.mutedText, themed.mutedText]}>
                 {kindLabel(activeJourney.kind)} · 开始于 {formatDateTime(activeJourney.createdAt)} ·{' '}
                 {activeJourney.entries.length} 条记录
               </Text>
+              {activeJourney.tags.length > 0 ? (
+                <View style={styles.tagRow}>
+                  {activeJourney.tags.map((tag) => (
+                    <View key={tag} style={[styles.tagChip, themed.tagChip]}>
+                      <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
-            <Pressable style={styles.ghostButton} onPress={endCurrentJourney}>
-              <Text style={styles.ghostButtonText}>结束旅程</Text>
+            <Pressable style={[styles.ghostButton, themed.ghostButton]} onPress={endCurrentJourney}>
+              <Text style={[styles.ghostButtonText, themed.ghostButtonText]}>结束旅程</Text>
             </Pressable>
           </View>
 
-          <Text style={styles.editorLabel}>{editingEntryId ? '编辑记录' : '新增记录'}</Text>
+          <Text style={[styles.editorLabel, themed.editorLabel]}>
+            {editingEntryId ? '编辑记录' : '新增记录'}
+          </Text>
           <TextInput
             value={entryText}
             onChangeText={setEntryText}
             placeholder="写下此刻的感受、见闻或备注..."
-            style={[styles.input, styles.textArea]}
+            placeholderTextColor={themed.inputPlaceholder}
+            style={[styles.input, styles.textArea, themed.input]}
             multiline
+          />
+          <TextInput
+            value={entryTagsInput}
+            onChangeText={setEntryTagsInput}
+            placeholder="记录标签（逗号分隔）：地铁, 雨天, 晚高峰"
+            placeholderTextColor={themed.inputPlaceholder}
+            style={[styles.input, themed.input]}
           />
 
           {draftLocation ? (
             <View style={styles.inlineRow}>
-              <Text style={styles.locationText}>
-                定位：{draftLocation.latitude.toFixed(5)}, {draftLocation.longitude.toFixed(5)}
+              <Text style={[styles.locationText, themed.locationText]}>
+                定位：
+                {draftLocation.placeName ? ` ${draftLocation.placeName} · ` : ' '}
+                {draftLocation.latitude.toFixed(5)}, {draftLocation.longitude.toFixed(5)}
               </Text>
               <Pressable onPress={() => setDraftLocation(undefined)}>
                 <Text style={styles.linkText}>移除定位</Text>
@@ -394,10 +640,23 @@ export default function JourneyScreen() {
           {draftMedia.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaRow}>
               {draftMedia.map((item) => (
-                <Pressable key={item.id} style={styles.mediaPreviewBox} onPress={() => setPreviewMedia(item)}>
-                  <Image source={{ uri: item.uri }} style={styles.mediaPreview} contentFit="cover" />
-                  <View style={styles.mediaFooter}>
-                    <Text style={styles.mediaBadge}>{item.type === 'video' ? '视频' : '照片'}</Text>
+                <Pressable
+                  key={item.id}
+                  style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
+                  onPress={() => setPreviewMedia(item)}>
+                  {mediaPreviewUri(item) ? (
+                    <Image source={{ uri: mediaPreviewUri(item) }} style={styles.mediaPreview} contentFit="cover" />
+                  ) : item.type === 'video' ? (
+                    <MediaVideoCover uri={item.uri} />
+                  ) : (
+                    <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                      <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>视频</Text>
+                    </View>
+                  )}
+                  <View style={[styles.mediaFooter, themed.mediaFooter]}>
+                    <Text style={[styles.mediaBadge, themed.mediaBadge]}>
+                      {item.type === 'video' ? '视频' : '照片'}
+                    </Text>
                     <Pressable onPress={() => setDraftMedia((prev) => prev.filter((m) => m.id !== item.id))}>
                       <Text style={styles.linkText}>删除</Text>
                     </Pressable>
@@ -409,34 +668,38 @@ export default function JourneyScreen() {
 
           <View style={styles.actionRow}>
             <Pressable
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, themed.secondaryButton]}
               onPress={attachCurrentLocation}
               disabled={loadingLocation}>
-              <Text style={styles.secondaryButtonText}>
+              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
                 {loadingLocation ? '定位中...' : '添加定位'}
               </Text>
             </Pressable>
             <Pressable
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, themed.secondaryButton]}
               onPress={pickMediaFromLibrary}
               disabled={pickingMedia}>
-              <Text style={styles.secondaryButtonText}>
+              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
                 {pickingMedia ? '读取中...' : '从相册添加'}
               </Text>
             </Pressable>
           </View>
           <View style={styles.actionRow}>
             <Pressable
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, themed.secondaryButton]}
               onPress={() => captureMediaWithCamera('photo')}
               disabled={pickingMedia}>
-              <Text style={styles.secondaryButtonText}>{pickingMedia ? '处理中...' : '拍照'}</Text>
+              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                {pickingMedia ? '处理中...' : '拍照'}
+              </Text>
             </Pressable>
             <Pressable
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, themed.secondaryButton]}
               onPress={() => captureMediaWithCamera('video')}
               disabled={pickingMedia}>
-              <Text style={styles.secondaryButtonText}>{pickingMedia ? '处理中...' : '拍视频'}</Text>
+              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                {pickingMedia ? '处理中...' : '拍视频'}
+              </Text>
             </Pressable>
           </View>
 
@@ -446,27 +709,27 @@ export default function JourneyScreen() {
             </Text>
           </Pressable>
           {editingEntryId ? (
-            <Pressable style={styles.cancelButton} onPress={resetDraft}>
-              <Text style={styles.cancelButtonText}>取消编辑</Text>
+            <Pressable style={[styles.cancelButton, themed.cancelButton]} onPress={resetDraft}>
+              <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>取消编辑</Text>
             </Pressable>
           ) : null}
         </View>
       )}
 
       {activeJourney && activeJourney.entries.length > 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>本次旅程时间线</Text>
+        <View style={[styles.card, themed.card]}>
+          <Text style={[styles.sectionTitle, themed.sectionTitle]}>本次旅程时间线</Text>
           {activeJourney.entries.map((entry, index) => (
             <View key={entry.id} style={styles.timelineItem}>
-              <View style={styles.timelineDot} />
+              <View style={[styles.timelineDot, themed.timelineDot]} />
               <View style={styles.timelineContent}>
                 <View style={styles.entryHeader}>
-                  <Text style={styles.timelineTime}>{formatDateTime(entry.createdAt)}</Text>
+                  <Text style={[styles.timelineTime, themed.timelineTime]}>{formatDateTime(entry.createdAt)}</Text>
                   <View style={styles.inlineRow}>
                     <Pressable onPress={() => startEditEntry(entry)}>
                       <Text style={styles.linkText}>编辑</Text>
                     </Pressable>
-                    <Text style={styles.mutedText}> · </Text>
+                    <Text style={[styles.mutedText, themed.mutedText]}> · </Text>
                     <Pressable
                       onPress={() =>
                         Alert.alert('删除这条记录？', '删除后无法恢复。', [
@@ -484,10 +747,21 @@ export default function JourneyScreen() {
                     </Pressable>
                   </View>
                 </View>
-                {entry.text ? <Text style={styles.timelineText}>{entry.text}</Text> : null}
+                {entry.text ? <Text style={[styles.timelineText, themed.timelineText]}>{entry.text}</Text> : null}
+                {entry.tags.length > 0 ? (
+                  <View style={styles.tagRow}>
+                    {entry.tags.map((tag) => (
+                      <View key={tag} style={[styles.tagChip, themed.tagChip]}>
+                        <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
                 {entry.location ? (
-                  <Text style={styles.mutedText}>
-                    📍 {entry.location.latitude.toFixed(5)}, {entry.location.longitude.toFixed(5)}
+                  <Text style={[styles.mutedText, themed.mutedText]}>
+                    📍
+                    {entry.location.placeName ? ` ${entry.location.placeName} · ` : ' '}
+                    {entry.location.latitude.toFixed(5)}, {entry.location.longitude.toFixed(5)}
                   </Text>
                 ) : null}
                 {entry.media.length > 0 ? (
@@ -495,16 +769,32 @@ export default function JourneyScreen() {
                     {entry.media.map((media) => (
                       <Pressable
                         key={media.id}
-                        style={styles.mediaPreviewBox}
+                        style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
                         onPress={() => setPreviewMedia(media)}>
-                        <Image source={{ uri: media.uri }} style={styles.mediaPreview} contentFit="cover" />
-                        <Text style={styles.mediaBadge}>{media.type === 'video' ? '视频' : '照片'}</Text>
+                        {mediaPreviewUri(media) ? (
+                          <Image
+                            source={{ uri: mediaPreviewUri(media) }}
+                            style={styles.mediaPreview}
+                            contentFit="cover"
+                          />
+                        ) : media.type === 'video' ? (
+                          <MediaVideoCover uri={media.uri} />
+                        ) : (
+                          <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                            <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>视频</Text>
+                          </View>
+                        )}
+                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>
+                          {media.type === 'video' ? '视频' : '照片'}
+                        </Text>
                       </Pressable>
                     ))}
                   </ScrollView>
                 ) : null}
               </View>
-              {index < activeJourney.entries.length - 1 ? <View style={styles.timelineLine} /> : null}
+              {index < activeJourney.entries.length - 1 ? (
+                <View style={[styles.timelineLine, themed.timelineLine]} />
+              ) : null}
             </View>
           ))}
         </View>
@@ -516,13 +806,7 @@ export default function JourneyScreen() {
             <Text style={styles.previewCloseText}>关闭</Text>
           </Pressable>
           {previewMedia?.type === 'video' ? (
-            <Video
-              source={{ uri: previewMedia.uri }}
-              style={styles.previewMedia}
-              useNativeControls
-              shouldPlay
-              resizeMode={ResizeMode.CONTAIN}
-            />
+            <PreviewVideo uri={previewMedia.uri} />
           ) : previewMedia ? (
             <Image source={{ uri: previewMedia.uri }} style={styles.previewMedia} contentFit="contain" />
           ) : null}
@@ -547,7 +831,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#0f172a',
-    marginTop: 12,
+  },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   pageSubTitle: {
     color: '#475569',
@@ -694,6 +983,18 @@ const styles = StyleSheet.create({
     width: 110,
     height: 80,
   },
+  mediaPlaceholder: {
+    width: 110,
+    height: 80,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaPlaceholderText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   mediaFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -745,6 +1046,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#0f172a',
     lineHeight: 22,
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tagChip: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#e0f2fe',
+  },
+  tagChipText: {
+    fontSize: 11,
+    color: '#0c4a6e',
+    fontWeight: '600',
   },
   previewOverlay: {
     flex: 1,
