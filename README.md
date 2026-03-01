@@ -1,50 +1,124 @@
-# Welcome to your Expo app 👋
+# GoWherer
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+[中文文档](./README.zh-CN.md)
 
-## Get started
+GoWherer is an Expo React Native app for recording and reviewing journey timelines (travel/commute). It focuses on fast capture, clear recap, and shareable output.
 
-1. Install dependencies
+## Features
 
-   ```bash
-   npm install
-   ```
+- Journey start/end flow
+- Timeline entries with text, location, photos, and videos
+- Camera capture and media library import
+- Entry edit/delete
+- Journey history with type filter
+- Reverse geocoding (lat/lng to place name)
+- Journey/entry tags and recap keyword/tag filters
+- Journey stats card:
+  - Distance
+  - Duration
+  - Average speed
+  - Location point count
+- Route visualization (native map + web fallback)
+- PDF export with route preview image and stats
+- Manual light/dark mode toggle with local persistence
 
-2. Start the app
+## Tech Stack
 
-   ```bash
-   npx expo start
-   ```
+- Expo SDK 55
+- React Native 0.83.2
+- React 19.2.0
+- Expo Router
+- AsyncStorage
+- `expo-image-picker`, `expo-location`, `expo-video`, `expo-print`, `expo-sharing`
+- `react-native-maps`
 
-In the output, you'll find options to open the app in a
+## Getting Started
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Requirements
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- Node.js 18+
+- npm
+- Expo environment for Android/iOS/Web
 
-## Get a fresh project
-
-When you're ready, run:
+### Install
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Run
 
-## Learn more
+```bash
+npm run start
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Or run platform-specific commands:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm run android
+npm run ios
+npm run web
+```
 
-## Join the community
+## Scripts
 
-Join our community of developers creating universal apps.
+- `npm run start` - start Expo dev server
+- `npm run android` - run on Android target
+- `npm run ios` - run on iOS target
+- `npm run web` - run web target
+- `npm run lint` - run lint checks
+- `npm run reset-project` - reset starter layout script
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Project Structure
+
+- `app/(tabs)/index.tsx` - active journey creation/management
+- `app/(tabs)/explore.tsx` - history, recap, and PDF export
+- `lib/journey-storage.ts` - local persistence logic
+- `types/journey.ts` - core data types
+- `components/track-map.tsx` - native route map
+- `components/track-map.web.tsx` - web route map fallback
+- `.github/workflows/eas-build.yml` - EAS CI workflow
+- `app.config.ts` - Expo app config
+
+## EAS Build and CI
+
+This project is configured for EAS builds with GitHub Actions manual dispatch (`platform`: `android`/`ios`/`all`, `profile`: `preview`/`production`).
+
+Required GitHub secrets:
+
+- `EXPO_TOKEN`
+- `EAS_PROJECT_ID`
+
+### Known Android CI issue
+
+If Android keystore is not provisioned yet, non-interactive CI build may fail with:
+
+`Generating a new Keystore is not supported in --non-interactive mode`
+
+Run once locally (interactive) to provision credentials:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest credentials -p android
+```
+
+Then rerun the GitHub Action.
+
+## Roadmap
+
+- P1:
+  - Smart route analysis (stay points / segment summary)
+  - GPS track denoise/smoothing
+  - Timeline entry templates
+  - PDF template and cover customization
+  - Journey share card generation
+- P2:
+  - Cloud sync
+  - Cross-device restore/browsing
+  - Collaboration mode
+  - Privacy controls for coordinate masking
+  - Geofence reminders and optional background auto logging
+
+## License
+
+MIT License. See [LICENSE](./LICENSE).

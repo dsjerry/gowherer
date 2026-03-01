@@ -1,14 +1,17 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { smoothTrackLocations } from '@/lib/track-utils';
 import { TimelineLocation } from '@/types/journey';
 
 export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
-  if (locations.length === 0) {
+  const displayLocations = smoothTrackLocations(locations);
+
+  if (displayLocations.length === 0) {
     return null;
   }
 
-  const first = locations[0];
-  const last = locations[locations.length - 1];
+  const first = displayLocations[0];
+  const last = displayLocations[displayLocations.length - 1];
 
   return (
     <View style={styles.fallbackBox}>
@@ -19,7 +22,7 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
       <Text style={styles.line}>
         终点：{last.latitude.toFixed(5)}, {last.longitude.toFixed(5)}
       </Text>
-      <Text style={styles.line}>定位点数量：{locations.length}</Text>
+      <Text style={styles.line}>定位点数量：{displayLocations.length}</Text>
     </View>
   );
 }

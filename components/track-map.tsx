@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
+import { smoothTrackLocations } from '@/lib/track-utils';
 import { TimelineLocation } from '@/types/journey';
 
 function getRegion(locations: TimelineLocation[]) {
@@ -38,19 +39,21 @@ function getRegion(locations: TimelineLocation[]) {
 }
 
 export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
-  if (locations.length === 0) {
+  const displayLocations = smoothTrackLocations(locations);
+
+  if (displayLocations.length === 0) {
     return null;
   }
 
   return (
     <View style={styles.mapWrap}>
-      <MapView style={styles.map} initialRegion={getRegion(locations)}>
-        <Polyline coordinates={locations} strokeWidth={4} strokeColor="#0f766e" />
-        {locations.map((location, index) => (
+      <MapView style={styles.map} initialRegion={getRegion(displayLocations)}>
+        <Polyline coordinates={displayLocations} strokeWidth={4} strokeColor="#0f766e" />
+        {displayLocations.map((location, index) => (
           <Marker
             key={`${location.latitude}-${location.longitude}-${index}`}
             coordinate={location}
-            title={index === 0 ? '起点' : index === locations.length - 1 ? '终点' : `节点 ${index + 1}`}
+            title={index === 0 ? '起点' : index === displayLocations.length - 1 ? '终点' : `节点 ${index + 1}`}
           />
         ))}
       </MapView>

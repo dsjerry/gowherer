@@ -20,6 +20,11 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import {
+  getDefaultEntryTemplateConfig,
+  loadEntryTemplateConfig,
+  saveEntryTemplateConfig,
+} from '@/lib/template-storage';
+import {
   Journey,
   JourneyKind,
   MediaType,
@@ -27,6 +32,7 @@ import {
   TimelineLocation,
   TimelineMedia,
 } from '@/types/journey';
+import { EntryTemplate, EntryTemplateConfig } from '@/types/template';
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -207,6 +213,13 @@ export default function JourneyScreen() {
     timelineText: {
       color: isDark ? '#e2e8f0' : '#0f172a',
     },
+    templateChip: {
+      borderColor: isDark ? '#334155' : '#cbd5e1',
+      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+    },
+    templateChipText: {
+      color: isDark ? '#cbd5e1' : '#334155',
+    },
     mediaPreviewBox: {
       borderColor: isDark ? '#334155' : '#e2e8f0',
       backgroundColor: isDark ? '#0f172a' : '#ffffff',
@@ -222,6 +235,23 @@ export default function JourneyScreen() {
     },
     mediaPlaceholderText: {
       color: '#ffffff',
+    },
+    modalCard: {
+      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    modalTitle: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    templateItem: {
+      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    templateItemTitle: {
+      color: isDark ? '#e2e8f0' : '#0f172a',
+    },
+    templateItemText: {
+      color: isDark ? '#cbd5e1' : '#334155',
     },
   };
   const [journeys, setJourneys] = useState<Journey[]>([]);
@@ -240,15 +270,29 @@ export default function JourneyScreen() {
   const [draftLocation, setDraftLocation] = useState<TimelineLocation>();
   const [draftMedia, setDraftMedia] = useState<TimelineMedia[]>([]);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
+  const [templateConfig, setTemplateConfig] = useState<EntryTemplateConfig>(
+    getDefaultEntryTemplateConfig()
+  );
+  const [templateModalVisible, setTemplateModalVisible] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
+    null
+  );
+  const [templateLabelInput, setTemplateLabelInput] = useState('');
+  const [templateTextInput, setTemplateTextInput] = useState('');
+  const [templateTagsInput, setTemplateTagsInput] = useState('');
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const stored = await loadJourneys();
+      const [storedJourneys, storedTemplateConfig] = await Promise.all([
+        loadJourneys(),
+        loadEntryTemplateConfig(),
+      ]);
       if (!active) {
         return;
       }
-      setJourneys(stored);
+      setJourneys(storedJourneys);
+      setTemplateConfig(storedTemplateConfig);
       setLoading(false);
     })();
 
@@ -265,6 +309,11 @@ export default function JourneyScreen() {
   const completedJourneysCount = useMemo(
     () => journeys.filter((item) => item.status === 'completed').length,
     [journeys]
+  );
+  const templateKind = activeJourney?.kind ?? journeyKind;
+  const entryTemplates = useMemo(
+    () => templateConfig[templateKind],
+    [templateConfig, templateKind]
   );
 
   function resetDraft() {
@@ -503,6 +552,93 @@ export default function JourneyScreen() {
     }
   }
 
+  function applyTemplate(template: EntryTemplate) {
+    const currentText = entryText.trim();
+    const nextText = currentText ? `${currentText}\n${template.text}` : template.text;
+    const currentTags = parseTagsInput(entryTagsInput);
+    const mergedTags = Array.from(new Set([...currentTags, ...template.tags]));
+
+    setEntryText(nextText);
+    setEntryTagsInput(mergedTags.join(', '));
+  }
+
+  function resetTemplateEditor() {
+    setEditingTemplateId(null);
+    setTemplateLabelInput('');
+    setTemplateTextInput('');
+    setTemplateTagsInput('');
+  }
+
+  function startEditTemplate(template: EntryTemplate) {
+    setEditingTemplateId(template.id);
+    setTemplateLabelInput(template.label);
+    setTemplateTextInput(template.text);
+    setTemplateTagsInput(template.tags.join(', '));
+  }
+
+  async function updateTemplateConfig(next: EntryTemplateConfig) {
+    setTemplateConfig(next);
+    await saveEntryTemplateConfig(next);
+  }
+
+  async function saveTemplate() {
+    const label = templateLabelInput.trim();
+    const text = templateTextInput.trim();
+    const tags = parseTagsInput(templateTagsInput);
+
+    if (!label || !text) {
+      Alert.alert('模板信息不完整', '请填写模板名称和模板文案。');
+      return;
+    }
+
+    const templates = templateConfig[templateKind];
+    const nextTemplate: EntryTemplate = {
+      id: editingTemplateId ?? createId(`template-${templateKind}`),
+      label,
+      text,
+      tags,
+    };
+    const nextTemplates = editingTemplateId
+      ? templates.map((template) =>
+          template.id === editingTemplateId ? nextTemplate : template
+        )
+      : [...templates, nextTemplate];
+
+    await updateTemplateConfig({
+      ...templateConfig,
+      [templateKind]: nextTemplates,
+    });
+    resetTemplateEditor();
+  }
+
+  async function removeTemplate(templateId: string) {
+    const templates = templateConfig[templateKind];
+    const nextTemplates = templates.filter((template) => template.id !== templateId);
+
+    if (nextTemplates.length === 0) {
+      Alert.alert('至少保留一个模板', '请至少保留一个模板，或使用“恢复默认模板”。');
+      return;
+    }
+
+    await updateTemplateConfig({
+      ...templateConfig,
+      [templateKind]: nextTemplates,
+    });
+
+    if (editingTemplateId === templateId) {
+      resetTemplateEditor();
+    }
+  }
+
+  async function resetTemplatesToDefault() {
+    const defaults = getDefaultEntryTemplateConfig();
+    await updateTemplateConfig({
+      ...templateConfig,
+      [templateKind]: defaults[templateKind],
+    });
+    resetTemplateEditor();
+  }
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -608,6 +744,30 @@ export default function JourneyScreen() {
           <Text style={[styles.editorLabel, themed.editorLabel]}>
             {editingEntryId ? '编辑记录' : '新增记录'}
           </Text>
+          <View style={styles.templateWrap}>
+            <View style={styles.templateHeaderRow}>
+              <Text style={[styles.mutedText, themed.mutedText]}>
+                快捷模板（{kindLabel(templateKind)}）：
+              </Text>
+              <Pressable onPress={() => setTemplateModalVisible(true)}>
+                <Text style={styles.linkText}>管理模板</Text>
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.templateRow}>
+                {entryTemplates.map((template) => (
+                  <Pressable
+                    key={template.id}
+                    style={[styles.templateChip, themed.templateChip]}
+                    onPress={() => applyTemplate(template)}>
+                    <Text style={[styles.templateChipText, themed.templateChipText]}>
+                      {template.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
           <TextInput
             value={entryText}
             onChangeText={setEntryText}
@@ -799,6 +959,134 @@ export default function JourneyScreen() {
           ))}
         </View>
       ) : null}
+
+      <Modal
+        visible={templateModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setTemplateModalVisible(false);
+          resetTemplateEditor();
+        }}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.templateModalCard, themed.modalCard]}>
+            <View style={styles.templateModalHeader}>
+              <Text style={[styles.templateModalTitle, themed.modalTitle]}>
+                模板管理（{kindLabel(templateKind)}）
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setTemplateModalVisible(false);
+                  resetTemplateEditor();
+                }}>
+                <Text style={styles.linkText}>关闭</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.templateModalList}>
+              {entryTemplates.map((template) => (
+                <View
+                  key={template.id}
+                  style={[styles.templateItemCard, themed.templateItem]}>
+                  <Text style={[styles.templateItemTitle, themed.templateItemTitle]}>
+                    {template.label}
+                  </Text>
+                  <Text style={[styles.templateItemText, themed.templateItemText]}>
+                    {template.text}
+                  </Text>
+                  {template.tags.length > 0 ? (
+                    <Text style={[styles.templateItemText, themed.templateItemText]}>
+                      标签：{template.tags.map((tag) => `#${tag}`).join(' ')}
+                    </Text>
+                  ) : null}
+                  <View style={styles.inlineRow}>
+                    <Pressable onPress={() => startEditTemplate(template)}>
+                      <Text style={styles.linkText}>编辑</Text>
+                    </Pressable>
+                    <Text style={[styles.mutedText, themed.mutedText]}> · </Text>
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert('删除该模板？', '删除后不可恢复。', [
+                          { text: '取消', style: 'cancel' },
+                          {
+                            text: '删除',
+                            style: 'destructive',
+                            onPress: () => {
+                              void removeTemplate(template.id);
+                            },
+                          },
+                        ])
+                      }>
+                      <Text style={styles.deleteText}>删除</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.templateEditorCard}>
+              <Text style={[styles.editorLabel, themed.editorLabel]}>
+                {editingTemplateId ? '编辑模板' : '新增模板'}
+              </Text>
+              <TextInput
+                value={templateLabelInput}
+                onChangeText={setTemplateLabelInput}
+                placeholder="模板名称（如：集合点）"
+                placeholderTextColor={themed.inputPlaceholder}
+                style={[styles.input, themed.input]}
+              />
+              <TextInput
+                value={templateTextInput}
+                onChangeText={setTemplateTextInput}
+                placeholder="模板文案"
+                placeholderTextColor={themed.inputPlaceholder}
+                style={[styles.input, styles.textArea, themed.input]}
+                multiline
+              />
+              <TextInput
+                value={templateTagsInput}
+                onChangeText={setTemplateTagsInput}
+                placeholder="模板标签（逗号分隔）"
+                placeholderTextColor={themed.inputPlaceholder}
+                style={[styles.input, themed.input]}
+              />
+              <View style={styles.actionRow}>
+                <Pressable
+                  style={[styles.primaryButton, styles.templateSaveButton]}
+                  onPress={() => void saveTemplate()}>
+                  <Text style={styles.primaryButtonText}>
+                    {editingTemplateId ? '保存修改' : '添加模板'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.cancelButton, themed.cancelButton, styles.templateResetButton]}
+                  onPress={resetTemplateEditor}>
+                  <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
+                    清空编辑
+                  </Text>
+                </Pressable>
+              </View>
+              <Pressable
+                style={[styles.cancelButton, themed.cancelButton]}
+                onPress={() =>
+                  Alert.alert('恢复默认模板？', '仅恢复当前类型的模板。', [
+                    { text: '取消', style: 'cancel' },
+                    {
+                      text: '恢复',
+                      onPress: () => {
+                        void resetTemplatesToDefault();
+                      },
+                    },
+                  ])
+                }>
+                <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
+                  恢复当前类型默认模板
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
         <View style={styles.previewOverlay}>
@@ -1062,6 +1350,92 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#0c4a6e',
     fontWeight: '600',
+  },
+  templateWrap: {
+    gap: 6,
+  },
+  templateHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  templateRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 6,
+  },
+  templateChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  templateChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  templateModalCard: {
+    width: '100%',
+    maxHeight: '86%',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    padding: 12,
+    gap: 10,
+  },
+  templateModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  templateModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  templateModalList: {
+    maxHeight: 220,
+  },
+  templateItemCard: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    gap: 6,
+    marginBottom: 8,
+  },
+  templateItemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  templateItemText: {
+    color: '#334155',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  templateEditorCard: {
+    gap: 8,
+  },
+  templateResetButton: {
+    flex: 1,
+  },
+  templateSaveButton: {
+    flex: 1,
   },
   previewOverlay: {
     flex: 1,

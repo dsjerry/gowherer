@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TrackMap } from '@/components/track-map';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { calculateTrackDistanceKm, smoothTrackLocations } from '@/lib/track-utils';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { Journey, JourneyKind, TimelineLocation, TimelineMedia } from '@/types/journey';
 
@@ -58,29 +59,18 @@ function formatDuration(durationMs: number) {
   return `${hours} 小时 ${minutes} 分钟`;
 }
 
-function haversineKm(a: TimelineLocation, b: TimelineLocation) {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const earthKm = 6371;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLng = toRad(b.longitude - a.longitude);
-  const lat1 = toRad(a.latitude);
-  const lat2 = toRad(b.latitude);
+function getJourneyLocations(journey: Journey, smooth = true) {
+  const locations = journey.entries
+    .filter((entry) => Boolean(entry.location))
+    .map((entry) => entry.location!)
+    .filter(Boolean);
 
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return earthKm * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return smooth ? smoothTrackLocations(locations) : locations;
 }
 
 function computeJourneyStats(journey: Journey) {
-  const locations = journey.entries
-    .filter((entry) => Boolean(entry.location))
-    .map((entry) => entry.location!);
-
-  let distanceKm = 0;
-  for (let i = 1; i < locations.length; i += 1) {
-    distanceKm += haversineKm(locations[i - 1], locations[i]);
-  }
+  const locations = getJourneyLocations(journey);
+  const distanceKm = calculateTrackDistanceKm(locations);
 
   const endMs = journey.endedAt
     ? new Date(journey.endedAt).getTime()
@@ -169,10 +159,7 @@ function buildTrackSvgDataUri(locations: TimelineLocation[]) {
 
 function journeyToHtml(journey: Journey) {
   const stats = computeJourneyStats(journey);
-  const locations = journey.entries
-    .filter((entry) => Boolean(entry.location))
-    .map((entry) => entry.location!)
-    .filter(Boolean);
+  const locations = getJourneyLocations(journey);
   const trackSvgUri = buildTrackSvgDataUri(locations);
 
   const cover = `
@@ -639,10 +626,7 @@ export default function JourneyHistoryScreen() {
         filteredJourneys.map((journey) => {
           const isCollapsed = collapsedJourneyIds.includes(journey.id);
           const stats = computeJourneyStats(journey);
-          const locations = journey.entries
-            .filter((entry) => Boolean(entry.location))
-            .map((entry) => entry.location!)
-            .filter(Boolean);
+          const locations = getJourneyLocations(journey);
 
           return (
             <View key={journey.id} style={[styles.card, themed.card]}>
