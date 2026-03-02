@@ -80,14 +80,47 @@ npm run web
 - `.github/workflows/eas-build.yml`：EAS 构建工作流
 - `app.config.ts`：Expo 应用配置
 
+## 环境变量（`app.config.ts`）
+
+`app.config.ts` 会读取以下变量：
+
+- `EAS_PROJECT_ID`
+  - 作用：注入 `extra.eas.projectId`，用于绑定 EAS 项目。
+  - 是否必填：是（EAS 构建/CI 场景）。
+  - GitHub Actions：建议配置为 `Repository Variable`（`vars.EAS_PROJECT_ID`）。
+- `APP_VERSION`
+  - 作用：在构建时设置应用展示版本（`expo.version`，例如 `1.2.3`）。
+  - 是否必填：否。
+  - 默认值：未配置时为 `1.0.0`。
+  - GitHub Actions：通过手动触发参数 `app_version` 传入。
+- `EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER`
+  - 作用：选择逆地理编码提供方（`amap` 或 `system`）。
+  - 是否必填：否。
+  - 默认值：未配置时默认 `amap`。
+  - GitHub Actions：可选配置为 `Repository Variable`（`vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER`）。
+- `EXPO_PUBLIC_AMAP_WEB_KEY`
+  - 作用：高德逆地理编码 Web API Key（当 provider 为 `amap` 时使用）。
+  - 是否必填：仅当 provider 为 `amap` 时必填。
+  - GitHub Actions：建议配置为 `Repository Secret`（`secrets.EXPO_PUBLIC_AMAP_WEB_KEY`）。
+
+安全说明：`EXPO_PUBLIC_*` 会打包到客户端，不应视为高敏感密钥。请在服务商控制台尽量配置来源限制（如包名/SHA1/域名）。
+
+### 坐标系说明（高德）
+
+当 provider 为 `amap` 时，应用会在调用高德逆地理编码前，将 `expo-location` 返回的 `WGS84` 坐标转换为 `GCJ-02`。该转换仅在中国大陆坐标范围内生效，海外坐标会保持原值。
+
 ## EAS 构建与 CI
 
 项目已配置 GitHub Actions 手动触发 EAS 构建（`platform`: `android`/`ios`/`all`，`profile`: `preview`/`production`）。
 
-需要的 GitHub Secrets：
+版本策略：
+- 应用展示版本（`expo.version`）可通过 workflow 输入 `app_version` 指定（如 `1.3.0`）。
+- 构建号（`android.versionCode` / `ios.buildNumber`）在 `preview` 与 `production` 两个 profile 下都会由 EAS 远程版本管理自动递增。
+
+需要的 GitHub 配置：
 
 - `EXPO_TOKEN`
-- `EAS_PROJECT_ID`
+- Variable：`EAS_PROJECT_ID`
 
 ### Android CI 已知问题
 

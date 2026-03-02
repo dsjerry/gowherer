@@ -5,6 +5,7 @@
   },
   "build": {
     "preview": {
+      "autoIncrement": true,
       "developmentClient": false,
       "distribution": "internal",
       "android": {

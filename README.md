@@ -80,14 +80,47 @@ npm run web
 - `.github/workflows/eas-build.yml` - EAS CI workflow
 - `app.config.ts` - Expo app config
 
+## Environment Variables (`app.config.ts`)
+
+`app.config.ts` reads the following variables:
+
+- `EAS_PROJECT_ID`
+  - Purpose: Injects `extra.eas.projectId` for EAS project binding.
+  - Required: Yes (for EAS builds/CI).
+  - GitHub Actions: configure as `Repository Variable` (`vars.EAS_PROJECT_ID`).
+- `APP_VERSION`
+  - Purpose: Sets app marketing version (`expo.version`) at build time (for example `1.2.3`).
+  - Required: No.
+  - Default: `1.0.0` when not set.
+  - GitHub Actions: set via manual dispatch input `app_version`.
+- `EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER`
+  - Purpose: Selects reverse geocoding provider (`amap` or `system`).
+  - Required: No.
+  - Default: `amap` when not set.
+  - GitHub Actions: optional `Repository Variable` (`vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER`).
+- `EXPO_PUBLIC_AMAP_WEB_KEY`
+  - Purpose: AMap reverse geocoding Web API key (used when provider is `amap`).
+  - Required: Required only when provider is `amap`.
+  - GitHub Actions: configure as `Repository Secret` (`secrets.EXPO_PUBLIC_AMAP_WEB_KEY`).
+
+Security note: `EXPO_PUBLIC_*` values are bundled to the client. Treat them as non-sensitive publishable keys and apply provider-side restrictions (package/SHA1/domain) when supported.
+
+### Coordinate System Note (AMap)
+
+When provider is `amap`, the app converts coordinates from `WGS84` (from `expo-location`) to `GCJ-02` before calling AMap reverse geocoding. This conversion is applied only for mainland China coordinates; outside China, original coordinates are used.
+
 ## EAS Build and CI
 
 This project is configured for EAS builds with GitHub Actions manual dispatch (`platform`: `android`/`ios`/`all`, `profile`: `preview`/`production`).
 
-Required GitHub secrets:
+Version behavior:
+- App version (`expo.version`) can be set by workflow input `app_version` (for example `1.3.0`).
+- Build numbers (`android.versionCode` / `ios.buildNumber`) auto-increment in both `preview` and `production` profiles via EAS remote versioning.
+
+Required GitHub configuration:
 
 - `EXPO_TOKEN`
-- `EAS_PROJECT_ID`
+- Variable: `EAS_PROJECT_ID`
 
 ### Known Android CI issue
 

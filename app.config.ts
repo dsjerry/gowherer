@@ -4,11 +4,12 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
   const projectId =
     process.env.EAS_PROJECT_ID ??
     '82904fd8-1c6c-4a9f-bae4-b3c2446c9ac9';
+  const appVersion = process.env.APP_VERSION ?? '1.0.0';
 
   return {
     name: 'gowherer',
     slug: 'gowherer',
-    version: '1.0.0',
+    version: appVersion,
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'gowherer',
@@ -83,6 +84,11 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
     extra: {
       eas: {
         projectId,
+      },
+      geocoding: {
+        provider:
+          process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ?? 'amap',
+        amapWebKey: process.env.EXPO_PUBLIC_AMAP_WEB_KEY
       },
     },
   };

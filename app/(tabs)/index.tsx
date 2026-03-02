@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
+import { reverseGeocodePlaceName } from '@/lib/reverse-geocode';
 import {
   getDefaultEntryTemplateConfig,
   loadEntryTemplateConfig,
@@ -60,29 +61,6 @@ function parseTagsInput(raw: string) {
         .filter(Boolean)
     )
   );
-}
-
-function formatPlaceName(address?: Location.LocationGeocodedAddress) {
-  if (!address) {
-    return undefined;
-  }
-
-  const parts = [
-    address.name,
-    address.street,
-    address.district,
-    address.city,
-    address.region,
-    address.country,
-  ]
-    .filter((item): item is string => Boolean(item && item.trim()))
-    .map((item) => item.trim());
-
-  if (parts.length === 0) {
-    return undefined;
-  }
-
-  return Array.from(new Set(parts)).join(' · ');
 }
 
 function mediaPreviewUri(media: TimelineMedia) {
@@ -448,11 +426,10 @@ export default function JourneyScreen() {
       });
       let placeName: string | undefined;
       try {
-        const addresses = await Location.reverseGeocodeAsync({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-        placeName = formatPlaceName(addresses[0]);
+        placeName = await reverseGeocodePlaceName(
+          position.coords.latitude,
+          position.coords.longitude
+        );
       } catch {
         placeName = undefined;
       }
@@ -786,12 +763,14 @@ export default function JourneyScreen() {
 
           {draftLocation ? (
             <View style={styles.inlineRow}>
-              <Text style={[styles.locationText, themed.locationText]}>
-                定位：
-                {draftLocation.placeName ? ` ${draftLocation.placeName} · ` : ' '}
-                {draftLocation.latitude.toFixed(5)}, {draftLocation.longitude.toFixed(5)}
-              </Text>
-              <Pressable onPress={() => setDraftLocation(undefined)}>
+              <View style={styles.locationTextContainer}>
+                <Text style={[styles.locationText, themed.locationText]}>
+                  定位：
+                  {draftLocation.placeName ? ` ${draftLocation.placeName} · ` : ' '}
+                  {draftLocation.latitude.toFixed(5)}, {draftLocation.longitude.toFixed(5)}
+                </Text>
+              </View>
+              <Pressable style={styles.inlineAction} onPress={() => setDraftLocation(undefined)}>
                 <Text style={styles.linkText}>移除定位</Text>
               </Pressable>
             </View>
@@ -1239,12 +1218,21 @@ const styles = StyleSheet.create({
   },
   inlineRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
+  },
+  locationTextContainer: {
+    flex: 1,
+    minWidth: 0,
   },
   locationText: {
     color: '#334155',
     fontSize: 13,
+    flexShrink: 1,
+  },
+  inlineAction: {
+    flexShrink: 0,
+    paddingTop: 1,
   },
   linkText: {
     color: '#0369a1',

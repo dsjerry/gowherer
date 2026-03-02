@@ -20,12 +20,19 @@ on:
         options:
           - preview
           - production
+      app_version:
+        description: App version (optional, SemVer like 1.2.3)
+        required: false
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+      EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER: ${{ vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER }}
+      EXPO_PUBLIC_AMAP_WEB_KEY: ${{ secrets.EXPO_PUBLIC_AMAP_WEB_KEY }}
+      APP_VERSION: ${{ inputs.app_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,7 +55,18 @@ jobs:
       - name: Validate required secrets
         run: |
           if [ -z "${EAS_PROJECT_ID}" ]; then
-            echo "Missing required secret: EAS_PROJECT_ID"
+            echo "Missing required variable: EAS_PROJECT_ID"
+            exit 1
+          fi
+
+          if [ -n "${APP_VERSION}" ] && ! echo "${APP_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid app_version: ${APP_VERSION}. Expected SemVer format like 1.2.3"
+            exit 1
+          fi
+
+          provider="${EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER:-amap}"
+          if [ "${provider}" = "amap" ] && [ -z "${EXPO_PUBLIC_AMAP_WEB_KEY}" ]; then
+            echo "Missing required secret for amap provider: EXPO_PUBLIC_AMAP_WEB_KEY"
             exit 1
           fi
 
