@@ -86,8 +86,8 @@ npm run web
 
 - `EAS_PROJECT_ID`
   - 作用：注入 `extra.eas.projectId`，用于绑定 EAS 项目。
-  - 是否必填：是（EAS 构建/CI 场景）。
-  - GitHub Actions：建议配置为 `Repository Variable`（`vars.EAS_PROJECT_ID`）。
+  - 是否必填：可选（workflow 可回退到 `app.config.ts` 默认 projectId）。
+  - GitHub Actions：可使用 `Repository Variable`（`vars.EAS_PROJECT_ID`）或 `Repository Secret`（`secrets.EAS_PROJECT_ID`）。
 - `APP_VERSION`
   - 作用：在构建时设置应用展示版本（`expo.version`，例如 `1.2.3`）。
   - 是否必填：否。
@@ -122,7 +122,7 @@ npm run web
 需要的 GitHub 配置：
 
 - `EXPO_TOKEN`
-- Variable：`EAS_PROJECT_ID`
+- Variable 或 Secret：`EAS_PROJECT_ID`（可选，建议配置）
 
 ### Android CI 已知问题
 

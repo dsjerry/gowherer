@@ -78,7 +78,7 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
   - `profile`: `preview` / `production`
   - `app_version` (optional, `x.y.z` format)
 - CI env and configuration:
-  - `vars.EAS_PROJECT_ID`
+  - `vars.EAS_PROJECT_ID` (or `secrets.EAS_PROJECT_ID`, optional due default fallback)
   - `vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER` (optional)
   - `secrets.EXPO_PUBLIC_AMAP_WEB_KEY` (required when provider=`amap`)
   - `secrets.EXPO_TOKEN`

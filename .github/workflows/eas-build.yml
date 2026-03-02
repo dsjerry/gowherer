@@ -31,7 +31,7 @@ jobs:
     permissions:
       contents: write
     env:
-      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID || secrets.EAS_PROJECT_ID }}
       EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER: ${{ vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER }}
       EXPO_PUBLIC_AMAP_WEB_KEY: ${{ secrets.EXPO_PUBLIC_AMAP_WEB_KEY }}
       APP_VERSION: ${{ inputs.app_version }}
@@ -57,8 +57,7 @@ jobs:
       - name: Validate required secrets
         run: |
           if [ -z "${EAS_PROJECT_ID}" ]; then
-            echo "Missing required variable: EAS_PROJECT_ID"
-            exit 1
+            echo "Warning: EAS_PROJECT_ID is empty. Falling back to app.config.ts default projectId."
           fi
 
           if [ -n "${APP_VERSION}" ] && ! echo "${APP_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then

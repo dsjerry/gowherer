@@ -86,8 +86,8 @@ npm run web
 
 - `EAS_PROJECT_ID`
   - Purpose: Injects `extra.eas.projectId` for EAS project binding.
-  - Required: Yes (for EAS builds/CI).
-  - GitHub Actions: configure as `Repository Variable` (`vars.EAS_PROJECT_ID`).
+  - Required: Optional (workflow can fall back to `app.config.ts` default projectId).
+  - GitHub Actions: use `Repository Variable` (`vars.EAS_PROJECT_ID`) or `Repository Secret` (`secrets.EAS_PROJECT_ID`).
 - `APP_VERSION`
   - Purpose: Sets app marketing version (`expo.version`) at build time (for example `1.2.3`).
   - Required: No.
@@ -122,7 +122,7 @@ Version behavior:
 Required GitHub configuration:
 
 - `EXPO_TOKEN`
-- Variable: `EAS_PROJECT_ID`
+- Variable or Secret: `EAS_PROJECT_ID` (optional, recommended)
 
 ### Known Android CI issue
 
