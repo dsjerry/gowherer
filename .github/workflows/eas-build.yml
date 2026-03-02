@@ -28,6 +28,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
       EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER: ${{ vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER }}
@@ -75,4 +77,58 @@ jobs:
           eas build \
             --platform ${{ inputs.platform }} \
             --profile ${{ inputs.profile }} \
-            --non-interactive
+            --non-interactive \
+            --wait \
+            --json > eas-build.json
+
+      - name: Download build artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          jq -c 'if type=="array" then .[] else . end' eas-build.json | while read -r item; do
+            platform=$(echo "$item" | jq -r '.platform // "unknown"')
+            build_url=$(echo "$item" | jq -r '.artifacts.buildUrl // empty')
+            if [ -z "$build_url" ]; then
+              echo "No artifact URL for platform: $platform"
+              continue
+            fi
+
+            ext="bin"
+            if [ "$platform" = "android" ]; then
+              if echo "$build_url" | grep -qiE '\.aab($|\?)'; then
+                ext="aab"
+              else
+                ext="apk"
+              fi
+            elif [ "$platform" = "ios" ]; then
+              ext="ipa"
+            fi
+
+            file_name="gowherer-${platform}-${{ inputs.profile }}-${{ github.run_number }}.${ext}"
+            echo "Downloading $platform artifact -> dist/$file_name"
+            curl -fL "$build_url" -o "dist/$file_name"
+          done
+
+          count=$(ls -1 dist | wc -l | tr -d ' ')
+          if [ "$count" = "0" ]; then
+            echo "No build artifacts downloaded."
+            exit 1
+          fi
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-build-${{ inputs.profile }}-${{ github.run_number }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="eas-build-${{ inputs.profile }}-${{ github.run_number }}"
+          title="EAS Build #${{ github.run_number }} (${{ inputs.profile }})"
+          notes="Platform: ${{ inputs.platform }}\nProfile: ${{ inputs.profile }}\nApp Version: ${APP_VERSION:-default}"
+          gh release create "$tag" --title "$title" --notes "$notes" || true
+          gh release upload "$tag" dist/* --clobber

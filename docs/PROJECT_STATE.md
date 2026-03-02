@@ -1,6 +1,6 @@
 # GoWherer Project State
 
-Last updated: 2026-02-28
+Last updated: 2026-03-02
 
 ## Project Overview
 
@@ -43,6 +43,8 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
 - Storage and types:
   - `lib/journey-storage.ts`
   - `types/journey.ts`
+- Geocoding:
+  - `lib/reverse-geocode.ts` (provider selection, AMap HTTP reverse geocode, fallback, coord transform)
 - Map components:
   - `components/track-map.tsx`
   - `components/track-map.web.tsx`
@@ -50,6 +52,19 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
   - `.github/workflows/eas-build.yml`
   - `eas.json`
   - `app.config.ts`
+
+## Geocoding Status
+
+- Reverse geocoding is now provider-configurable:
+  - `amap`: AMap Web API (`/v3/geocode/regeo`)
+  - `system`: `Location.reverseGeocodeAsync`
+- Active selector is `extra.geocoding.provider` (from env `EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER`, default `amap`).
+- AMap key source is `EXPO_PUBLIC_AMAP_WEB_KEY`.
+- Fallback behavior:
+  - If AMap fails or returns empty place text, app falls back to `system` reverse geocoding.
+- Coordinate-system handling:
+  - For `amap`, input coords from `expo-location` are converted `WGS84 -> GCJ-02` before request.
+  - Conversion applies only to mainland China bounds; outside China original coords are used.
 
 ## EAS / CI Status
 
@@ -61,9 +76,16 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
 - GitHub Action supports manual dispatch (`workflow_dispatch`) with:
   - `platform`: `android` / `ios` / `all`
   - `profile`: `preview` / `production`
-- Required GitHub repository secrets:
-  - `EXPO_TOKEN`
-  - `EAS_PROJECT_ID` (recommended to match value above)
+  - `app_version` (optional, `x.y.z` format)
+- CI env and configuration:
+  - `vars.EAS_PROJECT_ID`
+  - `vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER` (optional)
+  - `secrets.EXPO_PUBLIC_AMAP_WEB_KEY` (required when provider=`amap`)
+  - `secrets.EXPO_TOKEN`
+- Versioning behavior:
+  - `app.config.ts` reads `APP_VERSION` for `expo.version` (default `1.0.0`).
+  - `eas.json` uses remote app version source.
+  - `autoIncrement: true` enabled for both `preview` and `production` profiles.
 
 ## Current Blocker
 
@@ -91,33 +113,33 @@ After credentials exist on Expo servers, re-run GitHub Action.
 
 ## Local Workspace Snapshot
 
-Current uncommitted changes (2026-02-28):
-- `app.config.ts`
-- `package.json`
-- `package-lock.json`
+Current uncommitted changes (2026-03-02):
 - `LICENSE`
 - `docs/PROJECT_STATE.md` (this file)
 
-## Progress Log (2026-02-28)
+## Progress Log (2026-03-02)
 
-- Migrated media playback from `expo-av` to `expo-video` for SDK 55 compatibility (Expo Go path).
-- Added safe-area top spacing for tab pages.
-- Implemented reverse geocoding and place-name display in journey timeline, recap, and PDF export.
-- Added journey/entry tags with storage normalization for backward compatibility.
-- Added recap search and filtering by keyword + tags.
-- Added journey stats card (distance, duration, average speed, location points) and synced stats into PDF export.
-- Added recap card collapse/expand with animation; default remains expanded.
-- Switched recap action controls to icon buttons (expand/collapse, export PDF, delete).
-- Added manual light/dark theme toggle with local persistence and page-level theme adaptation.
-- Completed theme-following fixes for cards, inputs, tags, stats block, and media cards across `index` and `explore`.
-- Updated tab icon for `旅程` to a map-oriented symbol.
-- Added video cover behavior in media cards using dependency-free preview fallback (current environment-safe approach).
+- Added provider abstraction for reverse geocoding in `lib/reverse-geocode.ts`.
+- Integrated AMap reverse geocoding via Web API and kept system reverse geocoding as fallback.
+- Added Chinese response preference for AMap reverse geocoding (`language=zh_cn`).
+- Added AMap error introspection (`status/info/infocode`) in dev logs.
+- Added WGS84 -> GCJ-02 coordinate conversion before AMap reverse geocoding (mainland China only).
+- Updated create-entry location UI layout to prevent "移除定位" from overflowing on long addresses.
+- Updated CI workflow:
+  - moved `EAS_PROJECT_ID` to GitHub Variables usage
+  - added geocoding env injection
+  - added optional `app_version` input with SemVer validation
+- Updated app config to read `APP_VERSION` and geocoding env values.
+- Enabled EAS auto-increment versioning for both `preview` and `production`.
+- Updated README docs (EN + ZH) with env variables, coordinate-system note, and versioning behavior.
 
 ## Feature Roadmap (Planned)
 
 ### P0 - High ROI / Near-term
 
 - [Done] Place reverse geocoding (lat/lng -> human-readable place name).
+- [Done] Provider-switch reverse geocoding (`amap`/`system`) with fallback.
+- [Done] Mainland China coordinate-system adaptation (`WGS84 -> GCJ-02`) for AMap accuracy.
 - [Done] Tags for journey and entry, with keyword + tag filters.
 - [Done] Basic stats card per journey:
   - Total distance
@@ -151,17 +173,11 @@ Current uncommitted changes (2026-02-28):
   - Hide/mask sensitive coordinates on export/share
 - Geofence reminders and optional background auto logging.
 
-### Delivery Notes
-
-- Recommended first implementation batch:
-  1. cloud sync design draft
-- Reason: low-to-medium implementation cost, immediate UX gain, and minimal risk to current core flow.
-
 ## Suggested Next Actions
 
-1. Provision Android keystore in EAS (one-time).
-2. Re-run GitHub Action Android preview build and verify artifact output.
-3. Optionally add a short CI preflight step (`eas credentials` status check doc/process) to reduce credential-related CI failures.
-4. Start P1 implementation (recommended: timeline templates or route denoise/smoothing).
-5. Prepare cloud sync technical design draft (data model, conflict policy, provider choice).
-6. If release is planned, define production profile signing/release checklist in `docs/`.
+1. Create and use AMap Web Service key in CI (`EXPO_PUBLIC_AMAP_WEB_KEY`) and verify real-device geocoding accuracy.
+2. Provision Android keystore in EAS (one-time).
+3. Re-run GitHub Action Android preview build and verify artifact output.
+4. Define release version policy (`app_version` cadence + profile usage checklist).
+5. Add workflow input `publish_release` (boolean) to make GitHub Release publishing optional per run.
+6. Start P1 implementation (recommended: timeline templates or route denoise/smoothing).

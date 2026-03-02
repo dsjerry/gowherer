@@ -116,6 +116,8 @@ This project is configured for EAS builds with GitHub Actions manual dispatch (`
 Version behavior:
 - App version (`expo.version`) can be set by workflow input `app_version` (for example `1.3.0`).
 - Build numbers (`android.versionCode` / `ios.buildNumber`) auto-increment in both `preview` and `production` profiles via EAS remote versioning.
+- Build outputs are stored in EAS, uploaded as GitHub workflow artifacts, and also published to GitHub Releases.
+- Release tag format: `eas-build-<profile>-<run_number>`.
 
 Required GitHub configuration:
 
