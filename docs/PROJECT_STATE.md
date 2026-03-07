@@ -156,6 +156,22 @@ Post-baseline additions in repository:
 - CI now downloads EAS artifacts and publishes them to GitHub Releases in addition to workflow artifacts (`.github/workflows/eas-build.yml`).
 - CI `EAS_PROJECT_ID` supports variable/secret fallback (`vars.EAS_PROJECT_ID || secrets.EAS_PROJECT_ID`).
 
+Latest updates (2026-03-07):
+- Added Android AMap picker stability hardening based on native crash traces:
+  - replaced modal-style teardown path with persistent overlay container
+  - removed map forced remount (`key` refresh) to avoid repeated engine destroy/create
+  - adjusted picker close flow to reduce AMap surface destroy crash risk
+- Restored map location UX in picker:
+  - re-enabled AMap "my location" layer/button
+  - auto-center camera to current location on picker open when location is available
+  - fallback remains Beijing center when location cannot be obtained
+- Added/updated local runtime logs (`lib/local-log.ts`) and initialization hook in journey screen for easier field diagnosis.
+- Added project documentation set for onboarding and troubleshooting:
+  - `docs/ONBOARDING.md`
+  - `docs/TROUBLESHOOTING.md`
+  - `docs/PROJECT_KNOWLEDGE_BASE.md`
+  - refreshed `docs/KNOWLEDGE_POINTS.md` / `docs/PROJECT_STATE.md` index links
+
 ## Feature Roadmap (Planned)
 
 ### P0 - High ROI / Near-term
@@ -198,11 +214,12 @@ Post-baseline additions in repository:
 
 ## Suggested Next Actions
 
-1. Verify Android and iOS CI builds on current workflow and confirm release assets naming/retention policy.
-2. If not done yet, provision Android keystore in EAS (one-time), then re-run Android preview build.
-3. Define release governance:
+1. Verify Android real-device stability for AMap picker across repeated open/cancel/confirm cycles.
+2. Verify Android and iOS CI builds on current workflow and confirm release assets naming/retention policy.
+3. If not done yet, provision Android keystore in EAS (one-time), then re-run Android preview build.
+4. Define release governance:
    - whether every preview run should publish GitHub Release
    - if yes, clean-up/retention strategy for `eas-build-*` tags/releases
-4. Add workflow input `publish_release` (boolean) to make Release publishing optional per run.
-5. Start P1 smart route analysis (stay-point + segment summary) on top of existing smoothing pipeline.
-6. Plan export enhancement phase (PDF template/cover customization) and finalize minimal MVP scope.
+5. Add workflow input `publish_release` (boolean) to make Release publishing optional per run.
+6. Start P1 smart route analysis (stay-point + segment summary) on top of existing smoothing pipeline.
+7. Plan export enhancement phase (PDF template/cover customization) and finalize minimal MVP scope.
