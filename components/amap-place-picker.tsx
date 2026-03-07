@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { reverseGeocodePlaceName } from '@/lib/reverse-geocode';
+import { getLocalLogFileUri, logLocalError, logLocalInfo } from '@/lib/local-log';
 import { TimelineLocation } from '@/types/journey';
 
 type AMapLatLng = {
@@ -25,7 +26,7 @@ type Props = {
   initialLocation?: TimelineLocation;
   isDark: boolean;
   onClose: () => void;
-  onConfirm: (location: TimelineLocation) => void;
+  onConfirm: (location: TimelineLocation) => void | Promise<void>;
 };
 
 const DEFAULT_CENTER: AMapLatLng = {
@@ -45,6 +46,7 @@ export function AMapPlacePicker({
   const [selected, setSelected] = useState<AMapLatLng | null>(null);
   const [placeName, setPlaceName] = useState('');
   const [resolving, setResolving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [sdkError, setSdkError] = useState<string | null>(null);
 
@@ -84,12 +86,16 @@ export function AMapPlacePicker({
     if (Platform.OS !== 'android') {
       setSdkReady(false);
       setSdkError('当前仅支持 Android 高德 SDK 选点。');
+      void logLocalInfo('AMapPicker', 'platform not supported', {
+        platform: Platform.OS,
+      });
       return;
     }
 
     if (!amapAndroidApiKey) {
       setSdkReady(false);
       setSdkError('未配置高德 Android Key，请检查 app.config.ts。');
+      void logLocalInfo('AMapPicker', 'missing android api key');
       return;
     }
 
@@ -99,10 +105,12 @@ export function AMapPlacePicker({
       if (!initedRef.current) {
         AMapSdk.init(amapAndroidApiKey);
         initedRef.current = true;
+        void logLocalInfo('AMapPicker', 'sdk initialized');
       }
       setSdkError(null);
       setSdkReady(true);
-    } catch {
+    } catch (error) {
+      void logLocalError('AMapPicker', error, { stage: 'init-sdk' });
       setSdkReady(false);
       setSdkError('高德 SDK 尚不可用，请使用 Dev Client / EAS 构建后再试。');
     }
@@ -116,7 +124,11 @@ export function AMapPlacePicker({
         target.longitude
       );
       setPlaceName(maybeName ?? '');
-    } catch {
+    } catch (error) {
+      void logLocalError('AMapPicker', error, {
+        stage: 'reverse-geocode',
+        target,
+      });
       setPlaceName('');
     } finally {
       setResolving(false);
@@ -124,22 +136,48 @@ export function AMapPlacePicker({
   }
 
   async function selectByMapTap(target: AMapLatLng) {
+    if (!Number.isFinite(target.latitude) || !Number.isFinite(target.longitude)) {
+      void logLocalInfo('AMapPicker', 'invalid map tap coordinates', target);
+      return;
+    }
     setSelected(target);
+    void logLocalInfo('AMapPicker', 'map pressed', target);
     await resolvePlaceName(target);
   }
 
-  function confirmSelection() {
+  async function confirmSelection() {
     if (!selected) {
       Alert.alert('请先选点', '请在地图上点击一个地点后再确认。');
       return;
     }
+    if (!Number.isFinite(selected.latitude) || !Number.isFinite(selected.longitude)) {
+      Alert.alert('选点无效', '当前经纬度无效，请重新选点。');
+      void logLocalInfo('AMapPicker', 'invalid selected coordinates', selected);
+      return;
+    }
 
-    onConfirm({
+    setConfirming(true);
+    const location: TimelineLocation = {
       latitude: selected.latitude,
       longitude: selected.longitude,
       placeName: placeName.trim() || undefined,
-    });
-    onClose();
+    };
+
+    try {
+      void logLocalInfo('AMapPicker', 'confirm selection', location);
+      await Promise.resolve(onConfirm(location));
+    } catch (error) {
+      void logLocalError('AMapPicker', error, {
+        stage: 'confirm',
+        location,
+      });
+      Alert.alert(
+        '保存选点失败',
+        `请重试，错误已写入本地日志：${getLocalLogFileUri()}`
+      );
+    } finally {
+      setConfirming(false);
+    }
   }
 
   function renderAndroidMap() {
@@ -167,6 +205,7 @@ export function AMapPlacePicker({
         }: {
           nativeEvent: { name: string; position: AMapLatLng };
         }) => {
+          void logLocalInfo('AMapPicker', 'poi pressed', nativeEvent);
           setSelected(nativeEvent.position);
           setPlaceName(nativeEvent.name ?? '');
         }}
@@ -231,8 +270,13 @@ export function AMapPlacePicker({
             <Pressable style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.cancelText}>取消</Text>
             </Pressable>
-            <Pressable style={styles.confirmButton} onPress={confirmSelection}>
-              <Text style={styles.confirmText}>确认选点</Text>
+            <Pressable
+              style={styles.confirmButton}
+              onPress={() => void confirmSelection()}
+              disabled={confirming}>
+              <Text style={styles.confirmText}>
+                {confirming ? '确认中...' : '确认选点'}
+              </Text>
             </Pressable>
           </View>
         </View>

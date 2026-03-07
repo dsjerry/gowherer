@@ -21,7 +21,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { AMapPlacePicker } from '@/components/amap-place-picker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
-import { reverseGeocodePlaceName } from '@/lib/reverse-geocode';
+import { getLocalLogFileUri, logLocalError, logLocalInfo } from '@/lib/local-log';
 import {
   getDefaultEntryTemplateConfig,
   loadEntryTemplateConfig,
@@ -238,7 +238,7 @@ export default function JourneyScreen() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [savingEntry, setSavingEntry] = useState(false);
-  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [openingLocationPicker, setOpeningLocationPicker] = useState(false);
   const [pickingMedia, setPickingMedia] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
@@ -415,50 +415,31 @@ export default function JourneyScreen() {
     }
   }
 
-  async function attachCurrentLocation() {
-    setLoadingLocation(true);
+  async function openAmapPlacePicker() {
+    setOpeningLocationPicker(true);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('无法获取定位', '请在系统设置中开启定位权限。');
+      if (Platform.OS !== 'android') {
+        Alert.alert('暂不支持', '地图选点目前仅支持 Android。');
         return;
       }
 
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      let placeName: string | undefined;
-      try {
-        placeName = await reverseGeocodePlaceName(
-          position.coords.latitude,
-          position.coords.longitude
-        );
-      } catch {
-        placeName = undefined;
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('无法获取定位权限', '请在系统设置中开启定位权限后再使用地图选点。');
+        return;
       }
-      setDraftLocation({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        placeName,
-      });
+
+      void logLocalInfo('JourneyScreen', 'open map picker');
+      setAmapPickerVisible(true);
+    } catch (error) {
+      void logLocalError('JourneyScreen', error, { stage: 'open-map-picker' });
+      Alert.alert(
+        '打开地图失败',
+        `请重试，错误日志：${getLocalLogFileUri()}`
+      );
     } finally {
-      setLoadingLocation(false);
+      setOpeningLocationPicker(false);
     }
-  }
-
-  async function openAmapPlacePicker() {
-    if (Platform.OS !== 'android') {
-      Alert.alert('暂不支持', '高德 SDK 选点目前仅支持 Android。');
-      return;
-    }
-
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('无法获取定位权限', '请在系统设置中开启定位权限后再使用地图选点。');
-      return;
-    }
-    setAmapPickerVisible(true);
   }
 
   function startEditEntry(entry: TimelineEntry) {
@@ -825,17 +806,10 @@ export default function JourneyScreen() {
           <View style={styles.actionRow}>
             <Pressable
               style={[styles.secondaryButton, themed.secondaryButton]}
-              onPress={attachCurrentLocation}
-              disabled={loadingLocation}>
+              onPress={openAmapPlacePicker}
+              disabled={openingLocationPicker}>
               <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                {loadingLocation ? '定位中...' : '添加定位'}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.secondaryButton, themed.secondaryButton]}
-              onPress={openAmapPlacePicker}>
-              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                高德选点
+                {openingLocationPicker ? '打开地图中...' : '添加定位'}
               </Text>
             </Pressable>
           </View>
@@ -1098,7 +1072,22 @@ export default function JourneyScreen() {
         initialLocation={draftLocation}
         isDark={isDark}
         onClose={() => setAmapPickerVisible(false)}
-        onConfirm={(location) => setDraftLocation(location)}
+        onConfirm={async (location) => {
+          try {
+            setDraftLocation(location);
+            void logLocalInfo('JourneyScreen', 'location selected', location);
+          } catch (error) {
+            void logLocalError('JourneyScreen', error, {
+              stage: 'set-draft-location',
+              location,
+            });
+            throw error;
+          } finally {
+            setTimeout(() => {
+              setAmapPickerVisible(false);
+            }, 120);
+          }
+        }}
       />
 
       <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
