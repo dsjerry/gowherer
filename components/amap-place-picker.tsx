@@ -1,9 +1,9 @@
 import Constants from 'expo-constants';
+import * as Location from 'expo-location';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -42,8 +42,9 @@ export function AMapPlacePicker({
   onConfirm,
 }: Props) {
   const initedRef = useRef(false);
-  const [mapRenderKey, setMapRenderKey] = useState('init');
+  const mapRef = useRef<{ moveCamera?: (cameraPosition: { target: AMapLatLng; zoom?: number }, duration?: number) => void } | null>(null);
   const [selected, setSelected] = useState<AMapLatLng | null>(null);
+  const [cameraTarget, setCameraTarget] = useState<AMapLatLng>(DEFAULT_CENTER);
   const [placeName, setPlaceName] = useState('');
   const [resolving, setResolving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -72,7 +73,14 @@ export function AMapPlacePicker({
       return;
     }
 
-    setMapRenderKey(String(Date.now()));
+    setCameraTarget(
+      initialLocation
+        ? {
+            latitude: initialLocation.latitude,
+            longitude: initialLocation.longitude,
+          }
+        : DEFAULT_CENTER
+    );
     setSelected(
       initialLocation
         ? {
@@ -115,6 +123,43 @@ export function AMapPlacePicker({
       setSdkError('高德 SDK 尚不可用，请使用 Dev Client / EAS 构建后再试。');
     }
   }, [amapAndroidApiKey, initialLocation, visible]);
+
+  useEffect(() => {
+    if (!visible || Platform.OS !== 'android') {
+      return;
+    }
+
+    let active = true;
+    (async () => {
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (!active || !permission.granted) {
+          return;
+        }
+
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (!active) {
+          return;
+        }
+
+        const target = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        setCameraTarget(target);
+        mapRef.current?.moveCamera?.({ target, zoom: 16 }, 300);
+        void logLocalInfo('AMapPicker', 'camera moved to current location', target);
+      } catch (error) {
+        void logLocalError('AMapPicker', error, { stage: 'load-current-position' });
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [visible]);
 
   async function resolvePlaceName(target: AMapLatLng) {
     setResolving(true);
@@ -166,6 +211,7 @@ export function AMapPlacePicker({
     try {
       void logLocalInfo('AMapPicker', 'confirm selection', location);
       await Promise.resolve(onConfirm(location));
+      onClose();
     } catch (error) {
       void logLocalError('AMapPicker', error, {
         stage: 'confirm',
@@ -193,7 +239,9 @@ export function AMapPlacePicker({
     const { MapView, Marker } = require('react-native-amap3d');
     return (
       <MapView
-        key={mapRenderKey}
+        ref={(ref: typeof mapRef.current) => {
+          mapRef.current = ref;
+        }}
         style={styles.map}
         myLocationEnabled
         myLocationButtonEnabled
@@ -210,7 +258,7 @@ export function AMapPlacePicker({
           setPlaceName(nativeEvent.name ?? '');
         }}
         initialCameraPosition={{
-          target: center,
+          target: cameraTarget ?? center,
           zoom: 16,
         }}>
         {selected ? <Marker position={selected} /> : null}
@@ -219,7 +267,9 @@ export function AMapPlacePicker({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <View
+      pointerEvents={visible ? 'auto' : 'none'}
+      style={[styles.host, visible ? styles.hostVisible : styles.hostHidden]}>
       <View style={styles.mask}>
         <View
           style={[
@@ -281,11 +331,25 @@ export function AMapPlacePicker({
           </View>
         </View>
       </View>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  host: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 999,
+  },
+  hostVisible: {
+    opacity: 1,
+  },
+  hostHidden: {
+    opacity: 0,
+  },
   mask: {
     flex: 1,
     justifyContent: 'center',

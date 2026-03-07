@@ -21,7 +21,12 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { AMapPlacePicker } from '@/components/amap-place-picker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
-import { getLocalLogFileUri, logLocalError, logLocalInfo } from '@/lib/local-log';
+import {
+  getLocalLogFileUri,
+  initLocalLogFile,
+  logLocalError,
+  logLocalInfo,
+} from '@/lib/local-log';
 import {
   getDefaultEntryTemplateConfig,
   loadEntryTemplateConfig,
@@ -265,6 +270,7 @@ export default function JourneyScreen() {
   useEffect(() => {
     let active = true;
     (async () => {
+      await initLocalLogFile();
       const [storedJourneys, storedTemplateConfig] = await Promise.all([
         loadJourneys(),
         loadEntryTemplateConfig(),
@@ -623,11 +629,12 @@ export default function JourneyScreen() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.container,
-        { paddingTop: insets.top + 12 },
-      ]}>
+    <View style={styles.pageWrap}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: insets.top + 12 },
+        ]}>
       <View style={styles.pageHeader}>
         <Text style={[styles.pageTitle, themed.pageTitle]}>GoWherer 旅程时间线</Text>
         <ThemeToggle />
@@ -1067,6 +1074,20 @@ export default function JourneyScreen() {
         </View>
           </Modal>
 
+      <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
+        <View style={styles.previewOverlay}>
+          <Pressable style={styles.previewClose} onPress={() => setPreviewMedia(null)}>
+            <Text style={styles.previewCloseText}>关闭</Text>
+          </Pressable>
+          {previewMedia?.type === 'video' ? (
+            <PreviewVideo uri={previewMedia.uri} />
+          ) : previewMedia ? (
+            <Image source={{ uri: previewMedia.uri }} style={styles.previewMedia} contentFit="contain" />
+          ) : null}
+        </View>
+      </Modal>
+      </ScrollView>
+
       <AMapPlacePicker
         visible={amapPickerVisible}
         initialLocation={draftLocation}
@@ -1082,31 +1103,17 @@ export default function JourneyScreen() {
               location,
             });
             throw error;
-          } finally {
-            setTimeout(() => {
-              setAmapPickerVisible(false);
-            }, 120);
           }
         }}
       />
-
-      <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
-        <View style={styles.previewOverlay}>
-          <Pressable style={styles.previewClose} onPress={() => setPreviewMedia(null)}>
-            <Text style={styles.previewCloseText}>关闭</Text>
-          </Pressable>
-          {previewMedia?.type === 'video' ? (
-            <PreviewVideo uri={previewMedia.uri} />
-          ) : previewMedia ? (
-            <Image source={{ uri: previewMedia.uri }} style={styles.previewMedia} contentFit="contain" />
-          ) : null}
-        </View>
-      </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  pageWrap: {
+    flex: 1,
+  },
   container: {
     padding: 16,
     gap: 12,

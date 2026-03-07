@@ -20,10 +20,15 @@ async function appendLine(line: string) {
   }
 
   try {
-    const previous = await FileSystem.readAsStringAsync(LOG_FILE_URI);
-    await FileSystem.writeAsStringAsync(LOG_FILE_URI, `${previous}${line}`);
+    await FileSystem.writeAsStringAsync(LOG_FILE_URI, line, {
+      encoding: FileSystem.EncodingType.UTF8,
+      append: true,
+    });
   } catch {
-    await FileSystem.writeAsStringAsync(LOG_FILE_URI, line);
+    // If append fails on some platforms, fallback to overwrite create.
+    await FileSystem.writeAsStringAsync(LOG_FILE_URI, line, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
   }
 }
 
@@ -51,3 +56,8 @@ export function getLocalLogFileUri() {
   return LOG_FILE_URI;
 }
 
+export async function initLocalLogFile() {
+  await logLocalInfo('Logger', 'initialized', {
+    uri: LOG_FILE_URI,
+  });
+}
