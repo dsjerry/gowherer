@@ -19,6 +19,7 @@ GoWherer 是一个基于 Expo React Native 的旅程时间线应用（出行/通
   - 平均速度
   - 定位点数量
 - 路线可视化（原生地图 + Web 兜底）
+- Android 高德 SDK 地图选点（点击地图/POI 选择地点）
 - PDF 导出（含路线预览图与统计信息）
 - 手动浅色/深色主题切换（本地持久化）
 
@@ -102,8 +103,14 @@ npm run web
   - 作用：高德逆地理编码 Web API Key（当 provider 为 `amap` 时使用）。
   - 是否必填：仅当 provider 为 `amap` 时必填。
   - GitHub Actions：建议配置为 `Repository Secret`（`secrets.EXPO_PUBLIC_AMAP_WEB_KEY`）。
+- `AMAP_ANDROID_API_KEY`
+  - 作用：高德 Android 原生 SDK Key（用于应用内高德地图选点）。
+  - 是否必填：Android 地图选点功能需要。
+  - 默认值：未设置环境变量时回退到 `app.config.ts` 中配置的 key。
 
 安全说明：`EXPO_PUBLIC_*` 会打包到客户端，不应视为高敏感密钥。请在服务商控制台尽量配置来源限制（如包名/SHA1/域名）。
+
+原生模块说明：高德 SDK 选点需要使用自定义 Dev Client 或 EAS 构建，Expo Go 中不可用。
 
 ### 坐标系说明（高德）
 

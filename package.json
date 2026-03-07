@@ -37,6 +37,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.2",
+    "react-native-amap3d": "^3.2.4",
     "react-native-gesture-handler": "~2.30.0",
     "react-native-maps": "1.26.20",
     "react-native-reanimated": "4.2.1",

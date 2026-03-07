@@ -1,6 +1,6 @@
 # GoWherer Project State
 
-Last updated: 2026-03-02
+Last updated: 2026-03-07
 
 ## Project Overview
 
@@ -15,10 +15,12 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
 - Journey/entry tags + keyword/tag filter in recap
 - Basic journey stats card (distance/duration/avg speed/location points)
 - Media recap improvements (photo/video grouping + video thumbnail placeholder)
+- Entry quick templates (per journey kind, editable/resettable)
 - Manual light/dark theme toggle with local persistence
-- Route visualization (native map + web fallback)
+- Route visualization (native map + web fallback) with lightweight track smoothing
+- Android AMap SDK place picker (tap map/POI to select location in timeline draft)
 - PDF export (with generated route preview image)
-- GitHub Actions EAS build workflow
+- GitHub Actions EAS build workflow + artifact/release publishing
 
 ## Current Tech Stack
 
@@ -34,6 +36,7 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
   - `expo-print`
   - `expo-sharing`
 - Map: `react-native-maps`
+- Android map picker: `react-native-amap3d` (native SDK; not available in Expo Go)
 
 ## Key Files
 
@@ -48,6 +51,7 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
 - Map components:
   - `components/track-map.tsx`
   - `components/track-map.web.tsx`
+  - `components/amap-place-picker.tsx` (Android native AMap SDK picker modal)
 - Build config:
   - `.github/workflows/eas-build.yml`
   - `eas.json`
@@ -86,15 +90,18 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
   - `app.config.ts` reads `APP_VERSION` for `expo.version` (default `1.0.0`).
   - `eas.json` uses remote app version source.
   - `autoIncrement: true` enabled for both `preview` and `production` profiles.
+- Build outputs:
+  - EAS artifacts are downloaded in CI and uploaded as GitHub workflow artifacts.
+  - CI also publishes downloaded artifacts to GitHub Release tag: `eas-build-<profile>-<run_number>`.
 
-## Current Blocker
+## Current Risk / Blocker
 
-Android build in GitHub Actions fails in non-interactive mode when Android keystore is not yet provisioned on EAS.
+First Android build in GitHub Actions can fail in non-interactive mode if Android keystore has never been provisioned on EAS.
 
 Error (key line):
 - `Generating a new Keystore is not supported in --non-interactive mode`
 
-## Unblock Steps
+## One-time Unblock Steps (if keystore missing)
 
 Run once locally in interactive mode to generate/upload Android keystore:
 
@@ -113,12 +120,12 @@ After credentials exist on Expo servers, re-run GitHub Action.
 
 ## Local Workspace Snapshot
 
-Current uncommitted changes (2026-03-02):
+Current uncommitted changes (2026-03-07, before this update):
 - `LICENSE`
-- `docs/PROJECT_STATE.md` (this file)
 
-## Progress Log (2026-03-02)
+## Progress Log (Recent)
 
+2026-03-02 baseline:
 - Added provider abstraction for reverse geocoding in `lib/reverse-geocode.ts`.
 - Integrated AMap reverse geocoding via Web API and kept system reverse geocoding as fallback.
 - Added Chinese response preference for AMap reverse geocoding (`language=zh_cn`).
@@ -132,6 +139,15 @@ Current uncommitted changes (2026-03-02):
 - Updated app config to read `APP_VERSION` and geocoding env values.
 - Enabled EAS auto-increment versioning for both `preview` and `production`.
 - Updated README docs (EN + ZH) with env variables, coordinate-system note, and versioning behavior.
+
+Post-baseline additions in repository:
+- Added entry template system (`types/template.ts`, `lib/template-storage.ts`) and template management UI in `app/(tabs)/index.tsx`.
+- Added lightweight track smoothing utility (`lib/track-utils.ts`) and wired it into native/web map display and explore metrics flow.
+- Added Android AMap SDK place picker (`react-native-amap3d`) and integrated pick-and-fill flow into entry editor in `app/(tabs)/index.tsx`.
+- Added Android key config path in `app.config.ts` (`AMAP_ANDROID_API_KEY` -> `extra.amap.androidApiKey`).
+- Clarified runtime constraint in docs: third-party native SDK features require Dev Client / EAS build (Expo Go unsupported).
+- CI now downloads EAS artifacts and publishes them to GitHub Releases in addition to workflow artifacts (`.github/workflows/eas-build.yml`).
+- CI `EAS_PROJECT_ID` supports variable/secret fallback (`vars.EAS_PROJECT_ID || secrets.EAS_PROJECT_ID`).
 
 ## Feature Roadmap (Planned)
 
@@ -149,6 +165,8 @@ Current uncommitted changes (2026-03-02):
 - [Done] Video/Photo media improvements (dependency-free baseline):
   - Better grouped media display in recap
   - Video thumbnail placeholder support (and `thumbnailUri` field for future upgrade)
+- [Done] Timeline templates (departure/arrival/rest/check-in quick entry; editable/resettable per journey kind).
+- [Done] GPS track denoise/smoothing for cleaner route display and derived recap path metrics.
 - Safe area and full-screen adaptation refinements across pages.
 
 ### P1 - Product Depth
@@ -156,8 +174,6 @@ Current uncommitted changes (2026-03-02):
 - Smart route analysis:
   - Stay-point detection (hotspots)
   - Segment summary by movement/rest
-- GPS track denoise/smoothing for cleaner route lines.
-- Timeline templates (departure/arrival/rest/check-in quick entry).
 - Export enhancement:
   - PDF theme templates
   - Cover customization
@@ -175,9 +191,11 @@ Current uncommitted changes (2026-03-02):
 
 ## Suggested Next Actions
 
-1. Create and use AMap Web Service key in CI (`EXPO_PUBLIC_AMAP_WEB_KEY`) and verify real-device geocoding accuracy.
-2. Provision Android keystore in EAS (one-time).
-3. Re-run GitHub Action Android preview build and verify artifact output.
-4. Define release version policy (`app_version` cadence + profile usage checklist).
-5. Add workflow input `publish_release` (boolean) to make GitHub Release publishing optional per run.
-6. Start P1 implementation (recommended: timeline templates or route denoise/smoothing).
+1. Verify Android and iOS CI builds on current workflow and confirm release assets naming/retention policy.
+2. If not done yet, provision Android keystore in EAS (one-time), then re-run Android preview build.
+3. Define release governance:
+   - whether every preview run should publish GitHub Release
+   - if yes, clean-up/retention strategy for `eas-build-*` tags/releases
+4. Add workflow input `publish_release` (boolean) to make Release publishing optional per run.
+5. Start P1 smart route analysis (stay-point + segment summary) on top of existing smoothing pipeline.
+6. Plan export enhancement phase (PDF template/cover customization) and finalize minimal MVP scope.

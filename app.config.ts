@@ -5,6 +5,9 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
     process.env.EAS_PROJECT_ID ??
     '82904fd8-1c6c-4a9f-bae4-b3c2446c9ac9';
   const appVersion = process.env.APP_VERSION ?? '1.0.0';
+  const amapAndroidApiKey =
+    process.env.AMAP_ANDROID_API_KEY ??
+    '386ac0ef811f9c1e83df46f87992b826';
 
   return {
     name: 'gowherer',
@@ -89,6 +92,9 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
         provider:
           process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ?? 'amap',
         amapWebKey: process.env.EXPO_PUBLIC_AMAP_WEB_KEY
+      },
+      amap: {
+        androidApiKey: amapAndroidApiKey,
       },
     },
   };

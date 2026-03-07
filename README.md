@@ -19,6 +19,7 @@ GoWherer is an Expo React Native app for recording and reviewing journey timelin
   - Average speed
   - Location point count
 - Route visualization (native map + web fallback)
+- Android AMap SDK place picker (tap map/POI to select location)
 - PDF export with route preview image and stats
 - Manual light/dark mode toggle with local persistence
 
@@ -102,6 +103,12 @@ npm run web
   - Purpose: AMap reverse geocoding Web API key (used when provider is `amap`).
   - Required: Required only when provider is `amap`.
   - GitHub Actions: configure as `Repository Secret` (`secrets.EXPO_PUBLIC_AMAP_WEB_KEY`).
+- `AMAP_ANDROID_API_KEY`
+  - Purpose: AMap Android native SDK key (used by in-app AMap place picker).
+  - Required: Required for Android map place picker.
+  - Default: falls back to key configured in `app.config.ts` when env is not set.
+
+Native module note: AMap SDK features require a custom Dev Client or EAS build. They are not available in Expo Go.
 
 Security note: `EXPO_PUBLIC_*` values are bundled to the client. Treat them as non-sensitive publishable keys and apply provider-side restrictions (package/SHA1/domain) when supported.
 

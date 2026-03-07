@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { AMapPlacePicker } from '@/components/amap-place-picker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { reverseGeocodePlaceName } from '@/lib/reverse-geocode';
@@ -252,6 +254,7 @@ export default function JourneyScreen() {
     getDefaultEntryTemplateConfig()
   );
   const [templateModalVisible, setTemplateModalVisible] = useState(false);
+  const [amapPickerVisible, setAmapPickerVisible] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
     null
   );
@@ -442,6 +445,20 @@ export default function JourneyScreen() {
     } finally {
       setLoadingLocation(false);
     }
+  }
+
+  async function openAmapPlacePicker() {
+    if (Platform.OS !== 'android') {
+      Alert.alert('暂不支持', '高德 SDK 选点目前仅支持 Android。');
+      return;
+    }
+
+    const permission = await Location.requestForegroundPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('无法获取定位权限', '请在系统设置中开启定位权限后再使用地图选点。');
+      return;
+    }
+    setAmapPickerVisible(true);
   }
 
   function startEditEntry(entry: TimelineEntry) {
@@ -816,6 +833,15 @@ export default function JourneyScreen() {
             </Pressable>
             <Pressable
               style={[styles.secondaryButton, themed.secondaryButton]}
+              onPress={openAmapPlacePicker}>
+              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                高德选点
+              </Text>
+            </Pressable>
+          </View>
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[styles.secondaryButton, themed.secondaryButton]}
               onPress={pickMediaFromLibrary}
               disabled={pickingMedia}>
               <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
@@ -1065,7 +1091,15 @@ export default function JourneyScreen() {
             </View>
           </View>
         </View>
-      </Modal>
+          </Modal>
+
+      <AMapPlacePicker
+        visible={amapPickerVisible}
+        initialLocation={draftLocation}
+        isDark={isDark}
+        onClose={() => setAmapPickerVisible(false)}
+        onConfirm={(location) => setDraftLocation(location)}
+      />
 
       <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
         <View style={styles.previewOverlay}>
