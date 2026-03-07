@@ -109,26 +109,45 @@ jobs:
           mkdir -p dist
           jq -c 'if type=="array" then .[] else . end' eas-build.json | while read -r item; do
             platform=$(echo "$item" | jq -r '.platform // "unknown"')
-            build_url=$(echo "$item" | jq -r '.artifacts.buildUrl // empty')
+            build_url=$(echo "$item" | jq -r '.artifacts.applicationArchiveUrl // .artifacts.buildUrl // empty')
             if [ -z "$build_url" ]; then
               echo "No artifact URL for platform: $platform"
               continue
             fi
 
-            ext="bin"
+            ext=""
             if [ "$platform" = "android" ]; then
-              if echo "$build_url" | grep -qiE '\.aab($|\?)'; then
+              android_build_type=$(jq -r --arg profile "${{ inputs.profile }}" '.build[$profile].android.buildType // empty' eas.json 2>/dev/null || true)
+              if [ "$android_build_type" = "app-bundle" ]; then
                 ext="aab"
               else
                 ext="apk"
               fi
             elif [ "$platform" = "ios" ]; then
               ext="ipa"
+            else
+              ext="bin"
+            fi
+
+            header_file=$(mktemp)
+            tmp_file=$(mktemp)
+            echo "Downloading $platform artifact from $build_url"
+            curl -fL -D "$header_file" "$build_url" -o "$tmp_file"
+
+            disposition_name=$(grep -i '^content-disposition:' "$header_file" | sed -E 's/.*filename\*=UTF-8\x27\x27([^;]+).*/\1/I; t; s/.*filename="?([^\";]+)"?.*/\1/I' | tail -n1 || true)
+            disposition_name=$(printf "%s" "$disposition_name" | sed 's/%20/ /g' || true)
+
+            if [ -n "$disposition_name" ]; then
+              detected_ext="${disposition_name##*.}"
+              if echo "$detected_ext" | grep -qiE '^(apk|aab|ipa)$'; then
+                ext=$(echo "$detected_ext" | tr '[:upper:]' '[:lower:]')
+              fi
             fi
 
             file_name="gowherer-${platform}-${{ inputs.profile }}-${{ github.run_number }}.${ext}"
-            echo "Downloading $platform artifact -> dist/$file_name"
-            curl -fL "$build_url" -o "dist/$file_name"
+            mv "$tmp_file" "dist/$file_name"
+            rm -f "$header_file"
+            echo "Saved $platform artifact -> dist/$file_name"
           done
 
           count=$(ls -1 dist | wc -l | tr -d ' ')
