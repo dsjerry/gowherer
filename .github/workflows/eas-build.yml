@@ -71,6 +71,29 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare build env
+        run: |
+          set -euo pipefail
+          if [ -n "${APP_VERSION}" ]; then
+            touch .env
+            grep -v '^APP_VERSION=' .env > .env.tmp || true
+            mv .env.tmp .env
+            echo "APP_VERSION=${APP_VERSION}" >> .env
+            echo "Injected APP_VERSION into .env for cloud build: ${APP_VERSION}"
+          else
+            echo "APP_VERSION is empty. Keep default version from app.config.ts"
+          fi
+
+      - name: Verify resolved Expo version
+        run: |
+          set -euo pipefail
+          resolved_version=$(npx expo config --type public --json | jq -r '.version')
+          echo "Resolved expo.version before EAS build: ${resolved_version}"
+          if [ -n "${APP_VERSION}" ] && [ "${resolved_version}" != "${APP_VERSION}" ]; then
+            echo "Resolved version does not match APP_VERSION input."
+            exit 1
+          fi
+
       - name: Trigger EAS build
         run: |
           eas build \

@@ -122,6 +122,7 @@ npm run web
 
 版本策略：
 - 应用展示版本（`expo.version`）可通过 workflow 输入 `app_version` 指定（如 `1.3.0`）。
+- CI 会在触发 `eas build` 前将 `app_version` 写入项目 `.env` 的 `APP_VERSION`，确保云端构建使用相同版本值。
 - 构建号（`android.versionCode` / `ios.buildNumber`）在 `preview` 与 `production` 两个 profile 下都会由 EAS 远程版本管理自动递增。
 - 构建产物会保留在 EAS，同时上传为 GitHub workflow artifact，并发布到 GitHub Release。
 - Release 标签格式：`eas-build-<profile>-<run_number>`。
