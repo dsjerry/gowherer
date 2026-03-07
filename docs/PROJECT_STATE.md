@@ -2,6 +2,13 @@
 
 Last updated: 2026-03-07
 
+## Documentation Index
+
+- `docs/KNOWLEDGE_POINTS.md` (build/runtime troubleshooting and key project decisions)
+- `docs/PROJECT_KNOWLEDGE_BASE.md` (full project knowledge base)
+- `docs/ONBOARDING.md` (beginner setup and first-run guide)
+- `docs/TROUBLESHOOTING.md` (symptom-root cause-fix quick reference)
+
 ## Project Overview
 
 GoWherer is an Expo React Native app for creating and reviewing journey timelines (travel/commute), including:
