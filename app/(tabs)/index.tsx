@@ -1,8 +1,10 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,9 +20,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemeToggle } from '@/components/theme-toggle';
-import { AMapPlacePicker } from '@/components/amap-place-picker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
+import { consumePendingLocation } from '@/lib/pending-location';
 import {
   getLocalLogFileUri,
   initLocalLogFile,
@@ -121,6 +123,7 @@ function MediaVideoCover({ uri }: { uri: string }) {
 }
 
 export default function JourneyScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -259,7 +262,6 @@ export default function JourneyScreen() {
     getDefaultEntryTemplateConfig()
   );
   const [templateModalVisible, setTemplateModalVisible] = useState(false);
-  const [amapPickerVisible, setAmapPickerVisible] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
     null
   );
@@ -287,6 +289,23 @@ export default function JourneyScreen() {
       active = false;
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        const picked = await consumePendingLocation();
+        if (active && picked) {
+          setDraftLocation(picked);
+          void logLocalInfo('JourneyScreen', 'location selected from picker page', picked);
+        }
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const activeJourney = useMemo(
     () => journeys.find((item) => item.status === 'active'),
@@ -435,8 +454,18 @@ export default function JourneyScreen() {
         return;
       }
 
-      void logLocalInfo('JourneyScreen', 'open map picker');
-      setAmapPickerVisible(true);
+      void logLocalInfo('JourneyScreen', 'open map picker page');
+      const initial = draftLocation
+        ? JSON.stringify({
+            latitude: draftLocation.latitude,
+            longitude: draftLocation.longitude,
+            placeName: draftLocation.placeName,
+          })
+        : undefined;
+      router.push({
+        pathname: '/location-picker',
+        params: initial ? { initial } : {},
+      });
     } catch (error) {
       void logLocalError('JourneyScreen', error, { stage: 'open-map-picker' });
       Alert.alert(
@@ -1088,24 +1117,6 @@ export default function JourneyScreen() {
       </Modal>
       </ScrollView>
 
-      <AMapPlacePicker
-        visible={amapPickerVisible}
-        initialLocation={draftLocation}
-        isDark={isDark}
-        onClose={() => setAmapPickerVisible(false)}
-        onConfirm={async (location) => {
-          try {
-            setDraftLocation(location);
-            void logLocalInfo('JourneyScreen', 'location selected', location);
-          } catch (error) {
-            void logLocalError('JourneyScreen', error, {
-              stage: 'set-draft-location',
-              location,
-            });
-            throw error;
-          }
-        }}
-      />
     </View>
   );
 }

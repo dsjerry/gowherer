@@ -1,5 +1,44 @@
 import { TimelineLocation } from '@/types/journey';
 
+function normalizeTrackLocation(location: unknown): TimelineLocation | null {
+  if (!location || typeof location !== 'object') {
+    return null;
+  }
+
+  const raw = location as {
+    latitude?: unknown;
+    longitude?: unknown;
+    accuracy?: unknown;
+    placeName?: unknown;
+  };
+  const latitude = Number(raw.latitude);
+  const longitude = Number(raw.longitude);
+
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return null;
+  }
+
+  return {
+    latitude,
+    longitude,
+    accuracy: Number.isFinite(raw.accuracy) ? Number(raw.accuracy) : undefined,
+    placeName: typeof raw.placeName === 'string' ? raw.placeName : undefined,
+  };
+}
+
+export function sanitizeTrackLocations(locations: Array<TimelineLocation | null | undefined>): TimelineLocation[] {
+  return locations
+    .map((location) => normalizeTrackLocation(location))
+    .filter((location): location is TimelineLocation => Boolean(location));
+}
+
 export function haversineKm(a: TimelineLocation, b: TimelineLocation) {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const earthKm = 6371;
@@ -28,15 +67,16 @@ function mergeLocationMeta(
 }
 
 export function smoothTrackLocations(locations: TimelineLocation[]): TimelineLocation[] {
-  if (locations.length < 3) {
-    return locations;
+  const safeLocations = sanitizeTrackLocations(locations);
+  if (safeLocations.length < 3) {
+    return safeLocations;
   }
 
-  const smoothed: TimelineLocation[] = [locations[0]];
-  for (let i = 1; i < locations.length - 1; i += 1) {
-    const prev = locations[i - 1];
-    const current = locations[i];
-    const next = locations[i + 1];
+  const smoothed: TimelineLocation[] = [safeLocations[0]];
+  for (let i = 1; i < safeLocations.length - 1; i += 1) {
+    const prev = safeLocations[i - 1];
+    const current = safeLocations[i];
+    const next = safeLocations[i + 1];
 
     const smoothLat =
       prev.latitude * 0.25 +
@@ -59,19 +99,20 @@ export function smoothTrackLocations(locations: TimelineLocation[]): TimelineLoc
       )
     );
   }
-  smoothed.push(locations[locations.length - 1]);
+  smoothed.push(safeLocations[safeLocations.length - 1]);
 
   return smoothed;
 }
 
 export function calculateTrackDistanceKm(locations: TimelineLocation[]) {
-  if (locations.length < 2) {
+  const safeLocations = sanitizeTrackLocations(locations);
+  if (safeLocations.length < 2) {
     return 0;
   }
 
   let distanceKm = 0;
-  for (let i = 1; i < locations.length; i += 1) {
-    distanceKm += haversineKm(locations[i - 1], locations[i]);
+  for (let i = 1; i < safeLocations.length; i += 1) {
+    distanceKm += haversineKm(safeLocations[i - 1], safeLocations[i]);
   }
 
   return distanceKm;

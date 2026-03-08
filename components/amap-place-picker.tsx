@@ -42,6 +42,7 @@ export function AMapPlacePicker({
   onConfirm,
 }: Props) {
   const initedRef = useRef(false);
+  const pendingCameraTargetRef = useRef<AMapLatLng | null>(null);
   const mapRef = useRef<{ moveCamera?: (cameraPosition: { target: AMapLatLng; zoom?: number }, duration?: number) => void } | null>(null);
   const [selected, setSelected] = useState<AMapLatLng | null>(null);
   const [cameraTarget, setCameraTarget] = useState<AMapLatLng>(DEFAULT_CENTER);
@@ -67,6 +68,12 @@ export function AMapPlacePicker({
   const amapAndroidApiKey =
     Constants.expoConfig?.extra?.amap?.androidApiKey ??
     process.env.EXPO_PUBLIC_AMAP_ANDROID_API_KEY;
+
+  function moveCameraTo(target: AMapLatLng, duration = 300) {
+    setCameraTarget(target);
+    pendingCameraTargetRef.current = target;
+    mapRef.current?.moveCamera?.({ target, zoom: 16 }, duration);
+  }
 
   useEffect(() => {
     if (!visible) {
@@ -125,6 +132,18 @@ export function AMapPlacePicker({
   }, [amapAndroidApiKey, initialLocation, visible]);
 
   useEffect(() => {
+    if (!visible || Platform.OS !== 'android' || !sdkReady) {
+      return;
+    }
+    if (!pendingCameraTargetRef.current) {
+      return;
+    }
+
+    const target = pendingCameraTargetRef.current;
+    mapRef.current?.moveCamera?.({ target, zoom: 16 }, 300);
+  }, [sdkReady, visible]);
+
+  useEffect(() => {
     if (!visible || Platform.OS !== 'android') {
       return;
     }
@@ -148,8 +167,7 @@ export function AMapPlacePicker({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
-        setCameraTarget(target);
-        mapRef.current?.moveCamera?.({ target, zoom: 16 }, 300);
+        moveCameraTo(target, 300);
         void logLocalInfo('AMapPicker', 'camera moved to current location', target);
       } catch (error) {
         void logLocalError('AMapPicker', error, { stage: 'load-current-position' });
@@ -241,6 +259,9 @@ export function AMapPlacePicker({
       <MapView
         ref={(ref: typeof mapRef.current) => {
           mapRef.current = ref;
+          if (ref && pendingCameraTargetRef.current) {
+            ref.moveCamera?.({ target: pendingCameraTargetRef.current, zoom: 16 }, 300);
+          }
         }}
         style={styles.map}
         myLocationEnabled

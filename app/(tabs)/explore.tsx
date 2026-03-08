@@ -9,13 +9,11 @@ import {
   Alert,
   LayoutAnimation,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  UIManager,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +21,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TrackMap } from '@/components/track-map';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { calculateTrackDistanceKm, smoothTrackLocations } from '@/lib/track-utils';
+import {
+  calculateTrackDistanceKm,
+  sanitizeTrackLocations,
+  smoothTrackLocations,
+} from '@/lib/track-utils';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { Journey, JourneyKind, TimelineLocation, TimelineMedia } from '@/types/journey';
 
@@ -60,10 +62,7 @@ function formatDuration(durationMs: number) {
 }
 
 function getJourneyLocations(journey: Journey, smooth = true) {
-  const locations = journey.entries
-    .filter((entry) => Boolean(entry.location))
-    .map((entry) => entry.location!)
-    .filter(Boolean);
+  const locations = sanitizeTrackLocations(journey.entries.map((entry) => entry.location));
 
   return smooth ? smoothTrackLocations(locations) : locations;
 }
@@ -359,12 +358,6 @@ export default function JourneyHistoryScreen() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
   const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-  }, []);
 
   useFocusEffect(
     useCallback(() => {

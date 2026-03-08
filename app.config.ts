@@ -8,6 +8,9 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
   const amapAndroidApiKey =
     process.env.AMAP_ANDROID_API_KEY ??
     '386ac0ef811f9c1e83df46f87992b826';
+  const amapWebKey =
+    process.env.EXPO_PUBLIC_AMAP_WEB_KEY ??
+    '3797ea1e4c263ae4c4e78b2ae3b73b94';
 
   return {
     name: 'gowherer',
@@ -73,6 +76,9 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
           resizeMode: 'contain',
           backgroundColor: '#ffffff',
           dark: {
+            image: './assets/images/android-icon-foreground.png',
+            imageWidth: 200,
+            resizeMode: 'contain',
             backgroundColor: '#000000',
           },
         },
@@ -91,7 +97,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
       geocoding: {
         provider:
           process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ?? 'amap',
-        amapWebKey: process.env.EXPO_PUBLIC_AMAP_WEB_KEY
+        amapWebKey
       },
       amap: {
         androidApiKey: amapAndroidApiKey,

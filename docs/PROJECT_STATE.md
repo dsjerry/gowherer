@@ -1,6 +1,6 @@
 # GoWherer Project State
 
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 
 ## Documentation Index
 
@@ -171,6 +171,27 @@ Latest updates (2026-03-07):
   - `docs/TROUBLESHOOTING.md`
   - `docs/PROJECT_KNOWLEDGE_BASE.md`
   - refreshed `docs/KNOWLEDGE_POINTS.md` / `docs/PROJECT_STATE.md` index links
+
+Latest updates (2026-03-08):
+- Added dedicated location picker page flow:
+  - `app/location-picker.tsx` (top map + nearby places list)
+  - `app/(tabs)/index.tsx` changed from modal picker to route push/return
+  - `lib/pending-location.ts` for one-shot location handoff back to journey draft
+- Improved location UX and coordinate handling:
+  - location selection now uses explicit `WGS84 <-> GCJ-02` conversion utilities in `lib/reverse-geocode.ts`
+  - added nearby place query (`/v3/place/around`) and visible failure hints
+  - open picker auto-locates with quick last-known fallback then refined current location
+- Android AMap stability hardening for native crashes:
+  - added `android:allowNativeHeapPointerTagging=\"false\"` in `android/app/src/main/AndroidManifest.xml`
+  - hardened picker teardown/timing guards to avoid async updates on inactive map page
+- Recap tab crash fix on Android:
+  - root cause identified as Google Maps API key missing in `react-native-maps` path
+  - `components/track-map.tsx` switched Android rendering to `react-native-amap3d` (iOS/Web unchanged)
+- New Architecture warning cleanup:
+  - removed `UIManager.setLayoutAnimationEnabledExperimental` no-op call from `app/(tabs)/explore.tsx`
+- Track marker visuals:
+  - start/end/mid marker icons added in `assets/images/marker-start.png`, `marker-end.png`, `marker-mid.png`
+  - Android recap now shows all route waypoints with custom icon set
 
 ## Feature Roadmap (Planned)
 

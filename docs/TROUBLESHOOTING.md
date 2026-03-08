@@ -1,6 +1,6 @@
 # GoWherer Troubleshooting
 
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 
 ## 1. Android 构建报错：JAVA_HOME is set to an invalid directory
 
@@ -164,3 +164,51 @@ adb logcat -b crash -v threadtime
 adb shell run-as com.dsjerry.gowherer ls -la files
 adb shell run-as com.dsjerry.gowherer cat files/gowherer-debug.log
 ```
+
+## 10. 切到“回顾”Tab 闪退：`API key not found`
+
+症状：
+
+- `AndroidRuntime: FATAL EXCEPTION: androidmapsapi-*`
+- `java.lang.IllegalStateException: API key not found ... com.google.android.geo.API_KEY`
+
+根因：
+
+- Android 回顾页走了 `react-native-maps`（Google Maps）路径，但未配置 Google Maps API Key。
+
+修复（本项目已落地）：
+
+- Android 轨迹地图改为 `react-native-amap3d` 渲染（iOS/Web 继续用 `react-native-maps`）。
+
+## 11. 非 JS 异常：`expected Array, got a null`
+
+症状：
+
+- `UnexpectedNativeTypeException: expected Array, got a null`
+- 通常发生在切换 Tab 或地图组件重渲染阶段
+
+根因：
+
+- AMap 某些桥接参数在新架构下对 `null` 敏感（例如 marker 自定义 children/update 命令链）。
+
+修复（本项目已落地）：
+
+- 避免在 AMap marker 上使用 children 自定义 View。
+- 轨迹 marker 改为 `icon` 资源方式。
+- 关键数组参数显式传值（如 `Polyline.colors={[]}`）。
+
+## 12. AMap 原生崩溃：`Pointer tag ... was truncated` / `GLThread ... SIGABRT`
+
+症状：
+
+- `F libc: Pointer tag ... was truncated`
+- `Fatal signal 6 (SIGABRT) ... GLThread ...`
+
+根因：
+
+- Android 16/部分 ROM + 地图 native 渲染线程兼容问题（非 JS 层）。
+
+修复（本项目已落地）：
+
+- 在 `AndroidManifest.xml` 的 `<application>` 增加：
+  - `android:allowNativeHeapPointerTagging="false"`

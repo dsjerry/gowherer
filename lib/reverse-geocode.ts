@@ -2,6 +2,15 @@ import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 
 export type ReverseGeocodeProvider = 'system' | 'amap';
+export type CoordinateType = 'wgs84' | 'gcj02';
+export type NearbyPlace = {
+  id: string;
+  name: string;
+  address?: string;
+  distance?: number;
+  latitude: number;
+  longitude: number;
+};
 
 type GeocodingConfig = {
   provider: ReverseGeocodeProvider;
@@ -39,6 +48,21 @@ type AmapRegeocodeResponse = {
       streetNumber?: { street?: string; number?: string };
     };
   };
+};
+
+type AmapNearbyPoi = {
+  id?: string;
+  name?: string;
+  address?: string;
+  distance?: string;
+  location?: string;
+};
+
+type AmapNearbyResponse = {
+  status?: string;
+  info?: string;
+  infocode?: string;
+  pois?: AmapNearbyPoi[];
 };
 
 function formatSystemPlaceName(address?: Location.LocationGeocodedAddress) {
@@ -196,6 +220,26 @@ function wgs84ToGcj02(latitude: number, longitude: number) {
   return { latitude: mgLat, longitude: mgLng };
 }
 
+function gcj02ToWgs84(latitude: number, longitude: number) {
+  if (isOutOfChina(latitude, longitude)) {
+    return { latitude, longitude };
+  }
+
+  const gcj = wgs84ToGcj02(latitude, longitude);
+  return {
+    latitude: latitude * 2 - gcj.latitude,
+    longitude: longitude * 2 - gcj.longitude,
+  };
+}
+
+export function toGcj02(latitude: number, longitude: number) {
+  return wgs84ToGcj02(latitude, longitude);
+}
+
+export function toWgs84(latitude: number, longitude: number) {
+  return gcj02ToWgs84(latitude, longitude);
+}
+
 async function reverseGeocodeWithSystem(latitude: number, longitude: number) {
   const addresses = await Location.reverseGeocodeAsync({
     latitude,
@@ -207,9 +251,13 @@ async function reverseGeocodeWithSystem(latitude: number, longitude: number) {
 async function reverseGeocodeWithAmap(
   latitude: number,
   longitude: number,
-  amapWebKey: string
+  amapWebKey: string,
+  coordinateType: CoordinateType
 ) {
-  const gcj02 = wgs84ToGcj02(latitude, longitude);
+  const gcj02 =
+    coordinateType === 'gcj02'
+      ? { latitude, longitude }
+      : wgs84ToGcj02(latitude, longitude);
   devLog('amap input coords transformed', {
     from: { latitude, longitude },
     to: gcj02,
@@ -238,9 +286,11 @@ async function reverseGeocodeWithAmap(
 
 export async function reverseGeocodePlaceName(
   latitude: number,
-  longitude: number
+  longitude: number,
+  options?: { coordinateType?: CoordinateType }
 ) {
   const config = getGeocodingConfig();
+  const coordinateType = options?.coordinateType ?? 'wgs84';
   devLog('provider selected', config.provider);
 
   if (config.provider === 'amap' && config.amapWebKey) {
@@ -248,7 +298,8 @@ export async function reverseGeocodePlaceName(
       const placeName = await reverseGeocodeWithAmap(
         latitude,
         longitude,
-        config.amapWebKey
+        config.amapWebKey,
+        coordinateType
       );
       devLog('amap result', placeName);
       if (placeName) {
@@ -266,4 +317,67 @@ export async function reverseGeocodePlaceName(
   const placeName = await reverseGeocodeWithSystem(latitude, longitude);
   devLog('system result', placeName);
   return placeName;
+}
+
+export async function queryNearbyPlaces(
+  latitude: number,
+  longitude: number,
+  radius = 1200,
+  options?: { coordinateType?: CoordinateType }
+): Promise<NearbyPlace[]> {
+  const config = getGeocodingConfig();
+  if (!(config.provider === 'amap' && config.amapWebKey)) {
+    return [];
+  }
+
+  const coordinateType = options?.coordinateType ?? 'wgs84';
+  const gcj02 =
+    coordinateType === 'gcj02'
+      ? { latitude, longitude }
+      : wgs84ToGcj02(latitude, longitude);
+  const location = `${gcj02.longitude},${gcj02.latitude}`;
+  const url = `https://restapi.amap.com/v3/place/around?key=${encodeURIComponent(
+    config.amapWebKey
+  )}&location=${encodeURIComponent(location)}&radius=${Math.max(
+    200,
+    Math.min(5000, Math.floor(radius))
+  )}&sortrule=distance&offset=20&page=1&extensions=base&output=JSON`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`AMap nearby place query failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as AmapNearbyResponse;
+  if (data.status !== '1') {
+    throw new Error(
+      `AMap nearby place invalid status: status=${data.status ?? 'N/A'} info=${
+        data.info ?? 'N/A'
+      } infocode=${data.infocode ?? 'N/A'}`
+    );
+  }
+
+  const places: NearbyPlace[] = [];
+  for (const poi of data.pois ?? []) {
+    if (!poi.id || !poi.name || !poi.location) {
+      continue;
+    }
+    const [lngText, latText] = poi.location.split(',');
+    const poiLat = Number(latText);
+    const poiLng = Number(lngText);
+    if (!Number.isFinite(poiLat) || !Number.isFinite(poiLng)) {
+      continue;
+    }
+    places.push({
+      id: poi.id,
+      name: poi.name.trim(),
+      address: poi.address?.trim() || undefined,
+      distance: Number.isFinite(Number(poi.distance))
+        ? Number(poi.distance)
+        : undefined,
+      latitude: poiLat,
+      longitude: poiLng,
+    });
+  }
+  return places;
 }
