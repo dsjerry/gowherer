@@ -55,6 +55,38 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Sync secrets to EAS project
+        run: |
+          set -euo pipefail
+
+          if [ -n "${AMAP_ANDROID_API_KEY}" ]; then
+            eas secret:create \
+              --scope project \
+              --name AMAP_ANDROID_API_KEY \
+              --value "${AMAP_ANDROID_API_KEY}" \
+              --type string \
+              --non-interactive \
+              --force
+          fi
+
+          if [ -n "${EXPO_PUBLIC_AMAP_WEB_KEY}" ]; then
+            eas secret:create \
+              --scope project \
+              --name EXPO_PUBLIC_AMAP_WEB_KEY \
+              --value "${EXPO_PUBLIC_AMAP_WEB_KEY}" \
+              --type string \
+              --non-interactive \
+              --force
+          fi
+
+          eas secret:create \
+            --scope project \
+            --name EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER \
+            --value "${EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER:-amap}" \
+            --type string \
+            --non-interactive \
+            --force
+
       - name: Validate required secrets
         run: |
           if [ -z "${EAS_PROJECT_ID}" ]; then
