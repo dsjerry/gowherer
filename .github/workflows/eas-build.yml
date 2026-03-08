@@ -59,6 +59,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ -n "${APP_VERSION}" ]; then
+            eas secret:create \
+              --scope project \
+              --name APP_VERSION \
+              --value "${APP_VERSION}" \
+              --type string \
+              --non-interactive \
+              --force
+          fi
+
           if [ -n "${AMAP_ANDROID_API_KEY}" ]; then
             eas secret:create \
               --scope project \
