@@ -64,6 +64,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
             '允许使用定位以记录旅程中的位置节点。',
         },
       ],
+      './plugins/with-android-pointer-tagging',
       [
         'expo-splash-screen',
         {
