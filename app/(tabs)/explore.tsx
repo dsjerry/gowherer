@@ -1,10 +1,11 @@
+
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   LayoutAnimation,
@@ -18,9 +19,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { TrackMap } from '@/components/track-map';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/locale-preference';
 import {
   calculateTrackDistanceKm,
   sanitizeTrackLocations,
@@ -30,6 +31,8 @@ import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { Journey, JourneyKind, TimelineLocation, TimelineMedia } from '@/types/journey';
 
 type JourneyFilter = 'all' | JourneyKind;
+
+type TFunction = (key: string, params?: Record<string, string | number>) => string;
 
 function formatDateTime(iso?: string) {
   if (!iso) {
@@ -43,22 +46,22 @@ function formatDateTime(iso?: string) {
   return `${mm}/${dd} ${hh}:${min}`;
 }
 
-function kindLabel(kind: JourneyKind) {
-  return kind === 'travel' ? '旅行' : '通勤';
+function kindLabel(kind: JourneyKind, t: TFunction) {
+  return kind === 'travel' ? t('journey.kind.travel') : t('journey.kind.commute');
 }
 
-function formatDuration(durationMs: number) {
+function formatDuration(durationMs: number, t: TFunction) {
   const totalMinutes = Math.max(0, Math.floor(durationMs / 60000));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
   if (hours === 0) {
-    return `${minutes} 分钟`;
+    return t('duration.minutes', { minutes });
   }
   if (minutes === 0) {
-    return `${hours} 小时`;
+    return t('duration.hours', { hours });
   }
-  return `${hours} 小时 ${minutes} 分钟`;
+  return t('duration.hoursMinutes', { hours, minutes });
 }
 
 function getJourneyLocations(journey: Journey, smooth = true) {
@@ -116,7 +119,10 @@ function escapeHtml(text: string) {
     .replaceAll("'", '&#39;');
 }
 
-function buildTrackSvgDataUri(locations: TimelineLocation[]) {
+function buildTrackSvgDataUri(
+  locations: TimelineLocation[],
+  labels: { start: string; end: string }
+) {
   if (locations.length < 2) {
     return '';
   }
@@ -149,37 +155,53 @@ function buildTrackSvgDataUri(locations: TimelineLocation[]) {
     <polyline points='${points}' fill='none' stroke='#0f766e' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' />
     <circle cx='${start.split(',')[0]}' cy='${start.split(',')[1]}' r='7' fill='#0284c7' />
     <circle cx='${end.split(',')[0]}' cy='${end.split(',')[1]}' r='7' fill='#dc2626' />
-    <text x='20' y='24' font-size='12' fill='#334155'>起点</text>
-    <text x='64' y='24' font-size='12' fill='#334155'>终点</text>
+    <text x='20' y='24' font-size='12' fill='#334155'>${escapeHtml(labels.start)}</text>
+    <text x='64' y='24' font-size='12' fill='#334155'>${escapeHtml(labels.end)}</text>
   </svg>`;
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-function journeyToHtml(journey: Journey) {
+function journeyToHtml(journey: Journey, t: TFunction) {
   const stats = computeJourneyStats(journey);
   const locations = getJourneyLocations(journey);
-  const trackSvgUri = buildTrackSvgDataUri(locations);
+  const trackSvgUri = buildTrackSvgDataUri(locations, {
+    start: t('review.html.start'),
+    end: t('review.html.end'),
+  });
 
   const cover = `
     <section style="height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:20px;">
       <h1 style="margin:0;font-size:38px;color:#0f172a;">${escapeHtml(journey.title)}</h1>
       <p style="margin:14px 0 0;color:#475569;font-size:16px;">
-        ${kindLabel(journey.kind)} · ${formatDateTime(journey.createdAt)} - ${formatDateTime(journey.endedAt)}
+        ${escapeHtml(kindLabel(journey.kind, t))} · ${formatDateTime(journey.createdAt)} - ${formatDateTime(journey.endedAt)}
       </p>
       ${
         journey.tags.length > 0
-          ? `<p style="margin:8px 0 0;color:#334155;font-size:13px;">标签：${journey.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ')}</p>`
+          ? `<p style="margin:8px 0 0;color:#334155;font-size:13px;">${escapeHtml(
+              t('review.html.tags', { tags: journey.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ') })
+            )}</p>`
           : ''
       }
       <p style="margin:8px 0 0;color:#334155;font-size:13px;">
-        里程：${stats.distanceKm.toFixed(2)} km · 时长：${escapeHtml(formatDuration(stats.durationMs))} · 均速：${stats.avgSpeedKmh.toFixed(2)} km/h · 定位点：${stats.locationPoints}
+        ${escapeHtml(
+          t('review.html.stats', {
+            distance: stats.distanceKm.toFixed(2),
+            duration: formatDuration(stats.durationMs, t),
+            speed: stats.avgSpeedKmh.toFixed(2),
+            points: stats.locationPoints,
+          })
+        )}
       </p>
-      <p style="margin:6px 0 16px;color:#64748b;">共 ${journey.entries.length} 条记录</p>
+      <p style="margin:6px 0 16px;color:#64748b;">${escapeHtml(
+        t('review.html.totalEntries', { count: journey.entries.length })
+      )}</p>
       ${
         trackSvgUri
-          ? `<img src="${trackSvgUri}" alt="轨迹图" style="width:95%;max-width:780px;border:1px solid #e2e8f0;border-radius:12px;" />`
-          : `<div style="padding:14px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#64748b;">无足够定位点生成轨迹图</div>`
+          ? `<img src="${trackSvgUri}" alt="${escapeHtml(t('review.html.trackAlt'))}" style="width:95%;max-width:780px;border:1px solid #e2e8f0;border-radius:12px;" />`
+          : `<div style="padding:14px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#64748b;">${escapeHtml(
+              t('review.html.trackEmpty')
+            )}</div>`
       }
     </section>
     <div style="page-break-after:always;"></div>
@@ -188,17 +210,28 @@ function journeyToHtml(journey: Journey) {
   const items = journey.entries
     .map((entry) => {
       const location = entry.location
-        ? `<div style="color:#475569;">定位：${escapeHtml(formatLocationLabel(entry.location))}</div>`
+        ? `<div style="color:#475569;">${escapeHtml(
+            t('review.html.locationLabel', { location: formatLocationLabel(entry.location) })
+          )}</div>`
         : '';
       const mediaCount = entry.media.length
-        ? `<div style="color:#475569;">媒体：${entry.media.filter((m) => m.type === 'photo').length} 张照片 / ${entry.media.filter((m) => m.type === 'video').length} 段视频</div>`
+        ? `<div style="color:#475569;">${escapeHtml(
+            t('review.html.mediaLabel', {
+              photos: entry.media.filter((m) => m.type === 'photo').length,
+              videos: entry.media.filter((m) => m.type === 'video').length,
+            })
+          )}</div>`
         : '';
       const tags = entry.tags.length
-        ? `<div style="color:#334155;">标签：${entry.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ')}</div>`
+        ? `<div style="color:#334155;">${escapeHtml(
+            t('review.html.tags', { tags: entry.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ') })
+          )}</div>`
         : '';
       return `<div style="margin-bottom:12px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;">
         <div style="font-size:12px;color:#64748b;">${formatDateTime(entry.createdAt)}</div>
-        <div style="margin-top:6px;line-height:1.6;color:#0f172a;">${escapeHtml(entry.text || '(无文案)')}</div>
+        <div style="margin-top:6px;line-height:1.6;color:#0f172a;">${escapeHtml(
+          entry.text || t('review.html.noText')
+        )}</div>
         ${tags}
         ${location}
         ${mediaCount}
@@ -211,8 +244,8 @@ function journeyToHtml(journey: Journey) {
     <head><meta charset="utf-8" /></head>
     <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px;">
       ${cover}
-      <h2 style="margin:0 0 12px;color:#0f172a;">时间线明细</h2>
-      ${items || '<div style="color:#64748b;">无记录</div>'}
+      <h2 style="margin:0 0 12px;color:#0f172a;">${escapeHtml(t('review.html.title'))}</h2>
+      ${items || `<div style="color:#64748b;">${escapeHtml(t('review.html.emptyText'))}</div>`}
     </body>
   </html>`;
 }
@@ -253,6 +286,8 @@ export default function JourneyHistoryScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { t, locale } = useI18n();
+  const tagSortLocale = locale === 'zh' ? 'zh-CN' : 'en';
   const themed = {
     title: {
       color: isDark ? '#e2e8f0' : '#0f172a',
@@ -389,8 +424,8 @@ export default function JourneyHistoryScreen() {
             ...journey.entries.flatMap((entry) => entry.tags),
           ])
         )
-      ).sort((a, b) => a.localeCompare(b, 'zh-CN')),
-    [completedJourneys]
+      ).sort((a, b) => a.localeCompare(b, tagSortLocale)),
+    [completedJourneys, tagSortLocale]
   );
 
   const filteredJourneys = useMemo(() => {
@@ -413,7 +448,7 @@ export default function JourneyHistoryScreen() {
 
         const journeyMatch =
           includesQueryText(journey.title, query) ||
-          includesQueryText(kindLabel(journey.kind), query) ||
+          includesQueryText(kindLabel(journey.kind, t), query) ||
           journey.tags.some((tag) => includesQueryText(tag, query));
 
         if (journeyMatch) {
@@ -447,7 +482,7 @@ export default function JourneyHistoryScreen() {
 
       const journeyMatch =
         includesQueryText(journey.title, query) ||
-        includesQueryText(kindLabel(journey.kind), query) ||
+        includesQueryText(kindLabel(journey.kind, t), query) ||
         journey.tags.some((tag) => includesQueryText(tag, query));
 
       if (journeyMatch) {
@@ -461,7 +496,7 @@ export default function JourneyHistoryScreen() {
           entry.tags.some((tag) => includesQueryText(tag, query))
       );
     });
-  }, [completedJourneys, filter, searchQuery, selectedTag]);
+  }, [completedJourneys, filter, searchQuery, selectedTag, t]);
 
   async function removeJourney(journeyId: string) {
     const next = journeys.filter((item) => item.id !== journeyId);
@@ -481,7 +516,7 @@ export default function JourneyHistoryScreen() {
 
   async function exportJourneyPdf(journey: Journey) {
     try {
-      const html = journeyToHtml(journey);
+      const html = journeyToHtml(journey, t);
       if (Platform.OS === 'web') {
         await Print.printAsync({ html });
         return;
@@ -494,7 +529,7 @@ export default function JourneyHistoryScreen() {
 
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert('导出成功', `PDF 已生成：${file.uri}`);
+        Alert.alert(t('review.exportSuccessTitle'), t('review.exportSuccessBody', { uri: file.uri }));
         return;
       }
 
@@ -503,7 +538,7 @@ export default function JourneyHistoryScreen() {
         dialogTitle: `${journey.title}.pdf`,
       });
     } catch {
-      Alert.alert('导出失败', '请稍后重试。');
+      Alert.alert(t('review.exportFailedTitle'), t('review.exportFailedBody'));
     }
   }
 
@@ -514,16 +549,15 @@ export default function JourneyHistoryScreen() {
         { paddingTop: insets.top + 12 },
       ]}>
       <View style={styles.pageHeader}>
-        <Text style={[styles.title, themed.title]}>旅程回顾</Text>
-        <ThemeToggle />
+        <Text style={[styles.title, themed.title]}>{t('review.title')}</Text>
       </View>
       <Text style={[styles.subTitle, themed.subTitle]}>
-        结束后的旅程会按时间展示在这里，方便复盘每一段路。
+        {t('review.subtitle')}
       </Text>
       <TextInput
         value={searchQuery}
         onChangeText={setSearchQuery}
-        placeholder="搜索标题、记录文案、地点或标签"
+        placeholder={t('review.searchPlaceholder')}
         placeholderTextColor={themed.placeholder}
         style={[styles.searchInput, themed.searchInput]}
       />
@@ -538,7 +572,7 @@ export default function JourneyHistoryScreen() {
               themed.filterButtonText,
               filter === 'all' && styles.filterButtonTextActive,
             ]}>
-            全部
+            {t('review.filterAll')}
           </Text>
         </Pressable>
         <Pressable
@@ -550,7 +584,7 @@ export default function JourneyHistoryScreen() {
               themed.filterButtonText,
               filter === 'travel' && styles.filterButtonTextActive,
             ]}>
-            旅行
+            {t('review.filterTravel')}
           </Text>
         </Pressable>
         <Pressable
@@ -562,7 +596,7 @@ export default function JourneyHistoryScreen() {
               themed.filterButtonText,
               filter === 'commute' && styles.filterButtonTextActive,
             ]}>
-            通勤
+            {t('review.filterCommute')}
           </Text>
         </Pressable>
       </View>
@@ -582,7 +616,7 @@ export default function JourneyHistoryScreen() {
                   themed.tagFilterText,
                   !selectedTag && styles.tagFilterTextActive,
                 ]}>
-                全部标签
+                {t('review.filterAllTags')}
               </Text>
             </Pressable>
             {availableTags.map((tag) => (
@@ -610,9 +644,9 @@ export default function JourneyHistoryScreen() {
 
       {filteredJourneys.length === 0 ? (
         <View style={[styles.card, themed.card]}>
-          <Text style={[styles.emptyTitle, themed.emptyTitle]}>没有匹配的已完成旅程</Text>
+          <Text style={[styles.emptyTitle, themed.emptyTitle]}>{t('review.emptyTitle')}</Text>
           <Text style={[styles.emptyText, themed.emptyText]}>
-            换个筛选条件，或先在「旅程」页完成一次记录。
+            {t('review.emptyBody')}
           </Text>
         </View>
       ) : (
@@ -627,11 +661,11 @@ export default function JourneyHistoryScreen() {
                 <View>
                   <Text style={[styles.journeyTitle, themed.journeyTitle]}>{journey.title}</Text>
                   <Text style={[styles.journeyMeta, themed.journeyMeta]}>
-                    {kindLabel(journey.kind)} · {formatDateTime(journey.createdAt)} -{' '}
+                    {kindLabel(journey.kind, t)} · {formatDateTime(journey.createdAt)} -{' '}
                     {formatDateTime(journey.endedAt)}
                   </Text>
                   <Text style={[styles.journeyMeta, themed.journeyMeta]}>
-                    记录数：{journey.entries.length}
+                    {t('review.journeyCount', { count: journey.entries.length })}
                   </Text>
                   {journey.tags.length > 0 ? (
                     <View style={styles.tagRow}>
@@ -652,167 +686,175 @@ export default function JourneyHistoryScreen() {
                     />
                   </Pressable>
                   {!isCollapsed ? (
-                  <Pressable onPress={() => void exportJourneyPdf(journey)}>
-                    <MaterialIcons
-                      name="picture-as-pdf"
-                      size={20}
-                      color={isDark ? '#7dd3fc' : '#0369a1'}
-                    />
-                  </Pressable>
+                    <Pressable onPress={() => void exportJourneyPdf(journey)}>
+                      <MaterialIcons
+                        name="picture-as-pdf"
+                        size={20}
+                        color={isDark ? '#7dd3fc' : '#0369a1'}
+                      />
+                    </Pressable>
                   ) : null}
                   {!isCollapsed ? (
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert('删除这条旅程？', '将同时删除该旅程下所有记录。', [
-                        { text: '取消', style: 'cancel' },
-                        {
-                          text: '删除',
-                          style: 'destructive',
-                          onPress: () => {
-                            void removeJourney(journey.id);
-                          },
-                        },
-                      ])
-                    }>
-                    <MaterialIcons
-                      name="delete-outline"
-                      size={20}
-                      color={isDark ? '#fca5a5' : '#b91c1c'}
-                    />
-                  </Pressable>
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert(
+                          t('review.deleteJourneyTitle'),
+                          t('review.deleteJourneyBody'),
+                          [
+                            { text: t('common.cancel'), style: 'cancel' },
+                            {
+                              text: t('common.delete'),
+                              style: 'destructive',
+                              onPress: () => {
+                                void removeJourney(journey.id);
+                              },
+                            },
+                          ]
+                        )
+                      }>
+                      <MaterialIcons
+                        name="delete-outline"
+                        size={20}
+                        color={isDark ? '#fca5a5' : '#b91c1c'}
+                      />
+                    </Pressable>
                   ) : null}
                 </View>
               </View>
               {isCollapsed ? null : (
                 <>
-              <View style={[styles.statsWrap, themed.statsWrap]}>
-                <View style={[styles.statItem, themed.statItem]}>
-                  <Text style={[styles.statLabel, themed.statLabel]}>总里程</Text>
-                  <Text style={[styles.statValue, themed.statValue]}>{stats.distanceKm.toFixed(2)} km</Text>
-                </View>
-                <View style={[styles.statItem, themed.statItem]}>
-                  <Text style={[styles.statLabel, themed.statLabel]}>总时长</Text>
-                  <Text style={[styles.statValue, themed.statValue]}>{formatDuration(stats.durationMs)}</Text>
-                </View>
-                <View style={[styles.statItem, themed.statItem]}>
-                  <Text style={[styles.statLabel, themed.statLabel]}>平均速度</Text>
-                  <Text style={[styles.statValue, themed.statValue]}>{stats.avgSpeedKmh.toFixed(2)} km/h</Text>
-                </View>
-                <View style={[styles.statItem, themed.statItem]}>
-                  <Text style={[styles.statLabel, themed.statLabel]}>定位点数</Text>
-                  <Text style={[styles.statValue, themed.statValue]}>{stats.locationPoints}</Text>
-                </View>
-              </View>
+                  <View style={[styles.statsWrap, themed.statsWrap]}>
+                    <View style={[styles.statItem, themed.statItem]}>
+                      <Text style={[styles.statLabel, themed.statLabel]}>{t('review.statsDistance')}</Text>
+                      <Text style={[styles.statValue, themed.statValue]}>{stats.distanceKm.toFixed(2)} km</Text>
+                    </View>
+                    <View style={[styles.statItem, themed.statItem]}>
+                      <Text style={[styles.statLabel, themed.statLabel]}>{t('review.statsDuration')}</Text>
+                      <Text style={[styles.statValue, themed.statValue]}>{formatDuration(stats.durationMs, t)}</Text>
+                    </View>
+                    <View style={[styles.statItem, themed.statItem]}>
+                      <Text style={[styles.statLabel, themed.statLabel]}>{t('review.statsAvgSpeed')}</Text>
+                      <Text style={[styles.statValue, themed.statValue]}>{stats.avgSpeedKmh.toFixed(2)} km/h</Text>
+                    </View>
+                    <View style={[styles.statItem, themed.statItem]}>
+                      <Text style={[styles.statLabel, themed.statLabel]}>{t('review.statsLocationPoints')}</Text>
+                      <Text style={[styles.statValue, themed.statValue]}>{stats.locationPoints}</Text>
+                    </View>
+                  </View>
 
-              {locations.length > 0 ? (
-                <View>
-                  <Text style={[styles.mapTitle, themed.mapTitle]}>轨迹地图</Text>
-                  <TrackMap locations={locations} />
-                </View>
-              ) : (
-                <Text style={[styles.emptyText, themed.emptyText]}>
-                  该旅程没有定位点，暂无法生成轨迹。
-                </Text>
-              )}
+                  {locations.length > 0 ? (
+                    <View>
+                      <Text style={[styles.mapTitle, themed.mapTitle]}>{t('review.trackMapTitle')}</Text>
+                      <TrackMap locations={locations} />
+                    </View>
+                  ) : (
+                    <Text style={[styles.emptyText, themed.emptyText]}>
+                      {t('review.trackMapEmpty')}
+                    </Text>
+                  )}
 
-              <View style={[styles.divider, themed.divider]} />
+                  <View style={[styles.divider, themed.divider]} />
 
-              {journey.entries.length === 0 ? (
-                <Text style={[styles.emptyText, themed.emptyText]}>这条旅程还没有记录内容。</Text>
-              ) : (
-                journey.entries.map((entry) => (
-                  <View key={entry.id} style={[styles.entryItem, themed.entryItem]}>
-                    {(() => {
-                      const photos = entry.media.filter((media) => media.type === 'photo');
-                      const videos = entry.media.filter((media) => media.type === 'video');
+                  {journey.entries.length === 0 ? (
+                    <Text style={[styles.emptyText, themed.emptyText]}>{t('review.emptyEntries')}</Text>
+                  ) : (
+                    journey.entries.map((entry) => (
+                      <View key={entry.id} style={[styles.entryItem, themed.entryItem]}>
+                        {(() => {
+                          const photos = entry.media.filter((media) => media.type === 'photo');
+                          const videos = entry.media.filter((media) => media.type === 'video');
 
-                      return (
-                        <>
-                          <Text style={[styles.entryTime, themed.entryTime]}>
-                            {formatDateTime(entry.createdAt)}
-                          </Text>
-                          {entry.text ? <Text style={[styles.entryText, themed.entryText]}>{entry.text}</Text> : null}
-                          {entry.tags.length > 0 ? (
-                            <View style={styles.tagRow}>
-                                {entry.tags.map((tag) => (
-                                <View key={tag} style={[styles.tagChip, themed.tagChip]}>
-                                  <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
-                                </View>
-                              ))}
-                            </View>
-                          ) : null}
-                          {entry.location ? (
-                            <Text style={[styles.metaLine, themed.metaLine]}>
-                              定位：{formatLocationLabel(entry.location)}
-                            </Text>
-                          ) : null}
-                          {entry.media.length > 0 ? (
+                          return (
                             <>
-                              <Text style={[styles.metaLine, themed.metaLine]}>
-                                媒体：{photos.length} 张照片 / {videos.length} 段视频
+                              <Text style={[styles.entryTime, themed.entryTime]}>
+                                {formatDateTime(entry.createdAt)}
                               </Text>
-                              {photos.length > 0 ? (
-                                <>
-                                  <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>照片</Text>
-                                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    {photos.map((media) => (
-                                      <Pressable
-                                        key={media.id}
-                                        style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
-                                        onPress={() => setPreviewMedia(media)}>
-                                        <Image
-                                          source={{ uri: media.uri }}
-                                          style={styles.mediaPreview}
-                                          contentFit="cover"
-                                        />
-                                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>照片</Text>
-                                      </Pressable>
-                                    ))}
-                                  </ScrollView>
-                                </>
+                              {entry.text ? <Text style={[styles.entryText, themed.entryText]}>{entry.text}</Text> : null}
+                              {entry.tags.length > 0 ? (
+                                <View style={styles.tagRow}>
+                                  {entry.tags.map((tag) => (
+                                    <View key={tag} style={[styles.tagChip, themed.tagChip]}>
+                                      <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
+                                    </View>
+                                  ))}
+                                </View>
                               ) : null}
-                              {videos.length > 0 ? (
+                              {entry.location ? (
+                                <Text style={[styles.metaLine, themed.metaLine]}>
+                                  {t('review.locationLine', { location: formatLocationLabel(entry.location) })}
+                                </Text>
+                              ) : null}
+                              {entry.media.length > 0 ? (
                                 <>
-                                  <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>视频</Text>
-                                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    {videos.map((media) => (
-                                      <Pressable
-                                        key={media.id}
-                                        style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
-                                        onPress={() => setPreviewMedia(media)}>
-                                        {mediaPreviewUri(media) ? (
-                                          <Image
-                                            source={{ uri: mediaPreviewUri(media) }}
-                                            style={styles.mediaPreview}
-                                            contentFit="cover"
-                                          />
-                                        ) : media.type === 'video' ? (
-                                          <MediaVideoCover uri={media.uri} />
-                                        ) : (
-                                          <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
-                                            <Text
-                                              style={[
-                                                styles.mediaPlaceholderText,
-                                                themed.mediaPlaceholderText,
-                                              ]}>
-                                              视频
-                                            </Text>
-                                          </View>
-                                        )}
-                                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>视频</Text>
-                                      </Pressable>
-                                    ))}
-                                  </ScrollView>
+                                  <Text style={[styles.metaLine, themed.metaLine]}>
+                                    {t('review.mediaLine', { photos: photos.length, videos: videos.length })}
+                                  </Text>
+                                  {photos.length > 0 ? (
+                                    <>
+                                      <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>
+                                        {t('review.sectionPhotos')}
+                                      </Text>
+                                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                        {photos.map((media) => (
+                                          <Pressable
+                                            key={media.id}
+                                            style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
+                                            onPress={() => setPreviewMedia(media)}>
+                                            <Image
+                                              source={{ uri: media.uri }}
+                                              style={styles.mediaPreview}
+                                              contentFit="cover"
+                                            />
+                                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('common.photo')}</Text>
+                                          </Pressable>
+                                        ))}
+                                      </ScrollView>
+                                    </>
+                                  ) : null}
+                                  {videos.length > 0 ? (
+                                    <>
+                                      <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>
+                                        {t('review.sectionVideos')}
+                                      </Text>
+                                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                        {videos.map((media) => (
+                                          <Pressable
+                                            key={media.id}
+                                            style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
+                                            onPress={() => setPreviewMedia(media)}>
+                                            {mediaPreviewUri(media) ? (
+                                              <Image
+                                                source={{ uri: mediaPreviewUri(media) }}
+                                                style={styles.mediaPreview}
+                                                contentFit="cover"
+                                              />
+                                            ) : media.type === 'video' ? (
+                                              <MediaVideoCover uri={media.uri} />
+                                            ) : (
+                                              <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                                                <Text
+                                                  style={[
+                                                    styles.mediaPlaceholderText,
+                                                    themed.mediaPlaceholderText,
+                                                  ]}>
+                                                  {t('common.video')}
+                                                </Text>
+                                              </View>
+                                            )}
+                                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('common.video')}</Text>
+                                          </Pressable>
+                                        ))}
+                                      </ScrollView>
+                                    </>
+                                  ) : null}
                                 </>
                               ) : null}
                             </>
-                          ) : null}
-                        </>
-                      );
-                    })()}
-                  </View>
-                ))
-              )}
+                          );
+                        })()}
+                      </View>
+                    ))
+                  )}
                 </>
               )}
             </View>
@@ -823,7 +865,7 @@ export default function JourneyHistoryScreen() {
       <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
         <View style={styles.previewOverlay}>
           <Pressable style={styles.previewClose} onPress={() => setPreviewMedia(null)}>
-            <Text style={styles.previewCloseText}>关闭</Text>
+            <Text style={styles.previewCloseText}>{t('review.previewClose')}</Text>
           </Pressable>
           {previewMedia?.type === 'video' ? (
             <PreviewVideo uri={previewMedia.uri} />
@@ -1097,3 +1139,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

@@ -12,6 +12,8 @@ GoWherer is an Expo React Native app for recording and reviewing journey timelin
 - Entry edit/delete
 - Journey history with type filter
 - Reverse geocoding (lat/lng to place name)
+- Localization with system/English/Chinese preference
+- Settings screen for language and theme
 - Journey/entry tags and recap keyword/tag filters
 - Journey stats card:
   - Distance
@@ -30,6 +32,7 @@ GoWherer is an Expo React Native app for recording and reviewing journey timelin
 - React 19.2.0
 - Expo Router
 - AsyncStorage
+- `expo-localization`
 - `expo-image-picker`, `expo-location`, `expo-video`, `expo-print`, `expo-sharing`
 - `react-native-maps`
 
@@ -74,7 +77,9 @@ npm run web
 
 - `app/(tabs)/index.tsx` - active journey creation/management
 - `app/(tabs)/explore.tsx` - history, recap, and PDF export
+- `app/(tabs)/settings.tsx` - app settings (theme and language)
 - `lib/journey-storage.ts` - local persistence logic
+- `lib/i18n.ts` - i18n core logic
 - `types/journey.ts` - core data types
 - `components/track-map.tsx` - native route map
 - `components/track-map.web.tsx` - web route map fallback
@@ -121,16 +126,21 @@ When provider is `amap`, the app converts coordinates from `WGS84` (from `expo-l
 This project is configured for EAS builds with GitHub Actions manual dispatch (`platform`: `android`/`ios`/`all`, `profile`: `preview`/`production`).
 
 Version behavior:
+
 - App version (`expo.version`) can be set by workflow input `app_version` (for example `1.3.0`).
 - CI writes `app_version` into project `.env` as `APP_VERSION` before triggering `eas build`, ensuring cloud build uses the same version value.
 - Build numbers (`android.versionCode` / `ios.buildNumber`) auto-increment in both `preview` and `production` profiles via EAS remote versioning.
 - Build outputs are stored in EAS, uploaded as GitHub workflow artifacts, and also published to GitHub Releases.
 - Release tag format: `eas-build-<profile>-<run_number>`.
+- Optional release notes: `release_notes` input supports multi-line text and is written into the GitHub Release.
 
 Required GitHub configuration:
 
 - `EXPO_TOKEN`
 - Variable or Secret: `EAS_PROJECT_ID` (optional, recommended)
+- Variable: `EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER` (optional)
+- Secret: `EXPO_PUBLIC_AMAP_WEB_KEY` (required when provider=`amap`)
+- Secret: `AMAP_ANDROID_API_KEY` (required for Android AMap picker)
 
 ### Known Android CI issue
 

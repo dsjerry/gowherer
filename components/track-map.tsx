@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
+import { useI18n } from '@/hooks/locale-preference';
 import { toGcj02 } from '@/lib/reverse-geocode';
 import { sanitizeTrackLocations, smoothTrackLocations } from '@/lib/track-utils';
 import { TimelineLocation } from '@/types/journey';
@@ -67,6 +68,7 @@ function getAmapZoom(locations: TimelineLocation[]) {
 }
 
 export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
+  const { t } = useI18n();
   const displayLocations = smoothTrackLocations(sanitizeTrackLocations(locations));
   const amapAndroidApiKey =
     Constants.expoConfig?.extra?.amap?.androidApiKey ??
@@ -75,8 +77,7 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
   const [amapError, setAmapError] = useState<string | null>(null);
 
   const amapLocations = useMemo(
-    () =>
-      displayLocations.map((item) => toGcj02(item.latitude, item.longitude)),
+    () => displayLocations.map((item) => toGcj02(item.latitude, item.longitude)),
     [displayLocations]
   );
 
@@ -86,7 +87,7 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
     }
     if (!amapAndroidApiKey) {
       setAmapReady(false);
-      setAmapError('未配置高德 Android Key。');
+      setAmapError(t('trackMap.missingKey'));
       return;
     }
 
@@ -98,9 +99,9 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
       setAmapError(null);
     } catch {
       setAmapReady(false);
-      setAmapError('高德地图初始化失败。');
+      setAmapError(t('trackMap.initFailed'));
     }
-  }, [amapAndroidApiKey]);
+  }, [amapAndroidApiKey, t]);
 
   if (displayLocations.length === 0) {
     return null;
@@ -109,9 +110,9 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
   if (Platform.OS === 'android' && !amapReady) {
     return (
       <View style={styles.mapFallbackWrap}>
-        <Text style={styles.mapFallbackTitle}>轨迹地图暂不可用</Text>
+        <Text style={styles.mapFallbackTitle}>{t('trackMap.fallbackTitle')}</Text>
         <Text style={styles.mapFallbackText}>
-          {amapError ?? '高德地图初始化中，请稍后重试。'}
+          {amapError ?? t('trackMap.fallbackBody')}
         </Text>
       </View>
     );
@@ -121,9 +122,6 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { MapView: AMapView, Marker: AMapMarker, Polyline: AMapPolyline } = require('react-native-amap3d');
     const center = amapLocations[Math.floor(amapLocations.length / 2)];
-    const first = amapLocations[0];
-    const last = amapLocations[amapLocations.length - 1];
-
     return (
       <View style={styles.mapWrap}>
         <AMapView
@@ -167,7 +165,13 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
                   ? '#dc2626'
                   : '#0f766e'
             }
-            title={index === 0 ? '起点' : index === displayLocations.length - 1 ? '终点' : `节点 ${index + 1}`}
+            title={
+              index === 0
+                ? t('trackMap.startPoint')
+                : index === displayLocations.length - 1
+                  ? t('trackMap.endPoint')
+                  : t('trackMap.nodePoint', { index: index + 1 })
+            }
           />
         ))}
       </MapView>

@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import { LocalePreferenceProvider } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemePreferenceProvider } from '@/hooks/theme-preference';
 
@@ -12,9 +13,11 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <ThemePreferenceProvider>
-      <RootNavigator />
-    </ThemePreferenceProvider>
+    <LocalePreferenceProvider>
+      <ThemePreferenceProvider>
+        <RootNavigator />
+      </ThemePreferenceProvider>
+    </LocalePreferenceProvider>
   );
 }
 

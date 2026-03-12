@@ -12,8 +12,9 @@ import {
   View,
 } from 'react-native';
 
-import { reverseGeocodePlaceName } from '@/lib/reverse-geocode';
+import { useI18n } from '@/hooks/locale-preference';
 import { getLocalLogFileUri, logLocalError, logLocalInfo } from '@/lib/local-log';
+import { reverseGeocodePlaceName } from '@/lib/reverse-geocode';
 import { TimelineLocation } from '@/types/journey';
 
 type AMapLatLng = {
@@ -41,9 +42,12 @@ export function AMapPlacePicker({
   onClose,
   onConfirm,
 }: Props) {
+  const { t } = useI18n();
   const initedRef = useRef(false);
   const pendingCameraTargetRef = useRef<AMapLatLng | null>(null);
-  const mapRef = useRef<{ moveCamera?: (cameraPosition: { target: AMapLatLng; zoom?: number }, duration?: number) => void } | null>(null);
+  const mapRef = useRef<{
+    moveCamera?: (cameraPosition: { target: AMapLatLng; zoom?: number }, duration?: number) => void;
+  } | null>(null);
   const [selected, setSelected] = useState<AMapLatLng | null>(null);
   const [cameraTarget, setCameraTarget] = useState<AMapLatLng>(DEFAULT_CENTER);
   const [placeName, setPlaceName] = useState('');
@@ -100,7 +104,7 @@ export function AMapPlacePicker({
 
     if (Platform.OS !== 'android') {
       setSdkReady(false);
-      setSdkError('当前仅支持 Android 高德 SDK 选点。');
+      setSdkError(t('amapPicker.androidOnly'));
       void logLocalInfo('AMapPicker', 'platform not supported', {
         platform: Platform.OS,
       });
@@ -109,7 +113,7 @@ export function AMapPlacePicker({
 
     if (!amapAndroidApiKey) {
       setSdkReady(false);
-      setSdkError('未配置高德 Android Key，请检查 app.config.ts。');
+      setSdkError(t('amapPicker.missingKey'));
       void logLocalInfo('AMapPicker', 'missing android api key');
       return;
     }
@@ -127,9 +131,9 @@ export function AMapPlacePicker({
     } catch (error) {
       void logLocalError('AMapPicker', error, { stage: 'init-sdk' });
       setSdkReady(false);
-      setSdkError('高德 SDK 尚不可用，请使用 Dev Client / EAS 构建后再试。');
+      setSdkError(t('amapPicker.sdkUnavailable'));
     }
-  }, [amapAndroidApiKey, initialLocation, visible]);
+  }, [amapAndroidApiKey, initialLocation, t, visible]);
 
   useEffect(() => {
     if (!visible || Platform.OS !== 'android' || !sdkReady) {
@@ -182,10 +186,7 @@ export function AMapPlacePicker({
   async function resolvePlaceName(target: AMapLatLng) {
     setResolving(true);
     try {
-      const maybeName = await reverseGeocodePlaceName(
-        target.latitude,
-        target.longitude
-      );
+      const maybeName = await reverseGeocodePlaceName(target.latitude, target.longitude);
       setPlaceName(maybeName ?? '');
     } catch (error) {
       void logLocalError('AMapPicker', error, {
@@ -210,11 +211,11 @@ export function AMapPlacePicker({
 
   async function confirmSelection() {
     if (!selected) {
-      Alert.alert('请先选点', '请在地图上点击一个地点后再确认。');
+      Alert.alert(t('amapPicker.selectFirstTitle'), t('amapPicker.selectFirstBody'));
       return;
     }
     if (!Number.isFinite(selected.latitude) || !Number.isFinite(selected.longitude)) {
-      Alert.alert('选点无效', '当前经纬度无效，请重新选点。');
+      Alert.alert(t('amapPicker.invalidPointTitle'), t('amapPicker.invalidPointBody'));
       void logLocalInfo('AMapPicker', 'invalid selected coordinates', selected);
       return;
     }
@@ -236,8 +237,8 @@ export function AMapPlacePicker({
         location,
       });
       Alert.alert(
-        '保存选点失败',
-        `请重试，错误已写入本地日志：${getLocalLogFileUri()}`
+        t('amapPicker.saveFailedTitle'),
+        t('amapPicker.saveFailedBody', { uri: getLocalLogFileUri() })
       );
     } finally {
       setConfirming(false);
@@ -248,7 +249,7 @@ export function AMapPlacePicker({
     if (!sdkReady) {
       return (
         <View style={styles.sdkHintWrap}>
-          <Text style={styles.sdkHintText}>{sdkError ?? '高德 SDK 初始化中...'}</Text>
+          <Text style={styles.sdkHintText}>{sdkError ?? t('amapPicker.sdkInit')}</Text>
         </View>
       );
     }
@@ -301,10 +302,10 @@ export function AMapPlacePicker({
             },
           ]}>
           <Text style={[styles.title, { color: isDark ? '#e2e8f0' : '#0f172a' }]}>
-            高德地图选点
+            {t('amapPicker.title')}
           </Text>
           <Text style={[styles.hint, { color: isDark ? '#94a3b8' : '#475569' }]}>
-            点击地图或 POI 名称完成选点，再确认回填到记录。
+            {t('amapPicker.subtitle')}
           </Text>
 
           {renderAndroidMap()}
@@ -321,7 +322,7 @@ export function AMapPlacePicker({
               ]}
               value={placeName}
               onChangeText={setPlaceName}
-              placeholder="地点名称（可编辑）"
+              placeholder={t('amapPicker.placeNamePlaceholder')}
               placeholderTextColor={isDark ? '#94a3b8' : '#64748b'}
             />
             {resolving ? <ActivityIndicator size="small" /> : null}
@@ -333,20 +334,20 @@ export function AMapPlacePicker({
             </Text>
           ) : (
             <Text style={[styles.coord, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-              暂未选点
+              {t('amapPicker.noneSelected')}
             </Text>
           )}
 
           <View style={styles.actions}>
             <Pressable style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelText}>取消</Text>
+              <Text style={styles.cancelText}>{t('amapPicker.cancel')}</Text>
             </Pressable>
             <Pressable
               style={styles.confirmButton}
               onPress={() => void confirmSelection()}
               disabled={confirming}>
               <Text style={styles.confirmText}>
-                {confirming ? '确认中...' : '确认选点'}
+                {confirming ? t('amapPicker.confirming') : t('amapPicker.confirm')}
               </Text>
             </Pressable>
           </View>

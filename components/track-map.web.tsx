@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useI18n } from '@/hooks/locale-preference';
 import { smoothTrackLocations } from '@/lib/track-utils';
 import { TimelineLocation } from '@/types/journey';
 
 export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
+  const { t } = useI18n();
   const displayLocations = smoothTrackLocations(locations);
 
   if (displayLocations.length === 0) {
@@ -15,14 +17,14 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
 
   return (
     <View style={styles.fallbackBox}>
-      <Text style={styles.title}>轨迹地图（Web 端简化）</Text>
+      <Text style={styles.title}>{t('trackMap.webTitle')}</Text>
       <Text style={styles.line}>
-        起点：{first.latitude.toFixed(5)}, {first.longitude.toFixed(5)}
+        {t('trackMap.webStart', { lat: first.latitude.toFixed(5), lng: first.longitude.toFixed(5) })}
       </Text>
       <Text style={styles.line}>
-        终点：{last.latitude.toFixed(5)}, {last.longitude.toFixed(5)}
+        {t('trackMap.webEnd', { lat: last.latitude.toFixed(5), lng: last.longitude.toFixed(5) })}
       </Text>
-      <Text style={styles.line}>定位点数量：{displayLocations.length}</Text>
+      <Text style={styles.line}>{t('trackMap.webCount', { count: displayLocations.length })}</Text>
     </View>
   );
 }

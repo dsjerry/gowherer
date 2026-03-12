@@ -1,3 +1,4 @@
+
 import { useFocusEffect } from '@react-navigation/native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
@@ -19,8 +20,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemeToggle } from '@/components/theme-toggle';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/locale-preference';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { consumePendingLocation } from '@/lib/pending-location';
 import {
@@ -33,7 +34,7 @@ import {
   getDefaultEntryTemplateConfig,
   loadEntryTemplateConfig,
   saveEntryTemplateConfig,
-} from '@/lib/template-storage';
+} from '@/lib/template-storage-i18n';
 import {
   Journey,
   JourneyKind,
@@ -57,15 +58,11 @@ function formatDateTime(iso: string) {
   return `${mm}/${dd} ${hh}:${min}`;
 }
 
-function kindLabel(kind: JourneyKind) {
-  return kind === 'travel' ? '旅行' : '通勤';
-}
-
 function parseTagsInput(raw: string) {
   return Array.from(
     new Set(
       raw
-        .split(/[,\n，、]/)
+        .split(/[,，、]/)
         .map((item) => item.trim())
         .filter(Boolean)
     )
@@ -126,6 +123,7 @@ export default function JourneyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
+  const { t, locale } = useI18n();
   const isDark = colorScheme === 'dark';
   const themed = {
     pageTitle: {
@@ -259,7 +257,7 @@ export default function JourneyScreen() {
   const [draftMedia, setDraftMedia] = useState<TimelineMedia[]>([]);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
   const [templateConfig, setTemplateConfig] = useState<EntryTemplateConfig>(
-    getDefaultEntryTemplateConfig()
+    getDefaultEntryTemplateConfig(locale)
   );
   const [templateModalVisible, setTemplateModalVisible] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
@@ -273,15 +271,11 @@ export default function JourneyScreen() {
     let active = true;
     (async () => {
       await initLocalLogFile();
-      const [storedJourneys, storedTemplateConfig] = await Promise.all([
-        loadJourneys(),
-        loadEntryTemplateConfig(),
-      ]);
+      const storedJourneys = await loadJourneys();
       if (!active) {
         return;
       }
       setJourneys(storedJourneys);
-      setTemplateConfig(storedTemplateConfig);
       setLoading(false);
     })();
 
@@ -289,6 +283,21 @@ export default function JourneyScreen() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const storedTemplateConfig = await loadEntryTemplateConfig(locale);
+      if (!active) {
+        return;
+      }
+      setTemplateConfig(storedTemplateConfig);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [locale]);
 
   useFocusEffect(
     useCallback(() => {
@@ -316,6 +325,12 @@ export default function JourneyScreen() {
     () => journeys.filter((item) => item.status === 'completed').length,
     [journeys]
   );
+
+  const kindLabel = useCallback(
+    (kind: JourneyKind) => t(kind === 'travel' ? 'journey.kind.travel' : 'journey.kind.commute'),
+    [t]
+  );
+
   const templateKind = activeJourney?.kind ?? journeyKind;
   const entryTemplates = useMemo(
     () => templateConfig[templateKind],
@@ -338,12 +353,12 @@ export default function JourneyScreen() {
   async function createJourney() {
     const title = journeyTitle.trim();
     if (!title) {
-      Alert.alert('请输入标题', '请先填写本次旅程的名称。');
+      Alert.alert(t('journey.alertEnterTitleTitle'), t('journey.alertEnterTitleBody'));
       return;
     }
 
     if (activeJourney) {
-      Alert.alert('已有进行中的旅程', '请先结束当前旅程，再新建下一条时间线。');
+      Alert.alert(t('journey.alertActiveJourneyTitle'), t('journey.alertActiveJourneyBody'));
       return;
     }
 
@@ -393,7 +408,7 @@ export default function JourneyScreen() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('无法访问相册', '请在系统设置中允许访问相册。');
+        Alert.alert(t('journey.alertAlbumDeniedTitle'), t('journey.alertAlbumDeniedBody'));
         return;
       }
 
@@ -418,7 +433,7 @@ export default function JourneyScreen() {
     try {
       const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
       if (!cameraPermission.granted) {
-        Alert.alert('无法访问相机', '请在系统设置中允许使用相机。');
+        Alert.alert(t('journey.alertCameraDeniedTitle'), t('journey.alertCameraDeniedBody'));
         return;
       }
 
@@ -444,13 +459,13 @@ export default function JourneyScreen() {
     setOpeningLocationPicker(true);
     try {
       if (Platform.OS !== 'android') {
-        Alert.alert('暂不支持', '地图选点目前仅支持 Android。');
+        Alert.alert(t('journey.alertMapUnsupportedTitle'), t('journey.alertMapUnsupportedBody'));
         return;
       }
 
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('无法获取定位权限', '请在系统设置中开启定位权限后再使用地图选点。');
+        Alert.alert(t('journey.alertLocationDeniedTitle'), t('journey.alertLocationDeniedBody'));
         return;
       }
 
@@ -469,8 +484,8 @@ export default function JourneyScreen() {
     } catch (error) {
       void logLocalError('JourneyScreen', error, { stage: 'open-map-picker' });
       Alert.alert(
-        '打开地图失败',
-        `请重试，错误日志：${getLocalLogFileUri()}`
+        t('journey.alertOpenMapFailedTitle'),
+        t('journey.alertOpenMapFailedBody', { uri: getLocalLogFileUri() })
       );
     } finally {
       setOpeningLocationPicker(false);
@@ -513,7 +528,7 @@ export default function JourneyScreen() {
     const text = entryText.trim();
     const tags = parseTagsInput(entryTagsInput);
     if (!text && draftMedia.length === 0 && !draftLocation && tags.length === 0) {
-      Alert.alert('记录为空', '至少添加文案、标签、定位、照片或视频中的一项。');
+      Alert.alert(t('journey.recordEmptyTitle'), t('journey.recordEmptyBody'));
       return;
     }
 
@@ -588,7 +603,7 @@ export default function JourneyScreen() {
 
   async function updateTemplateConfig(next: EntryTemplateConfig) {
     setTemplateConfig(next);
-    await saveEntryTemplateConfig(next);
+    await saveEntryTemplateConfig(locale, next);
   }
 
   async function saveTemplate() {
@@ -597,7 +612,7 @@ export default function JourneyScreen() {
     const tags = parseTagsInput(templateTagsInput);
 
     if (!label || !text) {
-      Alert.alert('模板信息不完整', '请填写模板名称和模板文案。');
+      Alert.alert(t('journey.alertTemplateIncompleteTitle'), t('journey.alertTemplateIncompleteBody'));
       return;
     }
 
@@ -626,7 +641,7 @@ export default function JourneyScreen() {
     const nextTemplates = templates.filter((template) => template.id !== templateId);
 
     if (nextTemplates.length === 0) {
-      Alert.alert('至少保留一个模板', '请至少保留一个模板，或使用“恢复默认模板”。');
+      Alert.alert(t('journey.alertTemplateMinimumTitle'), t('journey.alertTemplateMinimumBody'));
       return;
     }
 
@@ -641,7 +656,7 @@ export default function JourneyScreen() {
   }
 
   async function resetTemplatesToDefault() {
-    const defaults = getDefaultEntryTemplateConfig();
+    const defaults = getDefaultEntryTemplateConfig(locale);
     await updateTemplateConfig({
       ...templateConfig,
       [templateKind]: defaults[templateKind],
@@ -664,108 +679,111 @@ export default function JourneyScreen() {
           styles.container,
           { paddingTop: insets.top + 12 },
         ]}>
-      <View style={styles.pageHeader}>
-        <Text style={[styles.pageTitle, themed.pageTitle]}>GoWherer 旅程时间线</Text>
-        <ThemeToggle />
-      </View>
-      <Text style={[styles.pageSubTitle, themed.pageSubTitle]}>
-        已完成旅程 {completedJourneysCount} 条，当前
-        {activeJourney ? '有进行中旅程' : '暂无进行中旅程'}
-      </Text>
-
-      {!activeJourney ? (
-        <View style={[styles.card, themed.card]}>
-          <Text style={[styles.sectionTitle, themed.sectionTitle]}>开始新的旅程</Text>
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[
-                styles.kindButton,
-                themed.kindButton,
-                journeyKind === 'travel' && styles.kindButtonActive,
-              ]}
-              onPress={() => setJourneyKind('travel')}>
-              <Text
-                style={[
-                  styles.kindButtonText,
-                  themed.kindButtonText,
-                  journeyKind === 'travel' && styles.kindButtonTextActive,
-                ]}>
-                旅行
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.kindButton,
-                themed.kindButton,
-                journeyKind === 'commute' && styles.kindButtonActive,
-              ]}
-              onPress={() => setJourneyKind('commute')}>
-              <Text
-                style={[
-                  styles.kindButtonText,
-                  themed.kindButtonText,
-                  journeyKind === 'commute' && styles.kindButtonTextActive,
-                ]}>
-                通勤
-              </Text>
-            </Pressable>
-          </View>
-          <TextInput
-            value={journeyTitle}
-            onChangeText={setJourneyTitle}
-            placeholder="例如：厦门周末旅行 / 周一通勤"
-            placeholderTextColor={themed.inputPlaceholder}
-            style={[styles.input, themed.input]}
-          />
-          <TextInput
-            value={journeyTagsInput}
-            onChangeText={setJourneyTagsInput}
-            placeholder="旅程标签（逗号分隔）：周末, 海边, 自驾"
-            placeholderTextColor={themed.inputPlaceholder}
-            style={[styles.input, themed.input]}
-          />
-          <Pressable style={styles.primaryButton} onPress={createJourney} disabled={creating}>
-            <Text style={styles.primaryButtonText}>{creating ? '创建中...' : '创建旅程'}</Text>
-          </Pressable>
+        <View style={styles.pageHeader}>
+          <Text style={[styles.pageTitle, themed.pageTitle]}>{t('journey.screenTitle')}</Text>
         </View>
-      ) : (
-        <View style={[styles.card, themed.card]}>
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.sectionTitle, themed.sectionTitle]}>{activeJourney.title}</Text>
-              <Text style={[styles.mutedText, themed.mutedText]}>
-                {kindLabel(activeJourney.kind)} · 开始于 {formatDateTime(activeJourney.createdAt)} ·{' '}
-                {activeJourney.entries.length} 条记录
-              </Text>
-              {activeJourney.tags.length > 0 ? (
-                <View style={styles.tagRow}>
-                  {activeJourney.tags.map((tag) => (
-                    <View key={tag} style={[styles.tagChip, themed.tagChip]}>
-                      <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-            <Pressable style={[styles.ghostButton, themed.ghostButton]} onPress={endCurrentJourney}>
-              <Text style={[styles.ghostButtonText, themed.ghostButtonText]}>结束旅程</Text>
-            </Pressable>
-          </View>
+        <Text style={[styles.pageSubTitle, themed.pageSubTitle]}>
+          {t('journey.screenSummary', {
+            count: completedJourneysCount,
+            status: activeJourney ? t('journey.statusActive') : t('journey.statusInactive'),
+          })}
+        </Text>
 
-          <Text style={[styles.editorLabel, themed.editorLabel]}>
-            {editingEntryId ? '编辑记录' : '新增记录'}
-          </Text>
-          <View style={styles.templateWrap}>
-            <View style={styles.templateHeaderRow}>
-              <Text style={[styles.mutedText, themed.mutedText]}>
-                快捷模板（{kindLabel(templateKind)}）：
-              </Text>
-              <Pressable onPress={() => setTemplateModalVisible(true)}>
-                <Text style={styles.linkText}>管理模板</Text>
+        {!activeJourney ? (
+          <View style={[styles.card, themed.card]}>
+            <Text style={[styles.sectionTitle, themed.sectionTitle]}>{t('journey.startNew')}</Text>
+            <View style={styles.kindRow}>
+              <Pressable
+                style={[
+                  styles.kindButton,
+                  themed.kindButton,
+                  journeyKind === 'travel' && styles.kindButtonActive,
+                ]}
+                onPress={() => setJourneyKind('travel')}>
+                <Text
+                  style={[
+                    styles.kindButtonText,
+                    themed.kindButtonText,
+                    journeyKind === 'travel' && styles.kindButtonTextActive,
+                  ]}>
+                  {t('journey.kind.travel')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.kindButton,
+                  themed.kindButton,
+                  journeyKind === 'commute' && styles.kindButtonActive,
+                ]}
+                onPress={() => setJourneyKind('commute')}>
+                <Text
+                  style={[
+                    styles.kindButtonText,
+                    themed.kindButtonText,
+                    journeyKind === 'commute' && styles.kindButtonTextActive,
+                  ]}>
+                  {t('journey.kind.commute')}
+                </Text>
               </Pressable>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.templateRow}>
+            <TextInput
+              value={journeyTitle}
+              onChangeText={setJourneyTitle}
+              placeholder={t('journey.journeyTitlePlaceholder')}
+              placeholderTextColor={themed.inputPlaceholder}
+              style={[styles.input, themed.input]}
+            />
+            <TextInput
+              value={journeyTagsInput}
+              onChangeText={setJourneyTagsInput}
+              placeholder={t('journey.journeyTagsPlaceholder')}
+              placeholderTextColor={themed.inputPlaceholder}
+              style={[styles.input, themed.input]}
+            />
+            <Pressable style={styles.primaryButton} onPress={createJourney} disabled={creating}>
+              <Text style={styles.primaryButtonText}>
+                {creating ? t('journey.creatingJourney') : t('journey.createJourney')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={[styles.card, themed.card]}>
+            <View style={styles.cardHeader}>
+              <View>
+                <Text style={[styles.sectionTitle, themed.sectionTitle]}>{activeJourney.title}</Text>
+                <Text style={[styles.mutedText, themed.mutedText]}>
+                  {t('journey.currentJourneyMeta', {
+                    kind: kindLabel(activeJourney.kind),
+                    date: formatDateTime(activeJourney.createdAt),
+                    count: activeJourney.entries.length,
+                  })}
+                </Text>
+              </View>
+              <Pressable
+                style={[styles.ghostButton, themed.ghostButton]}
+                onPress={() => void endCurrentJourney()}>
+                <Text style={[styles.ghostButtonText, themed.ghostButtonText]}>
+                  {t('journey.endJourney')}
+                </Text>
+              </Pressable>
+            </View>
+
+            <Text style={[styles.sectionTitle, themed.sectionTitle]}>
+              {t('journey.recordEditorTitle', {
+                mode: editingEntryId ? t('journey.modeEdit') : t('journey.modeCreate'),
+              })}
+            </Text>
+
+            <View style={styles.templateWrap}>
+              <View style={styles.templateHeaderRow}>
+                <Text style={[styles.mutedText, themed.mutedText]}>
+                  {t('journey.templateShortcuts', { kind: kindLabel(templateKind) })}
+                </Text>
+                <Pressable onPress={() => setTemplateModalVisible(true)}>
+                  <Text style={styles.linkText}>{t('journey.manageTemplates')}</Text>
+                </Pressable>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.templateRow}>
                 {entryTemplates.map((template) => (
                   <Pressable
                     key={template.id}
@@ -776,347 +794,371 @@ export default function JourneyScreen() {
                     </Text>
                   </Pressable>
                 ))}
-              </View>
-            </ScrollView>
-          </View>
-          <TextInput
-            value={entryText}
-            onChangeText={setEntryText}
-            placeholder="写下此刻的感受、见闻或备注..."
-            placeholderTextColor={themed.inputPlaceholder}
-            style={[styles.input, styles.textArea, themed.input]}
-            multiline
-          />
-          <TextInput
-            value={entryTagsInput}
-            onChangeText={setEntryTagsInput}
-            placeholder="记录标签（逗号分隔）：地铁, 雨天, 晚高峰"
-            placeholderTextColor={themed.inputPlaceholder}
-            style={[styles.input, themed.input]}
-          />
+              </ScrollView>
+            </View>
 
-          {draftLocation ? (
-            <View style={styles.inlineRow}>
-              <View style={styles.locationTextContainer}>
+            <TextInput
+              value={entryText}
+              onChangeText={setEntryText}
+              placeholder={t('journey.entryTextPlaceholder')}
+              placeholderTextColor={themed.inputPlaceholder}
+              style={[styles.input, styles.textArea, themed.input]}
+              multiline
+            />
+            <TextInput
+              value={entryTagsInput}
+              onChangeText={setEntryTagsInput}
+              placeholder={t('journey.entryTagsPlaceholder')}
+              placeholderTextColor={themed.inputPlaceholder}
+              style={[styles.input, themed.input]}
+            />
+
+            <View style={styles.actionRow}>
+              <View style={[styles.locationTextContainer, themed.locationText]}>
                 <Text style={[styles.locationText, themed.locationText]}>
-                  定位：
-                  {draftLocation.placeName ? ` ${draftLocation.placeName} · ` : ' '}
-                  {draftLocation.latitude.toFixed(5)}, {draftLocation.longitude.toFixed(5)}
+                  {t('journey.locationLabel')}
+                  {draftLocation
+                    ? `${draftLocation.placeName ? `${draftLocation.placeName} · ` : ''}${draftLocation.latitude.toFixed(5)}, ${draftLocation.longitude.toFixed(5)}`
+                    : '-'}
                 </Text>
               </View>
-              <Pressable style={styles.inlineAction} onPress={() => setDraftLocation(undefined)}>
-                <Text style={styles.linkText}>移除定位</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          {draftMedia.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaRow}>
-              {draftMedia.map((item) => (
-                <Pressable
-                  key={item.id}
-                  style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
-                  onPress={() => setPreviewMedia(item)}>
-                  {mediaPreviewUri(item) ? (
-                    <Image source={{ uri: mediaPreviewUri(item) }} style={styles.mediaPreview} contentFit="cover" />
-                  ) : item.type === 'video' ? (
-                    <MediaVideoCover uri={item.uri} />
-                  ) : (
-                    <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
-                      <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>视频</Text>
-                    </View>
-                  )}
-                  <View style={[styles.mediaFooter, themed.mediaFooter]}>
-                    <Text style={[styles.mediaBadge, themed.mediaBadge]}>
-                      {item.type === 'video' ? '视频' : '照片'}
-                    </Text>
-                    <Pressable onPress={() => setDraftMedia((prev) => prev.filter((m) => m.id !== item.id))}>
-                      <Text style={styles.linkText}>删除</Text>
-                    </Pressable>
-                  </View>
+              {draftLocation ? (
+                <Pressable style={styles.inlineAction} onPress={() => setDraftLocation(undefined)}>
+                  <Text style={styles.linkText}>{t('journey.removeLocation')}</Text>
                 </Pressable>
-              ))}
-            </ScrollView>
-          ) : null}
-
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[styles.secondaryButton, themed.secondaryButton]}
-              onPress={openAmapPlacePicker}
-              disabled={openingLocationPicker}>
-              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                {openingLocationPicker ? '打开地图中...' : '添加定位'}
-              </Text>
-            </Pressable>
-          </View>
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[styles.secondaryButton, themed.secondaryButton]}
-              onPress={pickMediaFromLibrary}
-              disabled={pickingMedia}>
-              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                {pickingMedia ? '读取中...' : '从相册添加'}
-              </Text>
-            </Pressable>
-          </View>
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[styles.secondaryButton, themed.secondaryButton]}
-              onPress={() => captureMediaWithCamera('photo')}
-              disabled={pickingMedia}>
-              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                {pickingMedia ? '处理中...' : '拍照'}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.secondaryButton, themed.secondaryButton]}
-              onPress={() => captureMediaWithCamera('video')}
-              disabled={pickingMedia}>
-              <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                {pickingMedia ? '处理中...' : '拍视频'}
-              </Text>
-            </Pressable>
-          </View>
-
-          <Pressable style={styles.primaryButton} onPress={saveTimelineEntry} disabled={savingEntry}>
-            <Text style={styles.primaryButtonText}>
-              {savingEntry ? '保存中...' : editingEntryId ? '更新记录' : '添加到时间线'}
-            </Text>
-          </Pressable>
-          {editingEntryId ? (
-            <Pressable style={[styles.cancelButton, themed.cancelButton]} onPress={resetDraft}>
-              <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>取消编辑</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      )}
-
-      {activeJourney && activeJourney.entries.length > 0 ? (
-        <View style={[styles.card, themed.card]}>
-          <Text style={[styles.sectionTitle, themed.sectionTitle]}>本次旅程时间线</Text>
-          {activeJourney.entries.map((entry, index) => (
-            <View key={entry.id} style={styles.timelineItem}>
-              <View style={[styles.timelineDot, themed.timelineDot]} />
-              <View style={styles.timelineContent}>
-                <View style={styles.entryHeader}>
-                  <Text style={[styles.timelineTime, themed.timelineTime]}>{formatDateTime(entry.createdAt)}</Text>
-                  <View style={styles.inlineRow}>
-                    <Pressable onPress={() => startEditEntry(entry)}>
-                      <Text style={styles.linkText}>编辑</Text>
-                    </Pressable>
-                    <Text style={[styles.mutedText, themed.mutedText]}> · </Text>
-                    <Pressable
-                      onPress={() =>
-                        Alert.alert('删除这条记录？', '删除后无法恢复。', [
-                          { text: '取消', style: 'cancel' },
-                          {
-                            text: '删除',
-                            style: 'destructive',
-                            onPress: () => {
-                              void deleteEntry(entry.id);
-                            },
-                          },
-                        ])
-                      }>
-                      <Text style={styles.deleteText}>删除</Text>
-                    </Pressable>
-                  </View>
-                </View>
-                {entry.text ? <Text style={[styles.timelineText, themed.timelineText]}>{entry.text}</Text> : null}
-                {entry.tags.length > 0 ? (
-                  <View style={styles.tagRow}>
-                    {entry.tags.map((tag) => (
-                      <View key={tag} style={[styles.tagChip, themed.tagChip]}>
-                        <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-                {entry.location ? (
-                  <Text style={[styles.mutedText, themed.mutedText]}>
-                    📍
-                    {entry.location.placeName ? ` ${entry.location.placeName} · ` : ' '}
-                    {entry.location.latitude.toFixed(5)}, {entry.location.longitude.toFixed(5)}
-                  </Text>
-                ) : null}
-                {entry.media.length > 0 ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {entry.media.map((media) => (
-                      <Pressable
-                        key={media.id}
-                        style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
-                        onPress={() => setPreviewMedia(media)}>
-                        {mediaPreviewUri(media) ? (
-                          <Image
-                            source={{ uri: mediaPreviewUri(media) }}
-                            style={styles.mediaPreview}
-                            contentFit="cover"
-                          />
-                        ) : media.type === 'video' ? (
-                          <MediaVideoCover uri={media.uri} />
-                        ) : (
-                          <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
-                            <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>视频</Text>
-                          </View>
-                        )}
-                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>
-                          {media.type === 'video' ? '视频' : '照片'}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                ) : null}
-              </View>
-              {index < activeJourney.entries.length - 1 ? (
-                <View style={[styles.timelineLine, themed.timelineLine]} />
               ) : null}
             </View>
-          ))}
-        </View>
-      ) : null}
 
-      <Modal
-        visible={templateModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setTemplateModalVisible(false);
-          resetTemplateEditor();
-        }}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.templateModalCard, themed.modalCard]}>
-            <View style={styles.templateModalHeader}>
-              <Text style={[styles.templateModalTitle, themed.modalTitle]}>
-                模板管理（{kindLabel(templateKind)}）
-              </Text>
-              <Pressable
-                onPress={() => {
-                  setTemplateModalVisible(false);
-                  resetTemplateEditor();
-                }}>
-                <Text style={styles.linkText}>关闭</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView style={styles.templateModalList}>
-              {entryTemplates.map((template) => (
-                <View
-                  key={template.id}
-                  style={[styles.templateItemCard, themed.templateItem]}>
-                  <Text style={[styles.templateItemTitle, themed.templateItemTitle]}>
-                    {template.label}
-                  </Text>
-                  <Text style={[styles.templateItemText, themed.templateItemText]}>
-                    {template.text}
-                  </Text>
-                  {template.tags.length > 0 ? (
-                    <Text style={[styles.templateItemText, themed.templateItemText]}>
-                      标签：{template.tags.map((tag) => `#${tag}`).join(' ')}
-                    </Text>
-                  ) : null}
-                  <View style={styles.inlineRow}>
-                    <Pressable onPress={() => startEditTemplate(template)}>
-                      <Text style={styles.linkText}>编辑</Text>
-                    </Pressable>
-                    <Text style={[styles.mutedText, themed.mutedText]}> · </Text>
-                    <Pressable
-                      onPress={() =>
-                        Alert.alert('删除该模板？', '删除后不可恢复。', [
-                          { text: '取消', style: 'cancel' },
-                          {
-                            text: '删除',
-                            style: 'destructive',
-                            onPress: () => {
-                              void removeTemplate(template.id);
-                            },
-                          },
-                        ])
-                      }>
-                      <Text style={styles.deleteText}>删除</Text>
-                    </Pressable>
+            {draftMedia.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaRow}>
+                {draftMedia.map((item) => (
+                  <View key={item.id} style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
+                    {mediaPreviewUri(item) ? (
+                      <Image
+                        source={{ uri: mediaPreviewUri(item) }}
+                        style={styles.mediaPreview}
+                        contentFit="cover"
+                      />
+                    ) : item.type === 'video' ? (
+                      <MediaVideoCover uri={item.uri} />
+                    ) : (
+                      <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                        <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>
+                          {t('journey.mediaBadgeVideo')}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={[styles.mediaFooter, themed.mediaFooter]}>
+                      <Text style={[styles.mediaBadge, themed.mediaBadge]}>
+                        {item.type === 'video' ? t('journey.mediaBadgeVideo') : t('journey.mediaBadgePhoto')}
+                      </Text>
+                      <Pressable
+                        onPress={() => setDraftMedia((prev) => prev.filter((media) => media.id !== item.id))}>
+                        <Text style={styles.linkText}>{t('common.delete')}</Text>
+                      </Pressable>
+                    </View>
                   </View>
-                </View>
-              ))}
-            </ScrollView>
+                ))}
+              </ScrollView>
+            ) : null}
 
-            <View style={styles.templateEditorCard}>
-              <Text style={[styles.editorLabel, themed.editorLabel]}>
-                {editingTemplateId ? '编辑模板' : '新增模板'}
-              </Text>
-              <TextInput
-                value={templateLabelInput}
-                onChangeText={setTemplateLabelInput}
-                placeholder="模板名称（如：集合点）"
-                placeholderTextColor={themed.inputPlaceholder}
-                style={[styles.input, themed.input]}
-              />
-              <TextInput
-                value={templateTextInput}
-                onChangeText={setTemplateTextInput}
-                placeholder="模板文案"
-                placeholderTextColor={themed.inputPlaceholder}
-                style={[styles.input, styles.textArea, themed.input]}
-                multiline
-              />
-              <TextInput
-                value={templateTagsInput}
-                onChangeText={setTemplateTagsInput}
-                placeholder="模板标签（逗号分隔）"
-                placeholderTextColor={themed.inputPlaceholder}
-                style={[styles.input, themed.input]}
-              />
-              <View style={styles.actionRow}>
-                <Pressable
-                  style={[styles.primaryButton, styles.templateSaveButton]}
-                  onPress={() => void saveTemplate()}>
-                  <Text style={styles.primaryButtonText}>
-                    {editingTemplateId ? '保存修改' : '添加模板'}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.cancelButton, themed.cancelButton, styles.templateResetButton]}
-                  onPress={resetTemplateEditor}>
-                  <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
-                    清空编辑
-                  </Text>
-                </Pressable>
-              </View>
+            <View style={styles.actionRow}>
               <Pressable
-                style={[styles.cancelButton, themed.cancelButton]}
-                onPress={() =>
-                  Alert.alert('恢复默认模板？', '仅恢复当前类型的模板。', [
-                    { text: '取消', style: 'cancel' },
-                    {
-                      text: '恢复',
-                      onPress: () => {
-                        void resetTemplatesToDefault();
-                      },
-                    },
-                  ])
-                }>
-                <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
-                  恢复当前类型默认模板
+                style={[styles.secondaryButton, themed.secondaryButton]}
+                onPress={openAmapPlacePicker}
+                disabled={openingLocationPicker}>
+                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                  {openingLocationPicker ? t('journey.openingMap') : t('journey.addLocation')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.secondaryButton, themed.secondaryButton]}
+                onPress={pickMediaFromLibrary}
+                disabled={pickingMedia}>
+                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                  {pickingMedia ? t('journey.readingAlbum') : t('journey.addFromAlbum')}
                 </Text>
               </Pressable>
             </View>
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[styles.secondaryButton, themed.secondaryButton]}
+                onPress={() => captureMediaWithCamera('photo')}
+                disabled={pickingMedia}>
+                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                  {pickingMedia ? t('journey.processingMedia') : t('journey.takePhoto')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.secondaryButton, themed.secondaryButton]}
+                onPress={() => captureMediaWithCamera('video')}
+                disabled={pickingMedia}>
+                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                  {pickingMedia ? t('journey.processingMedia') : t('journey.takeVideo')}
+                </Text>
+              </Pressable>
+            </View>
+
+            <Pressable style={styles.primaryButton} onPress={saveTimelineEntry} disabled={savingEntry}>
+              <Text style={styles.primaryButtonText}>
+                {savingEntry
+                  ? t('journey.savingEntry')
+                  : editingEntryId
+                    ? t('journey.updateEntry')
+                    : t('journey.saveEntry')}
+              </Text>
+            </Pressable>
+            {editingEntryId ? (
+              <Pressable style={[styles.cancelButton, themed.cancelButton]} onPress={resetDraft}>
+                <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
+                  {t('journey.cancelEdit')}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
-        </View>
-          </Modal>
+        )}
 
-      <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
-        <View style={styles.previewOverlay}>
-          <Pressable style={styles.previewClose} onPress={() => setPreviewMedia(null)}>
-            <Text style={styles.previewCloseText}>关闭</Text>
-          </Pressable>
-          {previewMedia?.type === 'video' ? (
-            <PreviewVideo uri={previewMedia.uri} />
-          ) : previewMedia ? (
-            <Image source={{ uri: previewMedia.uri }} style={styles.previewMedia} contentFit="contain" />
-          ) : null}
-        </View>
-      </Modal>
+        {activeJourney && activeJourney.entries.length > 0 ? (
+          <View style={[styles.card, themed.card]}>
+            <Text style={[styles.sectionTitle, themed.sectionTitle]}>{t('journey.timelineTitle')}</Text>
+            {activeJourney.entries.map((entry, index) => (
+              <View key={entry.id} style={styles.timelineItem}>
+                <View style={[styles.timelineDot, themed.timelineDot]} />
+                <View style={styles.timelineContent}>
+                  <View style={styles.entryHeader}>
+                    <Text style={[styles.timelineTime, themed.timelineTime]}>{formatDateTime(entry.createdAt)}</Text>
+                    <View style={styles.inlineRow}>
+                      <Pressable onPress={() => startEditEntry(entry)}>
+                        <Text style={styles.linkText}>{t('common.edit')}</Text>
+                      </Pressable>
+                      <Text style={[styles.mutedText, themed.mutedText]}> · </Text>
+                      <Pressable
+                        onPress={() =>
+                          Alert.alert(
+                            t('journey.alertDeleteEntryTitle'),
+                            t('journey.alertDeleteEntryBody'),
+                            [
+                              { text: t('common.cancel'), style: 'cancel' },
+                              {
+                                text: t('common.delete'),
+                                style: 'destructive',
+                                onPress: () => {
+                                  void deleteEntry(entry.id);
+                                },
+                              },
+                            ]
+                          )
+                        }>
+                        <Text style={styles.deleteText}>{t('common.delete')}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                  {entry.text ? <Text style={[styles.timelineText, themed.timelineText]}>{entry.text}</Text> : null}
+                  {entry.tags.length > 0 ? (
+                    <View style={styles.tagRow}>
+                      {entry.tags.map((tag) => (
+                        <View key={tag} style={[styles.tagChip, themed.tagChip]}>
+                          <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                  {entry.location ? (
+                    <Text style={[styles.mutedText, themed.mutedText]}>
+                      ??
+                      {entry.location.placeName ? ` ${entry.location.placeName} · ` : ' '}
+                      {entry.location.latitude.toFixed(5)}, {entry.location.longitude.toFixed(5)}
+                    </Text>
+                  ) : null}
+                  {entry.media.length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {entry.media.map((media) => (
+                        <Pressable
+                          key={media.id}
+                          style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
+                          onPress={() => setPreviewMedia(media)}>
+                          {mediaPreviewUri(media) ? (
+                            <Image
+                              source={{ uri: mediaPreviewUri(media) }}
+                              style={styles.mediaPreview}
+                              contentFit="cover"
+                            />
+                          ) : media.type === 'video' ? (
+                            <MediaVideoCover uri={media.uri} />
+                          ) : (
+                            <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                              <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>
+                                {t('journey.mediaBadgeVideo')}
+                              </Text>
+                            </View>
+                          )}
+                          <Text style={[styles.mediaBadge, themed.mediaBadge]}>
+                            {media.type === 'video' ? t('journey.mediaBadgeVideo') : t('journey.mediaBadgePhoto')}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  ) : null}
+                </View>
+                {index < activeJourney.entries.length - 1 ? (
+                  <View style={[styles.timelineLine, themed.timelineLine]} />
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        <Modal
+          visible={templateModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setTemplateModalVisible(false);
+            resetTemplateEditor();
+          }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.templateModalCard, themed.modalCard]}>
+              <View style={styles.templateModalHeader}>
+                <Text style={[styles.templateModalTitle, themed.modalTitle]}>
+                  {t('journey.templateManagerTitle', { kind: kindLabel(templateKind) })}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setTemplateModalVisible(false);
+                    resetTemplateEditor();
+                  }}>
+                  <Text style={styles.linkText}>{t('common.close')}</Text>
+                </Pressable>
+              </View>
+
+              <ScrollView style={styles.templateModalList}>
+                {entryTemplates.map((template) => (
+                  <View
+                    key={template.id}
+                    style={[styles.templateItemCard, themed.templateItem]}>
+                    <Text style={[styles.templateItemTitle, themed.templateItemTitle]}>
+                      {template.label}
+                    </Text>
+                    <Text style={[styles.templateItemText, themed.templateItemText]}>
+                      {template.text}
+                    </Text>
+                    {template.tags.length > 0 ? (
+                      <Text style={[styles.templateItemText, themed.templateItemText]}>
+                        {t('common.tags')}：{template.tags.map((tag) => `#${tag}`).join(' ')}
+                      </Text>
+                    ) : null}
+                    <View style={styles.inlineRow}>
+                      <Pressable onPress={() => startEditTemplate(template)}>
+                        <Text style={styles.linkText}>{t('common.edit')}</Text>
+                      </Pressable>
+                      <Text style={[styles.mutedText, themed.mutedText]}> · </Text>
+                      <Pressable
+                        onPress={() =>
+                          Alert.alert(
+                            t('journey.alertDeleteTemplateTitle'),
+                            t('journey.alertDeleteTemplateBody'),
+                            [
+                              { text: t('common.cancel'), style: 'cancel' },
+                              {
+                                text: t('common.delete'),
+                                style: 'destructive',
+                                onPress: () => {
+                                  void removeTemplate(template.id);
+                                },
+                              },
+                            ]
+                          )
+                        }>
+                        <Text style={styles.deleteText}>{t('common.delete')}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <View style={styles.templateEditorCard}>
+                <Text style={[styles.editorLabel, themed.editorLabel]}>
+                  {t('journey.templateEditorTitle', {
+                    mode: editingTemplateId ? t('journey.templateModeEdit') : t('journey.templateModeCreate'),
+                  })}
+                </Text>
+                <TextInput
+                  value={templateLabelInput}
+                  onChangeText={setTemplateLabelInput}
+                  placeholder={t('journey.templateNamePlaceholder')}
+                  placeholderTextColor={themed.inputPlaceholder}
+                  style={[styles.input, themed.input]}
+                />
+                <TextInput
+                  value={templateTextInput}
+                  onChangeText={setTemplateTextInput}
+                  placeholder={t('journey.templateTextPlaceholder')}
+                  placeholderTextColor={themed.inputPlaceholder}
+                  style={[styles.input, styles.textArea, themed.input]}
+                  multiline
+                />
+                <TextInput
+                  value={templateTagsInput}
+                  onChangeText={setTemplateTagsInput}
+                  placeholder={t('journey.templateTagsPlaceholder')}
+                  placeholderTextColor={themed.inputPlaceholder}
+                  style={[styles.input, themed.input]}
+                />
+                <View style={styles.actionRow}>
+                  <Pressable
+                    style={[styles.primaryButton, styles.templateSaveButton]}
+                    onPress={() => void saveTemplate()}>
+                    <Text style={styles.primaryButtonText}>
+                      {editingTemplateId ? t('journey.updateTemplate') : t('journey.saveTemplate')}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.cancelButton, themed.cancelButton, styles.templateResetButton]}
+                    onPress={resetTemplateEditor}>
+                    <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
+                      {t('journey.clearTemplateEdit')}
+                    </Text>
+                  </Pressable>
+                </View>
+                <Pressable
+                  style={[styles.cancelButton, themed.cancelButton]}
+                  onPress={() =>
+                    Alert.alert(
+                      t('journey.alertResetTemplatesTitle'),
+                      t('journey.alertResetTemplatesBody'),
+                      [
+                        { text: t('common.cancel'), style: 'cancel' },
+                        {
+                          text: t('common.confirm'),
+                          onPress: () => {
+                            void resetTemplatesToDefault();
+                          },
+                        },
+                      ]
+                    )
+                  }>
+                  <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
+                    {t('journey.resetTemplates')}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
+          <View style={styles.previewOverlay}>
+            <Pressable style={styles.previewClose} onPress={() => setPreviewMedia(null)}>
+              <Text style={styles.previewCloseText}>{t('common.close')}</Text>
+            </Pressable>
+            {previewMedia?.type === 'video' ? (
+              <PreviewVideo uri={previewMedia.uri} />
+            ) : previewMedia ? (
+              <Image source={{ uri: previewMedia.uri }} style={styles.previewMedia} contentFit="contain" />
+            ) : null}
+          </View>
+        </Modal>
       </ScrollView>
-
     </View>
   );
 }
@@ -1210,6 +1252,10 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#0f172a',
     fontWeight: '500',
+  },
+  kindRow: {
+    flexDirection: 'row',
+    gap: 10,
   },
   kindButton: {
     backgroundColor: '#f1f5f9',
@@ -1492,3 +1538,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

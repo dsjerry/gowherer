@@ -5,9 +5,11 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/locale-preference';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { t } = useI18n();
 
   return (
     <Tabs
@@ -19,15 +21,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: '旅程',
+          title: t('tabs.journey'),
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="map.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: '回顾',
+          title: t('tabs.explore'),
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: t('tabs.settings'),
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
         }}
       />
     </Tabs>

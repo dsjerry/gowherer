@@ -1,6 +1,6 @@
 # GoWherer Project State
 
-Last updated: 2026-03-08
+Last updated: 2026-03-13
 
 ## Documentation Index
 
@@ -244,3 +244,34 @@ Latest updates (2026-03-08):
 5. Add workflow input `publish_release` (boolean) to make Release publishing optional per run.
 6. Start P1 smart route analysis (stay-point + segment summary) on top of existing smoothing pipeline.
 7. Plan export enhancement phase (PDF template/cover customization) and finalize minimal MVP scope.
+
+## Work Log (2026-03-12)
+
+### Completed
+- Added Settings tab and new Settings screen with language selection (system/zh/en).
+- Implemented i18n base: locale storage, translator, and locale-aware template defaults.
+- Wired i18n into tabs, Journey screen, Review screen, map picker, AMap picker, and track map (web + native).
+- Added English + Chinese translation dictionaries and moved default templates per locale.
+- Added Settings icon mapping for tab bar.
+
+### TODO / Follow-ups
+- Install new dependency `expo-localization` in the workspace.
+- Decide whether to deprecate or remove legacy `lib/template-storage.ts` (now replaced by locale-aware storage).
+- Run app/build checks to validate i18n flow and tab navigation.
+
+## Work Log (2026-03-13)
+
+### Completed
+- Fixed lint errors (invalid character in `components/ui/icon-symbol.tsx`, broken regex in `app/(tabs)/index.tsx`, unused vars).
+- Rewrote locale files to UTF-8 and restored Chinese strings to resolve Android bundling error in `locales/zh.ts`.
+- Moved theme toggle into Settings and redesigned Settings items as list rows.
+- Updated EAS GitHub Action to accept `release_notes` input and write multi-line notes into GitHub Release.
+
+## Working Tree Summary (2026-03-13)
+
+- Added Settings screen and i18n infrastructure: `app/(tabs)/settings.tsx`, `hooks/locale-preference.tsx`, `lib/i18n.ts`, `lib/template-storage-i18n.ts`, `locales/`.
+- Updated journey and review tabs to use localized strings and refreshed UI: `app/(tabs)/index.tsx`, `app/(tabs)/explore.tsx`, `app/(tabs)/_layout.tsx`.
+- Refined location picker and AMap picker flows: `app/location-picker.tsx`, `components/amap-place-picker.tsx`.
+- Adjusted track map rendering for native/web and lint fixes: `components/track-map.tsx`, `components/track-map.web.tsx`, `components/ui/icon-symbol.tsx`.
+- Updated workflow to support release notes input: `.github/workflows/eas-build.yml`.
+- Updated runtime scripts and dependencies: `package.json`, `package-lock.json`.
