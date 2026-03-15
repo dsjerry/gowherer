@@ -1,6 +1,6 @@
 # GoWherer Project State
 
-Last updated: 2026-03-13
+Last updated: 2026-03-15
 
 ## Documentation Index
 
@@ -127,8 +127,25 @@ After credentials exist on Expo servers, re-run GitHub Action.
 
 ## Local Workspace Snapshot
 
-Current uncommitted changes (2026-03-07, before this update):
+Current uncommitted changes (2026-03-15):
+- Line ending normalization (LF -> CRLF) across these files:
 - `LICENSE`
+- `app/(tabs)/_layout.tsx`
+- `app/(tabs)/explore.tsx`
+- `app/(tabs)/index.tsx`
+- `app/_layout.tsx`
+- `app/location-picker.tsx`
+- `android/app/build.gradle`
+- `components/amap-place-picker.tsx`
+- `components/track-map.tsx`
+- `components/track-map.web.tsx`
+- `docs/PROJECT_STATE.md`
+- `hooks/locale-preference.tsx`
+- `lib/i18n.ts`
+- `lib/template-storage-i18n.ts`
+- `locales/en.ts`
+- `package.json`
+- `package-lock.json`
 
 ## Progress Log (Recent)
 
@@ -275,3 +292,13 @@ Latest updates (2026-03-08):
 - Adjusted track map rendering for native/web and lint fixes: `components/track-map.tsx`, `components/track-map.web.tsx`, `components/ui/icon-symbol.tsx`.
 - Updated workflow to support release notes input: `.github/workflows/eas-build.yml`.
 - Updated runtime scripts and dependencies: `package.json`, `package-lock.json`.
+
+## Work Log (2026-03-15)
+
+### Completed
+- Fixed map picker nearby-place separator mojibake by replacing corrupted separator with ASCII `-` and ensuring UTF-8 encoding in `app/location-picker.tsx`.
+- Added Android debug `applicationIdSuffix` + `versionNameSuffix` so debug builds can install alongside release builds.
+- Workspace still shows line ending normalization (LF -> CRLF) across multiple files.
+
+### TODO / Follow-ups
+- If line ending normalization was unintentional, decide whether to revert or standardize via `.gitattributes`.

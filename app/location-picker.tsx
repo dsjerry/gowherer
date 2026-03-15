@@ -410,7 +410,7 @@ export default function LocationPickerScreen() {
         </View>
         <Text style={[styles.coordText, theme.coord]}>
           {selected
-            ? `${placeName ? `${placeName} ¡¤ ` : ''}${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}`
+            ? `${placeName ? `${placeName} - ` : ''}${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}`
             : t('mapPicker.pickHint')}
         </Text>
         <View style={styles.mapWrap}>{renderMap()}</View>
@@ -440,7 +440,7 @@ export default function LocationPickerScreen() {
                 }>
                 <Text style={[styles.placeTitle, theme.itemTitle]}>{item.name}</Text>
                 <Text style={[styles.placeMeta, theme.itemSub]}>
-                  {item.address ? `${item.address} ¡¤ ` : ''}
+                  {item.address ? `${item.address} - ` : ''}
                   {typeof item.distance === 'number' ? `${Math.round(item.distance)}m` : ''}
                 </Text>
               </Pressable>
