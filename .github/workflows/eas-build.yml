@@ -233,7 +233,7 @@ jobs:
             if [ -n "${{ inputs.release_notes }}" ]; then
               echo ""
               echo "Release Notes:"
-              echo "${{ inputs.release_notes }}"
+              printf '%b\n' "${{ inputs.release_notes }}"
             fi
           } > "$notes_file"
           gh release create "$tag" --title "$title" --notes-file "$notes_file" || true
