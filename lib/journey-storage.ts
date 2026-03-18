@@ -36,7 +36,12 @@ function normalizeMediaItem(media: unknown) {
 
   return {
     ...item,
-    type: item.type === 'video' ? 'video' : 'photo',
+    type:
+      item.type === 'video'
+        ? 'video'
+        : item.type === 'audio'
+          ? 'audio'
+          : 'photo',
     thumbnailUri:
       typeof item.thumbnailUri === 'string' && item.thumbnailUri.trim()
         ? item.thumbnailUri

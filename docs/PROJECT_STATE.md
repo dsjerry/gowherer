@@ -1,6 +1,6 @@
 # GoWherer Project State
 
-Last updated: 2026-03-15
+Last updated: 2026-03-18
 
 ## Documentation Index
 
@@ -14,8 +14,9 @@ Last updated: 2026-03-15
 GoWherer is an Expo React Native app for creating and reviewing journey timelines (travel/commute), including:
 
 - Journey start/end flow
-- Timeline entries with text, location, photos, and videos
+- Timeline entries with text, location, photos, videos, and audio clips
 - Camera capture + media library import
+- In-entry audio recording and playback
 - Entry edit/delete
 - Journey history with type filter
 - Reverse geocoding for location labels (lat/lng -> place name)
@@ -37,6 +38,7 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
 - Expo Router
 - AsyncStorage for local persistence
 - Media/location/PDF:
+  - `expo-audio`
   - `expo-image-picker`
   - `expo-location`
   - `expo-video`
@@ -127,7 +129,12 @@ After credentials exist on Expo servers, re-run GitHub Action.
 
 ## Local Workspace Snapshot
 
-Current uncommitted changes (2026-03-15):
+Current uncommitted changes (2026-03-18):
+- Added local audio timeline support in working tree (not yet reflected in a dedicated git commit):
+  - new dependency `expo-audio`
+  - `TimelineMedia.type` expanded from `photo | video` to `photo | video | audio`
+  - journey draft supports microphone recording, stop/save to media list, and inline playback
+  - existing timeline entries render audio playback cards alongside photo/video media
 - Line ending normalization (LF -> CRLF) across these files:
 - `LICENSE`
 - `app/(tabs)/_layout.tsx`
@@ -297,8 +304,26 @@ Latest updates (2026-03-08):
 
 ### Completed
 - Fixed map picker nearby-place separator mojibake by replacing corrupted separator with ASCII `-` and ensuring UTF-8 encoding in `app/location-picker.tsx`.
-- Added Android debug `applicationIdSuffix` + `versionNameSuffix` so debug builds can install alongside release builds.
+- Kept Android debug `versionNameSuffix` only; removed `applicationIdSuffix` so `expo run:android` can install and launch the same package id reliably.
 - Workspace still shows line ending normalization (LF -> CRLF) across multiple files.
 
 ### TODO / Follow-ups
 - If line ending normalization was unintentional, decide whether to revert or standardize via `.gitattributes`.
+
+## Work Log (2026-03-18)
+
+### Git Record Check
+- Recent visible commits stop at `77ecb91 feat: add permissions and licenses pages`; there is no dedicated committed `audio` feature commit yet.
+- Current audio capability exists in local uncommitted changes on top of `main`.
+
+### Completed
+- Added `expo-audio` dependency for native audio recording/playback support.
+- Extended timeline media model to support `audio` items in addition to `photo` and `video`.
+- Added journey-page audio recording flow:
+  - request microphone permission
+  - start/stop recording with `RecordingPresets.HIGH_QUALITY`
+  - append recorded clip into draft media list
+- Added inline audio playback UI for both draft media and saved timeline entries.
+
+### TODO / Follow-ups
+- Verify recording/playback behavior on Android device, especially permission prompts, repeated start/stop, and saved clip replay after app restart.

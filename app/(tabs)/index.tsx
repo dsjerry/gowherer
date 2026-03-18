@@ -1,10 +1,20 @@
 
+import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,16 +30,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/locale-preference';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
-import { consumePendingLocation } from '@/lib/pending-location';
 import {
   getLocalLogFileUri,
   initLocalLogFile,
   logLocalError,
   logLocalInfo,
 } from '@/lib/local-log';
+import { consumePendingLocation } from '@/lib/pending-location';
 import {
   getDefaultEntryTemplateConfig,
   loadEntryTemplateConfig,
@@ -47,6 +57,32 @@ import { EntryTemplate, EntryTemplateConfig } from '@/types/template';
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function AudioPlayer({ uri, label }: { uri: string; label: string }) {
+  const player = useAudioPlayer(uri);
+  const status = useAudioPlayerStatus(player);
+  const isPlaying = status?.playing ?? false;
+
+  const togglePlayback = async () => {
+    if (isPlaying) {
+      await player.pause();
+      return;
+    }
+    if (status?.duration && status.currentTime >= status.duration) {
+      await player.seekTo(0);
+    }
+    await player.play();
+  };
+
+  return (
+    <Pressable style={styles.audioCard} onPress={togglePlayback}>
+      <MaterialIcons name={isPlaying ? 'pause-circle-filled' : 'play-circle-filled'} size={20} color="#0f766e" />
+      <Text style={styles.audioLabel} numberOfLines={1} ellipsizeMode="tail">
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
 
 function formatDateTime(iso: string) {
@@ -72,6 +108,9 @@ function parseTagsInput(raw: string) {
 function mediaPreviewUri(media: TimelineMedia) {
   if (media.type === 'video') {
     return media.thumbnailUri;
+  }
+  if (media.type === 'audio') {
+    return undefined;
   }
   return media.uri;
 }
@@ -256,6 +295,8 @@ export default function JourneyScreen() {
   const [draftLocation, setDraftLocation] = useState<TimelineLocation>();
   const [draftMedia, setDraftMedia] = useState<TimelineMedia[]>([]);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
   const [templateConfig, setTemplateConfig] = useState<EntryTemplateConfig>(
     getDefaultEntryTemplateConfig(locale)
   );
@@ -343,6 +384,9 @@ export default function JourneyScreen() {
     setEntryTagsInput('');
     setDraftLocation(undefined);
     setDraftMedia([]);
+    if (recorderState.isRecording) {
+      void audioRecorder.stop();
+    }
   }
 
   async function updateJourneys(next: Journey[]) {
@@ -425,6 +469,43 @@ export default function JourneyScreen() {
       setDraftMedia((prev) => [...prev, ...picked]);
     } finally {
       setPickingMedia(false);
+    }
+  }
+
+  async function startRecording() {
+    const permission = await AudioModule.requestRecordingPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(t('journey.alertMicDeniedTitle'), t('journey.alertMicDeniedBody'));
+      return;
+    }
+    await setAudioModeAsync({
+      allowsRecording: true,
+      playsInSilentMode: true,
+    });
+    await audioRecorder.prepareToRecordAsync();
+    audioRecorder.record();
+  }
+
+  async function stopRecording() {
+    if (!recorderState.isRecording) {
+      return;
+    }
+    await audioRecorder.stop();
+    await setAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: true,
+    });
+    const uri = audioRecorder.uri;
+    if (uri) {
+      setDraftMedia((prev) => [
+        ...prev,
+        {
+          id: createId('audio'),
+          uri,
+          type: 'audio',
+          thumbnailUri: undefined,
+        },
+      ]);
     }
   }
 
@@ -832,32 +913,45 @@ export default function JourneyScreen() {
             {draftMedia.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaRow}>
                 {draftMedia.map((item) => (
-                  <View key={item.id} style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
-                    {mediaPreviewUri(item) ? (
-                      <Image
-                        source={{ uri: mediaPreviewUri(item) }}
-                        style={styles.mediaPreview}
-                        contentFit="cover"
-                      />
-                    ) : item.type === 'video' ? (
-                      <MediaVideoCover uri={item.uri} />
-                    ) : (
-                      <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
-                        <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>
-                          {t('journey.mediaBadgeVideo')}
-                        </Text>
+                  item.type === 'audio' ? (
+                    <View key={item.id} style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
+                      <AudioPlayer uri={item.uri} label={t('journey.audioBadge')} />
+                      <View style={[styles.mediaFooter, themed.mediaFooter]}>
+                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('journey.audioBadge')}</Text>
+                        <Pressable
+                          onPress={() => setDraftMedia((prev) => prev.filter((media) => media.id !== item.id))}>
+                          <Text style={styles.linkText}>{t('common.delete')}</Text>
+                        </Pressable>
                       </View>
-                    )}
-                    <View style={[styles.mediaFooter, themed.mediaFooter]}>
-                      <Text style={[styles.mediaBadge, themed.mediaBadge]}>
-                        {item.type === 'video' ? t('journey.mediaBadgeVideo') : t('journey.mediaBadgePhoto')}
-                      </Text>
-                      <Pressable
-                        onPress={() => setDraftMedia((prev) => prev.filter((media) => media.id !== item.id))}>
-                        <Text style={styles.linkText}>{t('common.delete')}</Text>
-                      </Pressable>
                     </View>
-                  </View>
+                  ) : (
+                    <View key={item.id} style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
+                      {mediaPreviewUri(item) ? (
+                        <Image
+                          source={{ uri: mediaPreviewUri(item) }}
+                          style={styles.mediaPreview}
+                          contentFit="cover"
+                        />
+                      ) : item.type === 'video' ? (
+                        <MediaVideoCover uri={item.uri} />
+                      ) : (
+                        <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                          <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>
+                            {t('journey.mediaBadgeVideo')}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={[styles.mediaFooter, themed.mediaFooter]}>
+                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>
+                          {item.type === 'video' ? t('journey.mediaBadgeVideo') : t('journey.mediaBadgePhoto')}
+                        </Text>
+                        <Pressable
+                          onPress={() => setDraftMedia((prev) => prev.filter((media) => media.id !== item.id))}>
+                          <Text style={styles.linkText}>{t('common.delete')}</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  )
                 ))}
               </ScrollView>
             ) : null}
@@ -895,6 +989,16 @@ export default function JourneyScreen() {
                 disabled={pickingMedia}>
                 <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
                   {pickingMedia ? t('journey.processingMedia') : t('journey.takeVideo')}
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[styles.secondaryButton, themed.secondaryButton]}
+                onPress={() => (recorderState.isRecording ? void stopRecording() : void startRecording())}
+                disabled={pickingMedia}>
+                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                  {recorderState.isRecording ? t('journey.stopRecording') : t('journey.recordAudio')}
                 </Text>
               </Pressable>
             </View>
@@ -973,29 +1077,36 @@ export default function JourneyScreen() {
                   {entry.media.length > 0 ? (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       {entry.media.map((media) => (
-                        <Pressable
-                          key={media.id}
-                          style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
-                          onPress={() => setPreviewMedia(media)}>
-                          {mediaPreviewUri(media) ? (
-                            <Image
-                              source={{ uri: mediaPreviewUri(media) }}
-                              style={styles.mediaPreview}
-                              contentFit="cover"
-                            />
-                          ) : media.type === 'video' ? (
-                            <MediaVideoCover uri={media.uri} />
-                          ) : (
-                            <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
-                              <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>
-                                {t('journey.mediaBadgeVideo')}
-                              </Text>
-                            </View>
-                          )}
-                          <Text style={[styles.mediaBadge, themed.mediaBadge]}>
-                            {media.type === 'video' ? t('journey.mediaBadgeVideo') : t('journey.mediaBadgePhoto')}
-                          </Text>
-                        </Pressable>
+                        media.type === 'audio' ? (
+                          <View key={media.id} style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
+                            <AudioPlayer uri={media.uri} label={t('journey.audioBadge')} />
+                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('journey.audioBadge')}</Text>
+                          </View>
+                        ) : (
+                          <Pressable
+                            key={media.id}
+                            style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
+                            onPress={() => setPreviewMedia(media)}>
+                            {mediaPreviewUri(media) ? (
+                              <Image
+                                source={{ uri: mediaPreviewUri(media) }}
+                                style={styles.mediaPreview}
+                                contentFit="cover"
+                              />
+                            ) : media.type === 'video' ? (
+                              <MediaVideoCover uri={media.uri} />
+                            ) : (
+                              <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                                <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>
+                                  {t('journey.mediaBadgeVideo')}
+                                </Text>
+                              </View>
+                            )}
+                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>
+                              {media.type === 'video' ? t('journey.mediaBadgeVideo') : t('journey.mediaBadgePhoto')}
+                            </Text>
+                          </Pressable>
+                        )
                       ))}
                     </ScrollView>
                   ) : null}
@@ -1536,6 +1647,18 @@ const styles = StyleSheet.create({
   previewCloseText: {
     color: '#ffffff',
     fontWeight: '700',
+  },
+  audioCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  audioLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
   },
 });
 

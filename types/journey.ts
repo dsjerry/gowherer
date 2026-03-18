@@ -1,5 +1,5 @@
 export type JourneyStatus = 'active' | 'completed';
-export type MediaType = 'photo' | 'video';
+export type MediaType = 'photo' | 'video' | 'audio';
 export type JourneyKind = 'travel' | 'commute';
 
 export type TimelineLocation = {

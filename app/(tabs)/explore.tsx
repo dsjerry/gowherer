@@ -1,6 +1,7 @@
 
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Image } from 'expo-image';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -10,6 +11,7 @@ import {
   Alert,
   LayoutAnimation,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -219,6 +221,7 @@ function journeyToHtml(journey: Journey, t: TFunction) {
             t('review.html.mediaLabel', {
               photos: entry.media.filter((m) => m.type === 'photo').length,
               videos: entry.media.filter((m) => m.type === 'video').length,
+              audios: entry.media.filter((m) => m.type === 'audio').length,
             })
           )}</div>`
         : '';
@@ -279,6 +282,36 @@ function MediaVideoCover({ uri }: { uri: string }) {
       nativeControls={false}
       contentFit="cover"
     />
+  );
+}
+
+function AudioPlayer({ uri, label }: { uri: string; label: string }) {
+  const player = useAudioPlayer(uri);
+  const status = useAudioPlayerStatus(player);
+  const isPlaying = status?.playing ?? false;
+
+  const togglePlayback = async () => {
+    if (isPlaying) {
+      await player.pause();
+      return;
+    }
+    if (status?.duration && status.currentTime >= status.duration) {
+      await player.seekTo(0);
+    }
+    await player.play();
+  };
+
+  return (
+    <Pressable style={styles.audioCard} onPress={togglePlayback}>
+      <MaterialIcons
+        name={isPlaying ? 'pause-circle-filled' : 'play-circle-filled'}
+        size={20}
+        color="#0f766e"
+      />
+      <Text style={styles.audioLabel} numberOfLines={1} ellipsizeMode="tail">
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -763,6 +796,7 @@ export default function JourneyHistoryScreen() {
                         {(() => {
                           const photos = entry.media.filter((media) => media.type === 'photo');
                           const videos = entry.media.filter((media) => media.type === 'video');
+                          const audios = entry.media.filter((media) => media.type === 'audio');
 
                           return (
                             <>
@@ -787,7 +821,11 @@ export default function JourneyHistoryScreen() {
                               {entry.media.length > 0 ? (
                                 <>
                                   <Text style={[styles.metaLine, themed.metaLine]}>
-                                    {t('review.mediaLine', { photos: photos.length, videos: videos.length })}
+                                    {t('review.mediaLine', {
+                                      photos: photos.length,
+                                      videos: videos.length,
+                                      audios: audios.length,
+                                    })}
                                   </Text>
                                   {photos.length > 0 ? (
                                     <>
@@ -843,6 +881,25 @@ export default function JourneyHistoryScreen() {
                                             )}
                                             <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('common.video')}</Text>
                                           </Pressable>
+                                        ))}
+                                      </ScrollView>
+                                    </>
+                                  ) : null}
+                                  {audios.length > 0 ? (
+                                    <>
+                                      <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>
+                                        {t('review.sectionAudios')}
+                                      </Text>
+                                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                        {audios.map((media) => (
+                                          <View
+                                            key={media.id}
+                                            style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
+                                            <AudioPlayer uri={media.uri} label={t('common.audio')} />
+                                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>
+                                              {t('common.audio')}
+                                            </Text>
+                                          </View>
                                         ))}
                                       </ScrollView>
                                     </>
@@ -1112,6 +1169,18 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     padding: 4,
     backgroundColor: '#f8fafc',
+  },
+  audioCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  audioLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
   },
   previewOverlay: {
     flex: 1,
