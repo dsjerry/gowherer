@@ -1,18 +1,23 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ExternalLink } from '@/components/external-link';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/locale-preference';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { LocalePreference } from '@/lib/i18n';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t, preference, setPreference } = useI18n();
+  const appVersion = Constants.expoConfig?.version ?? '0.0.0';
 
   const theme = useMemo(
     () => ({
@@ -73,6 +78,47 @@ export default function SettingsScreen() {
             );
           })}
         </View>
+      </View>
+
+      <View style={[styles.card, theme.card, styles.aboutCard]}>
+        <Text style={[styles.sectionTitle, theme.title]}>{t('settings.aboutTitle')}</Text>
+        <View style={styles.aboutIntro}>
+          <Text style={[styles.aboutIntroText, theme.muted]}>
+            {t('settings.aboutIntro')}
+          </Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, theme.muted]}>{t('settings.aboutSource')}</Text>
+          <ExternalLink href="https://github.com/dsjerry/gowherer.git">
+            <Text style={[styles.infoLink, theme.accent]} numberOfLines={1}>
+              github
+            </Text>
+          </ExternalLink>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, theme.muted]}>{t('settings.aboutRelease')}</Text>
+          <ExternalLink href="https://gowherer.smalljerry.cn/">
+            <Text style={[styles.infoLink, theme.accent]} numberOfLines={1}>
+              gowherer.smalljerry.cn
+            </Text>
+          </ExternalLink>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, theme.muted]}>{t('settings.aboutVersion')}</Text>
+          <Text style={[styles.infoValue, theme.rowText]}>{appVersion}</Text>
+        </View>
+        <Pressable
+          style={styles.infoRowButton}
+          onPress={() => router.push('/permissions' as never)}>
+          <Text style={[styles.infoLabel, theme.muted]}>{t('settings.permissionsTitle')}</Text>
+          <MaterialIcons name="chevron-right" size={20} color={theme.muted.color} />
+        </Pressable>
+        <Pressable
+          style={styles.infoRowButton}
+          onPress={() => router.push('/licenses' as never)}>
+          <Text style={[styles.infoLabel, theme.muted]}>{t('settings.licensesTitle')}</Text>
+          <MaterialIcons name="chevron-right" size={20} color={theme.muted.color} />
+        </Pressable>
       </View>
     </View>
   );
@@ -137,5 +183,41 @@ const styles = StyleSheet.create({
   listItemText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  infoRowButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+    gap: 12,
+  },
+  infoLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  infoLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  aboutCard: {
+    gap: 12,
+  },
+  aboutIntro: {
+    paddingVertical: 4,
+  },
+  aboutIntroText: {
+    fontSize: 13,
+    lineHeight: 20,
   },
 });

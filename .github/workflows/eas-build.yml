@@ -50,8 +50,23 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Resolve app version
+        run: |
+          set -euo pipefail
+          if [ -n "${APP_VERSION}" ]; then
+            resolved_version="${APP_VERSION}"
+          else
+            resolved_version=$(node -p "require('./package.json').version")
+          fi
+
+          echo "APP_VERSION=${resolved_version}" >> "$GITHUB_ENV"
+          echo "Resolved APP_VERSION=${resolved_version}"
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Generate licenses
+        run: npm run licenses:generate
 
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
