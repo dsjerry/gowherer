@@ -1,6 +1,6 @@
 # GoWherer Knowledge Points
 
-Last updated: 2026-03-07
+Last updated: 2026-04-11
 
 See also: `docs/PROJECT_KNOWLEDGE_BASE.md` for full project-level coverage.
 Beginner docs: `docs/ONBOARDING.md`, `docs/TROUBLESHOOTING.md`.
@@ -74,7 +74,15 @@ Beginner docs: `docs/ONBOARDING.md`, `docs/TROUBLESHOOTING.md`.
 - CI 版本注入修复（确保 `app_version` 真正进云端构建）。
 - CI 产物下载逻辑修复（避免 Release 产物被保存为 `.bin`）。
 
-## 10. 5分钟排障 Checklist
+## 10. 持续定位功能要点
+
+- 开关位于当前旅程卡片标题下方，开启后后台持续记录 GPS。
+- `Location.watchPositionAsync` 参数：`accuracy=Highest`，`timeInterval=5000`，`distanceInterval=5`。
+- 点位先写 ref，组件渲染时批量写入 `Journey.trackLocations` 并持久化。
+- 旧版旅程数据读取时自动补空数组，无需手动迁移。
+- 轨迹数据存储在 `Journey.trackLocations`，可对接 `TrackMap` 组件渲染路线。
+
+## 11. 5分钟排障 Checklist
 
 1. 先确认运行容器：必须是 Dev Client/EAS 安装包，不是 Expo Go。
 2. 先确认 Java 环境：`java -version`、`javac -version`，`JAVA_HOME` 指向 JDK 根目录。

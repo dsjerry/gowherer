@@ -15,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -308,6 +309,9 @@ export default function JourneyScreen() {
   const [templateTextInput, setTemplateTextInput] = useState('');
   const [templateTagsInput, setTemplateTagsInput] = useState('');
 
+  const [locationTracking, setLocationTracking] = useState(false);
+  const trackedLocations = useRef<TimelineLocation[]>([]);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -357,10 +361,80 @@ export default function JourneyScreen() {
     }, [])
   );
 
+  // Start/stop background location tracking
+  useEffect(() => {
+    if (!locationTracking) return;
+
+    let sub: Location.LocationSubscription | null = null;
+    let aborted = false;
+
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted' || aborted) {
+        if (!aborted) setLocationTracking(false);
+        return;
+      }
+
+      trackedLocations.current = [];
+
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 3 },
+        (result) => {
+          if (aborted) return;
+          trackedLocations.current = [
+            ...trackedLocations.current,
+            {
+              latitude: result.coords.latitude,
+              longitude: result.coords.longitude,
+              accuracy: result.coords.accuracy ?? undefined,
+            },
+          ];
+        }
+      );
+
+      if (aborted) {
+        sub.remove();
+        sub = null;
+      }
+    })();
+
+    return () => {
+      aborted = true;
+      sub?.remove();
+      sub = null;
+    };
+  }, [locationTracking]);
+
   const activeJourney = useMemo(
     () => journeys.find((item) => item.status === 'active'),
     [journeys]
   );
+
+  // Sync tracked locations into activeJourney periodically
+  useEffect(() => {
+    if (!locationTracking || !activeJourney) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      if (trackedLocations.current.length === 0) {
+        return;
+      }
+      const pending = [...trackedLocations.current];
+      trackedLocations.current = [];
+      setJourneys((prev) => {
+        const next = prev.map((j) =>
+          j.id === activeJourney.id
+            ? { ...j, trackLocations: [...j.trackLocations, ...pending] }
+            : j
+        );
+        void saveJourneys(next);
+        return next;
+      });
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [locationTracking, activeJourney]);
 
   const completedJourneysCount = useMemo(
     () => journeys.filter((item) => item.status === 'completed').length,
@@ -418,6 +492,7 @@ export default function JourneyScreen() {
         status: 'active',
         tags,
         entries: [],
+        trackLocations: [],
       };
 
       await updateJourneys([nextJourney, ...journeys]);
@@ -434,12 +509,18 @@ export default function JourneyScreen() {
       return;
     }
 
+    // Flush remaining tracked locations before completing
+    const remaining = [...trackedLocations.current];
+    trackedLocations.current = [];
+    setLocationTracking(false);
+
     const next = journeys.map((item) =>
       item.id === activeJourney.id
         ? {
             ...item,
             status: 'completed' as const,
             endedAt: new Date().toISOString(),
+            trackLocations: [...item.trackLocations, ...remaining],
           }
         : item
     );
@@ -849,6 +930,29 @@ export default function JourneyScreen() {
               </Pressable>
             </View>
 
+            <View style={styles.trackingRow}>
+              <Text style={[styles.trackingLabel, themed.sectionTitle]}>
+                {t('journey.locationTracking')}
+              </Text>
+              <Switch
+                value={locationTracking}
+                onValueChange={(val) => {
+                  if (val) {
+                    setLocationTracking(true);
+                  } else {
+                    setLocationTracking(false);
+                  }
+                }}
+                trackColor={{ false: '#94a3b8', true: '#0f766e' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+            {locationTracking && activeJourney.trackLocations.length > 0 ? (
+              <Text style={[styles.mutedText, themed.mutedText]}>
+                {t('journey.trackingPoints', { count: activeJourney.trackLocations.length })}
+              </Text>
+            ) : null}
+
             <Text style={[styles.sectionTitle, themed.sectionTitle]}>
               {t('journey.recordEditorTitle', {
                 mode: editingEntryId ? t('journey.modeEdit') : t('journey.modeCreate'),
@@ -895,7 +999,7 @@ export default function JourneyScreen() {
             />
 
             <View style={styles.actionRow}>
-              <View style={[styles.locationTextContainer, themed.locationText]}>
+              <View style={styles.locationTextContainer}>
                 <Text style={[styles.locationText, themed.locationText]}>
                   {t('journey.locationLabel')}
                   {draftLocation
@@ -962,25 +1066,25 @@ export default function JourneyScreen() {
                 onPress={openAmapPlacePicker}
                 disabled={openingLocationPicker}>
                 <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {openingLocationPicker ? t('journey.openingMap') : t('journey.addLocation')}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={pickMediaFromLibrary}
-                disabled={pickingMedia}>
-                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {pickingMedia ? t('journey.readingAlbum') : t('journey.addFromAlbum')}
+                  {openingLocationPicker ? t('journey.openingMap') : `📍 ${t('journey.addLocation')}`}
                 </Text>
               </Pressable>
             </View>
             <View style={styles.actionRow}>
               <Pressable
                 style={[styles.secondaryButton, themed.secondaryButton]}
+                onPress={pickMediaFromLibrary}
+                disabled={pickingMedia}>
+                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
+                  {pickingMedia ? t('journey.readingAlbum') : `🖼️ ${t('journey.addFromAlbum')}`}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.secondaryButton, themed.secondaryButton]}
                 onPress={() => captureMediaWithCamera('photo')}
                 disabled={pickingMedia}>
                 <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {pickingMedia ? t('journey.processingMedia') : t('journey.takePhoto')}
+                  {pickingMedia ? t('journey.processingMedia') : `📷 ${t('journey.takePhoto')}`}
                 </Text>
               </Pressable>
               <Pressable
@@ -988,7 +1092,7 @@ export default function JourneyScreen() {
                 onPress={() => captureMediaWithCamera('video')}
                 disabled={pickingMedia}>
                 <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {pickingMedia ? t('journey.processingMedia') : t('journey.takeVideo')}
+                  {pickingMedia ? t('journey.processingMedia') : `🎥 ${t('journey.takeVideo')}`}
                 </Text>
               </Pressable>
             </View>
@@ -998,7 +1102,7 @@ export default function JourneyScreen() {
                 onPress={() => (recorderState.isRecording ? void stopRecording() : void startRecording())}
                 disabled={pickingMedia}>
                 <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {recorderState.isRecording ? t('journey.stopRecording') : t('journey.recordAudio')}
+                  {recorderState.isRecording ? `⏹️ ${t('journey.stopRecording')}` : `🎙️ ${t('journey.recordAudio')}`}
                 </Text>
               </Pressable>
             </View>
@@ -1069,7 +1173,7 @@ export default function JourneyScreen() {
                   ) : null}
                   {entry.location ? (
                     <Text style={[styles.mutedText, themed.mutedText]}>
-                      ??
+                      📍
                       {entry.location.placeName ? ` ${entry.location.placeName} · ` : ' '}
                       {entry.location.latitude.toFixed(5)}, {entry.location.longitude.toFixed(5)}
                     </Text>
@@ -1393,6 +1497,16 @@ const styles = StyleSheet.create({
     borderColor: '#f59e0b',
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+  trackingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  trackingLabel: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   ghostButtonText: {
     color: '#b45309',

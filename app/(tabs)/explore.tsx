@@ -1,6 +1,6 @@
 
-import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Image } from 'expo-image';
 import * as Print from 'expo-print';
@@ -22,14 +22,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TrackMap } from '@/components/track-map';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/locale-preference';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import {
   calculateTrackDistanceKm,
   sanitizeTrackLocations,
   smoothTrackLocations,
 } from '@/lib/track-utils';
-import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { Journey, JourneyKind, TimelineLocation, TimelineMedia } from '@/types/journey';
 
 type JourneyFilter = 'all' | JourneyKind;
@@ -67,7 +67,9 @@ function formatDuration(durationMs: number, t: TFunction) {
 }
 
 function getJourneyLocations(journey: Journey, smooth = true) {
-  const locations = sanitizeTrackLocations(journey.entries.map((entry) => entry.location));
+  const entryLocations = journey.entries.map((entry) => entry.location);
+  const trackLocations = journey.trackLocations ?? [];
+  const locations = sanitizeTrackLocations([...trackLocations, ...entryLocations]);
 
   return smooth ? smoothTrackLocations(locations) : locations;
 }

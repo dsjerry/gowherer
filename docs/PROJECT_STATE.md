@@ -1,6 +1,6 @@
 # GoWherer Project State
 
-Last updated: 2026-03-18
+Last updated: 2026-04-11
 
 ## Documentation Index
 
@@ -27,6 +27,7 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
 - Manual light/dark theme toggle with local persistence
 - Route visualization (native map + web fallback) with lightweight track smoothing
 - Android AMap SDK place picker (tap map/POI to select location in timeline draft)
+- **Continuous GPS location tracking toggle** — when enabled, records location points in the background during an active journey; accumulated track points are stored persistently and can be used to draw the journey route on the map when the journey ends
 - PDF export (with generated route preview image)
 - GitHub Actions EAS build workflow + artifact/release publishing
 
@@ -54,7 +55,7 @@ GoWherer is an Expo React Native app for creating and reviewing journey timeline
   - `app/(tabs)/explore.tsx` (history, recap, PDF export)
 - Storage and types:
   - `lib/journey-storage.ts`
-  - `types/journey.ts`
+  - `types/journey.ts` (includes `Journey.trackLocations` for continuous GPS tracking)
 - Geocoding:
   - `lib/reverse-geocode.ts` (provider selection, AMap HTTP reverse geocode, fallback, coord transform)
 - Map components:
@@ -235,6 +236,7 @@ Latest updates (2026-03-08):
   - Video thumbnail placeholder support (and `thumbnailUri` field for future upgrade)
 - [Done] Timeline templates (departure/arrival/rest/check-in quick entry; editable/resettable per journey kind).
 - [Done] GPS track denoise/smoothing for cleaner route display and derived recap path metrics.
+- [Done] Continuous GPS location tracking toggle — background recording during active journey, persisted to `Journey.trackLocations`.
 - Safe area and full-screen adaptation refinements across pages.
 
 ### P1 - Product Depth
@@ -327,3 +329,20 @@ Latest updates (2026-03-08):
 
 ### TODO / Follow-ups
 - Verify recording/playback behavior on Android device, especially permission prompts, repeated start/stop, and saved clip replay after app restart.
+
+## Work Log (2026-04-11)
+
+### Completed
+- Added continuous GPS location tracking feature:
+  - New `trackLocations: TimelineLocation[]` field on `Journey` type (`types/journey.ts`)
+  - Storage migration: `lib/journey-storage.ts` normalizes missing `trackLocations` to `[]` for existing journeys
+  - Toggle switch UI in active journey card (`app/(tabs)/index.tsx`) — "Track location" / "持续定位"
+  - `Location.watchPositionAsync` with `accuracy: Highest`, `timeInterval: 5000`, `distanceInterval: 5`
+  - Locations buffered in a ref, batch-synced into the active journey's `trackLocations` array on every render cycle
+  - Toggle off stops the watcher and flushes any pending points
+  - Added i18n keys: `journey.locationTracking`, `journey.trackingPoints` in both English and Chinese locale files
+- Fixed pre-existing `View` style type error (`themed.locationText` was incorrectly applied to a `View`而非 `Text`)
+
+### TODO / Follow-ups
+- Wire `Journey.trackLocations` into the recap map (`components/track-map.tsx`) so the continuous track replaces or supplements manual location entries when drawing the route.
+- Consider adding a "tracking is active" indicator (e.g., subtle badge or pulsing dot) so users know background tracking is running.

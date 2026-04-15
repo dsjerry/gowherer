@@ -34,4 +34,6 @@ export type Journey = {
   status: JourneyStatus;
   tags: string[];
   entries: TimelineEntry[];
+  /** Continuously recorded GPS track points while tracking is enabled */
+  trackLocations: TimelineLocation[];
 };
