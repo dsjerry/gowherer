@@ -23,6 +23,7 @@ const en = {
     permissionsHint:
       "Review current access and open system settings to update it.",
     permissionLocation: "Location",
+    permissionBackgroundLocation: "Background location",
     permissionMedia: "Media Library",
     permissionCamera: "Camera",
     permissionGranted: "Granted",
@@ -78,6 +79,17 @@ const en = {
     endJourney: "End journey",
     locationTracking: "Track location",
     trackingPoints: "Tracking {count} points",
+    trackingNotificationTitle: "GoWherer is tracking your route",
+    trackingNotificationBody: "Background location tracking is active for this journey.",
+    alertTrackingUnavailableTitle: "Background tracking is unavailable",
+    alertTrackingUnavailableBody:
+      "Use a development build or production build to test background location. Expo Go has limitations here.",
+    alertTrackingPermissionTitle: "Cannot start tracking",
+    alertTrackingPermissionBody:
+      "Allow both foreground and background location access before enabling continuous route tracking.",
+    alertTrackingStartFailedTitle: "Tracking failed to start",
+    alertTrackingStartFailedBody:
+      "Background route tracking did not start. Check permissions and battery settings, then try again.",
     recordEditorTitle: "{mode} Record",
     modeCreate: "New",
     modeEdit: "Edit",

@@ -5,6 +5,7 @@ import 'react-native-reanimated';
 
 import { LocalePreferenceProvider } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import '@/lib/background-location';
 import { ThemePreferenceProvider } from '@/hooks/theme-preference';
 
 export const unstable_settings = {

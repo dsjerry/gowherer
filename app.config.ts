@@ -62,6 +62,12 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
         {
           locationWhenInUsePermission:
             '允许使用定位以记录旅程中的位置节点。',
+          locationAlwaysAndWhenInUsePermission:
+            '允许始终访问定位，以便在后台持续记录跑步、骑行等旅程轨迹。',
+          locationAlwaysPermission:
+            '允许始终访问定位，以便在后台持续记录跑步、骑行等旅程轨迹。',
+          isIosBackgroundLocationEnabled: true,
+          isAndroidBackgroundLocationEnabled: true,
         },
       ],
       './plugins/with-android-pointer-tagging',

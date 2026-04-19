@@ -15,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +33,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+  isBackgroundLocationTrackingAvailable,
+  isLocationTrackingActive,
+  startLocationTracking,
+  stopLocationTracking,
+} from '@/lib/background-location';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import {
   getLocalLogFileUri,
@@ -310,7 +316,7 @@ export default function JourneyScreen() {
   const [templateTagsInput, setTemplateTagsInput] = useState('');
 
   const [locationTracking, setLocationTracking] = useState(false);
-  const trackedLocations = useRef<TimelineLocation[]>([]);
+  const [trackingBusy, setTrackingBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -361,75 +367,41 @@ export default function JourneyScreen() {
     }, [])
   );
 
-  // Start/stop background location tracking
-  useEffect(() => {
-    if (!locationTracking) return;
-
-    let sub: Location.LocationSubscription | null = null;
-    let aborted = false;
-
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted' || aborted) {
-        if (!aborted) setLocationTracking(false);
-        return;
-      }
-
-      trackedLocations.current = [];
-
-      sub = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 3 },
-        (result) => {
-          if (aborted) return;
-          trackedLocations.current = [
-            ...trackedLocations.current,
-            {
-              latitude: result.coords.latitude,
-              longitude: result.coords.longitude,
-              accuracy: result.coords.accuracy ?? undefined,
-            },
-          ];
-        }
-      );
-
-      if (aborted) {
-        sub.remove();
-        sub = null;
-      }
-    })();
-
-    return () => {
-      aborted = true;
-      sub?.remove();
-      sub = null;
-    };
-  }, [locationTracking]);
-
   const activeJourney = useMemo(
     () => journeys.find((item) => item.status === 'active'),
     [journeys]
   );
 
-  // Sync tracked locations into activeJourney periodically
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      if (!activeJourney) {
+        if (active) {
+          setLocationTracking(false);
+        }
+        return;
+      }
+
+      const started = await isLocationTrackingActive();
+      if (active) {
+        setLocationTracking(started);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [activeJourney?.id]);
+
   useEffect(() => {
     if (!locationTracking || !activeJourney) {
       return;
     }
 
     const intervalId = setInterval(() => {
-      if (trackedLocations.current.length === 0) {
-        return;
-      }
-      const pending = [...trackedLocations.current];
-      trackedLocations.current = [];
-      setJourneys((prev) => {
-        const next = prev.map((j) =>
-          j.id === activeJourney.id
-            ? { ...j, trackLocations: [...j.trackLocations, ...pending] }
-            : j
-        );
-        void saveJourneys(next);
-        return next;
+      void loadJourneys().then((storedJourneys) => {
+        setJourneys(storedJourneys);
       });
     }, 10000);
 
@@ -466,6 +438,65 @@ export default function JourneyScreen() {
   async function updateJourneys(next: Journey[]) {
     setJourneys(next);
     await saveJourneys(next);
+  }
+
+  async function handleLocationTrackingChange(nextValue: boolean) {
+    if (!activeJourney || trackingBusy) {
+      return;
+    }
+
+    setTrackingBusy(true);
+
+    try {
+      if (!nextValue) {
+        await stopLocationTracking();
+        setLocationTracking(false);
+        const storedJourneys = await loadJourneys();
+        setJourneys(storedJourneys);
+        return;
+      }
+
+      const available = await isBackgroundLocationTrackingAvailable();
+      if (!available) {
+        Alert.alert(
+          t('journey.alertTrackingUnavailableTitle'),
+          t('journey.alertTrackingUnavailableBody')
+        );
+        return;
+      }
+
+      const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+      if (foregroundPermission.status !== 'granted') {
+        Alert.alert(
+          t('journey.alertTrackingPermissionTitle'),
+          t('journey.alertTrackingPermissionBody')
+        );
+        return;
+      }
+
+      const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+      if (backgroundPermission.status !== 'granted') {
+        Alert.alert(
+          t('journey.alertTrackingPermissionTitle'),
+          t('journey.alertTrackingPermissionBody')
+        );
+        return;
+      }
+
+      await startLocationTracking(activeJourney.id, {
+        notificationTitle: t('journey.trackingNotificationTitle'),
+        notificationBody: t('journey.trackingNotificationBody'),
+      });
+      setLocationTracking(true);
+    } catch (error) {
+      void logLocalError('JourneyScreen', 'failed to toggle location tracking', error);
+      Alert.alert(
+        t('journey.alertTrackingStartFailedTitle'),
+        t('journey.alertTrackingStartFailedBody')
+      );
+    } finally {
+      setTrackingBusy(false);
+    }
   }
 
   async function createJourney() {
@@ -509,18 +540,20 @@ export default function JourneyScreen() {
       return;
     }
 
-    // Flush remaining tracked locations before completing
-    const remaining = [...trackedLocations.current];
-    trackedLocations.current = [];
+    try {
+      await stopLocationTracking();
+    } catch (error) {
+      void logLocalError('JourneyScreen', 'failed to stop location tracking while ending journey', error);
+    }
     setLocationTracking(false);
 
-    const next = journeys.map((item) =>
+    const storedJourneys = await loadJourneys();
+    const next = storedJourneys.map((item) =>
       item.id === activeJourney.id
         ? {
             ...item,
             status: 'completed' as const,
             endedAt: new Date().toISOString(),
-            trackLocations: [...item.trackLocations, ...remaining],
           }
         : item
     );
@@ -936,13 +969,8 @@ export default function JourneyScreen() {
               </Text>
               <Switch
                 value={locationTracking}
-                onValueChange={(val) => {
-                  if (val) {
-                    setLocationTracking(true);
-                  } else {
-                    setLocationTracking(false);
-                  }
-                }}
+                onValueChange={(val) => void handleLocationTrackingChange(val)}
+                disabled={trackingBusy}
                 trackColor={{ false: '#94a3b8', true: '#0f766e' }}
                 thumbColor="#ffffff"
               />

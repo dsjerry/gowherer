@@ -17,6 +17,7 @@ type PermissionStatusKey = typeof STATUS_GRANTED | typeof STATUS_DENIED | typeof
 
 type PermissionStatus = {
   location: PermissionStatusKey;
+  backgroundLocation: PermissionStatusKey;
   media: PermissionStatusKey;
   camera: PermissionStatusKey;
 };
@@ -28,6 +29,7 @@ export default function PermissionsScreen() {
   const { t } = useI18n();
   const [status, setStatus] = useState<PermissionStatus>({
     location: STATUS_UNKNOWN,
+    backgroundLocation: STATUS_UNKNOWN,
     media: STATUS_UNKNOWN,
     camera: STATUS_UNKNOWN,
   });
@@ -36,8 +38,9 @@ export default function PermissionsScreen() {
     let active = true;
     const refreshPermissions = async () => {
       try {
-        const [location, media, camera] = await Promise.all([
+        const [location, backgroundLocation, media, camera] = await Promise.all([
           Location.getForegroundPermissionsAsync(),
+          Location.getBackgroundPermissionsAsync(),
           ImagePicker.getMediaLibraryPermissionsAsync(),
           ImagePicker.getCameraPermissionsAsync(),
         ]);
@@ -55,6 +58,7 @@ export default function PermissionsScreen() {
         };
         setStatus({
           location: resolveStatus(location.status),
+          backgroundLocation: resolveStatus(backgroundLocation.status),
           media: resolveStatus(media.status),
           camera: resolveStatus(camera.status),
         });
@@ -62,6 +66,7 @@ export default function PermissionsScreen() {
         if (active) {
           setStatus({
             location: STATUS_UNKNOWN,
+            backgroundLocation: STATUS_UNKNOWN,
             media: STATUS_UNKNOWN,
             camera: STATUS_UNKNOWN,
           });
@@ -111,6 +116,16 @@ export default function PermissionsScreen() {
             <Text style={[styles.permissionLabel, theme.text]}>{t('settings.permissionLocation')}</Text>
             <View style={[styles.permissionBadge, styles.permissionBadgeBase, theme.divider]}>
               <Text style={[styles.permissionBadgeText, theme.muted]}>{resolveLabel(status.location)}</Text>
+            </View>
+          </View>
+          <View style={styles.permissionRow}>
+            <Text style={[styles.permissionLabel, theme.text]}>
+              {t('settings.permissionBackgroundLocation')}
+            </Text>
+            <View style={[styles.permissionBadge, styles.permissionBadgeBase, theme.divider]}>
+              <Text style={[styles.permissionBadgeText, theme.muted]}>
+                {resolveLabel(status.backgroundLocation)}
+              </Text>
             </View>
           </View>
           <View style={styles.permissionRow}>
