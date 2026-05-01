@@ -1,16 +1,25 @@
-import Constants from 'expo-constants';
-import { useEffect, useMemo, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import Constants from "expo-constants"
+import { useEffect, useMemo, useState } from "react"
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native"
+import MapView, { Marker, Polyline } from "react-native-maps"
 
-import { useI18n } from '@/hooks/locale-preference';
-import { toGcj02 } from '@/lib/reverse-geocode';
-import { sanitizeTrackLocations, smoothTrackLocations } from '@/lib/track-utils';
-import { TimelineLocation } from '@/types/journey';
+import { useI18n } from "@/hooks/locale-preference"
+import { toGcj02 } from "@/lib/reverse-geocode"
+import { sanitizeTrackLocations, smoothTrackLocations } from "@/lib/track-utils"
+import { TimelineLocation } from "@/types/journey"
 
-const startMarkerIcon = require('../assets/images/marker-start.png');
-const endMarkerIcon = require('../assets/images/marker-end.png');
-const midMarkerIcon = require('../assets/images/marker-mid.png');
+const startMarkerIcon = require("../assets/images/marker-start.png")
+const endMarkerIcon = require("../assets/images/marker-end.png")
+const midMarkerIcon = require("../assets/images/marker-mid.png")
 
 function getRegion(locations: TimelineLocation[]) {
   if (locations.length === 0) {
@@ -19,7 +28,7 @@ function getRegion(locations: TimelineLocation[]) {
       longitude: 116.4074,
       latitudeDelta: 0.08,
       longitudeDelta: 0.08,
-    };
+    }
   }
 
   if (locations.length === 1) {
@@ -28,100 +37,162 @@ function getRegion(locations: TimelineLocation[]) {
       longitude: locations[0].longitude,
       latitudeDelta: 0.02,
       longitudeDelta: 0.02,
-    };
+    }
   }
 
-  const lats = locations.map((item) => item.latitude);
-  const lngs = locations.map((item) => item.longitude);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const lats = locations.map(item => item.latitude)
+  const lngs = locations.map(item => item.longitude)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
 
   return {
     latitude: (minLat + maxLat) / 2,
     longitude: (minLng + maxLng) / 2,
     latitudeDelta: Math.max(0.01, (maxLat - minLat) * 1.4),
     longitudeDelta: Math.max(0.01, (maxLng - minLng) * 1.4),
-  };
+  }
 }
 
 function getAmapZoom(locations: TimelineLocation[]) {
   if (locations.length <= 1) {
-    return 16;
+    return 16
   }
 
-  const lats = locations.map((item) => item.latitude);
-  const lngs = locations.map((item) => item.longitude);
-  const span = Math.max(Math.max(...lats) - Math.min(...lats), Math.max(...lngs) - Math.min(...lngs));
+  const lats = locations.map(item => item.latitude)
+  const lngs = locations.map(item => item.longitude)
+  const span = Math.max(
+    Math.max(...lats) - Math.min(...lats),
+    Math.max(...lngs) - Math.min(...lngs),
+  )
 
   if (span < 0.01) {
-    return 16;
+    return 16
   }
   if (span < 0.03) {
-    return 14;
+    return 14
   }
   if (span < 0.08) {
-    return 12;
+    return 12
   }
-  return 10;
+  return 10
 }
 
 export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
-  const { t } = useI18n();
-  const displayLocations = smoothTrackLocations(sanitizeTrackLocations(locations));
+  const { t } = useI18n()
+  const displayLocations = smoothTrackLocations(
+    sanitizeTrackLocations(locations),
+  )
   const amapAndroidApiKey =
     Constants.expoConfig?.extra?.amap?.androidApiKey ??
-    process.env.EXPO_PUBLIC_AMAP_ANDROID_API_KEY;
-  const [amapReady, setAmapReady] = useState(Platform.OS !== 'android');
-  const [amapError, setAmapError] = useState<string | null>(null);
+    process.env.EXPO_PUBLIC_AMAP_ANDROID_API_KEY
+  const [amapReady, setAmapReady] = useState(Platform.OS !== "android")
+  const [amapError, setAmapError] = useState<string | null>(null)
+  const [showTrackData, setShowTrackData] = useState(false)
 
   const amapLocations = useMemo(
-    () => displayLocations.map((item) => toGcj02(item.latitude, item.longitude)),
-    [displayLocations]
-  );
+    () => displayLocations.map(item => toGcj02(item.latitude, item.longitude)),
+    [displayLocations],
+  )
 
   useEffect(() => {
-    if (Platform.OS !== 'android') {
-      return;
+    if (Platform.OS !== "android") {
+      return
     }
     if (!amapAndroidApiKey) {
-      setAmapReady(false);
-      setAmapError(t('trackMap.missingKey'));
-      return;
+      setAmapReady(false)
+      setAmapError(t("trackMap.missingKey"))
+      return
     }
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { AMapSdk } = require('react-native-amap3d');
-      AMapSdk.init(amapAndroidApiKey);
-      setAmapReady(true);
-      setAmapError(null);
+      const { AMapSdk } = require("react-native-amap3d")
+      AMapSdk.init(amapAndroidApiKey)
+      setAmapReady(true)
+      setAmapError(null)
     } catch {
-      setAmapReady(false);
-      setAmapError(t('trackMap.initFailed'));
+      setAmapReady(false)
+      setAmapError(t("trackMap.initFailed"))
     }
-  }, [amapAndroidApiKey, t]);
+  }, [amapAndroidApiKey, t])
 
   if (displayLocations.length === 0) {
-    return null;
+    return null
   }
 
-  if (Platform.OS === 'android' && !amapReady) {
+  if (Platform.OS === "android" && !amapReady) {
     return (
-      <View style={styles.mapFallbackWrap}>
-        <Text style={styles.mapFallbackTitle}>{t('trackMap.fallbackTitle')}</Text>
-        <Text style={styles.mapFallbackText}>
-          {amapError ?? t('trackMap.fallbackBody')}
-        </Text>
-      </View>
-    );
+      <>
+        <View style={styles.mapFallbackWrap}>
+          <Text style={styles.mapFallbackTitle}>
+            {t("trackMap.fallbackTitle")}
+          </Text>
+          <Text style={styles.mapFallbackText}>
+            {amapError ?? t("trackMap.fallbackBody")}
+          </Text>
+          <TouchableOpacity
+            style={styles.viewDataButton}
+            onPress={() => setShowTrackData(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.viewDataButtonText}>
+              {t("trackMap.viewTrackData")}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <Modal
+          visible={showTrackData}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setShowTrackData(false)}
+        >
+          <View style={styles.trackDataOverlay}>
+            <View style={styles.trackDataSheet}>
+              <Text style={styles.trackDataTitle}>
+                {t("trackMap.trackDataTitle")}
+              </Text>
+              <ScrollView style={styles.trackDataList}>
+                {displayLocations.map((loc, index) => (
+                  <View key={index} style={styles.trackDataRow}>
+                    <Text style={styles.trackDataIndex}>{index + 1}</Text>
+                    <View style={styles.trackDataCoords}>
+                      <Text style={styles.trackDataText}>
+                        {loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}
+                      </Text>
+                      {loc.placeName ? (
+                        <Text style={styles.trackDataPlace}>
+                          {loc.placeName}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+              <Pressable
+                style={styles.trackDataClose}
+                onPress={() => setShowTrackData(false)}
+              >
+                <Text style={styles.trackDataCloseText}>
+                  {t("trackMap.trackDataClose")}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      </>
+    )
   }
 
-  if (Platform.OS === 'android') {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { MapView: AMapView, Marker: AMapMarker, Polyline: AMapPolyline } = require('react-native-amap3d');
-    const center = amapLocations[Math.floor(amapLocations.length / 2)];
+  if (Platform.OS === "android") {
+    const {
+      MapView: AMapView,
+      Marker: AMapMarker,
+      Polyline: AMapPolyline,
+    } = require("react-native-amap3d")
+    const center = amapLocations[Math.floor(amapLocations.length / 2)]
     return (
       <View style={styles.mapWrap}>
         <AMapView
@@ -132,83 +203,174 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
           initialCameraPosition={{
             target: center,
             zoom: getAmapZoom(amapLocations),
-          }}>
-          <AMapPolyline points={amapLocations} width={4} color="#0f766e" colors={[]} />
+          }}
+        >
+          <AMapPolyline
+            points={amapLocations}
+            width={4}
+            color="#0f766e"
+            colors={[]}
+          />
           {amapLocations.map((point, index) => {
-            const isStart = index === 0;
-            const isEnd = index === amapLocations.length - 1;
+            const isStart = index === 0
+            const isEnd = index === amapLocations.length - 1
             return (
               <AMapMarker
                 key={`${point.latitude}-${point.longitude}-${index}`}
                 position={point}
-                icon={isStart ? startMarkerIcon : isEnd ? endMarkerIcon : midMarkerIcon}
+                icon={
+                  isStart
+                    ? startMarkerIcon
+                    : isEnd
+                      ? endMarkerIcon
+                      : midMarkerIcon
+                }
               />
-            );
+            )
           })}
         </AMapView>
       </View>
-    );
+    )
   }
 
   return (
     <View style={styles.mapWrap}>
       <MapView style={styles.map} initialRegion={getRegion(displayLocations)}>
-        <Polyline coordinates={displayLocations} strokeWidth={4} strokeColor="#0f766e" />
+        <Polyline
+          coordinates={displayLocations}
+          strokeWidth={4}
+          strokeColor="#0f766e"
+        />
         {displayLocations.map((location, index) => (
           <Marker
             key={`${location.latitude}-${location.longitude}-${index}`}
             coordinate={location}
             pinColor={
               index === 0
-                ? '#0284c7'
+                ? "#0284c7"
                 : index === displayLocations.length - 1
-                  ? '#dc2626'
-                  : '#0f766e'
+                  ? "#dc2626"
+                  : "#0f766e"
             }
             title={
               index === 0
-                ? t('trackMap.startPoint')
+                ? t("trackMap.startPoint")
                 : index === displayLocations.length - 1
-                  ? t('trackMap.endPoint')
-                  : t('trackMap.nodePoint', { index: index + 1 })
+                  ? t("trackMap.endPoint")
+                  : t("trackMap.nodePoint", { index: index + 1 })
             }
           />
         ))}
       </MapView>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
   mapWrap: {
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: "#e2e8f0",
     marginTop: 6,
   },
   map: {
-    width: '100%',
+    width: "100%",
     height: 180,
   },
   mapFallbackWrap: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
     marginTop: 6,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 4,
   },
   mapFallbackTitle: {
-    color: '#0f172a',
+    color: "#0f172a",
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   mapFallbackText: {
-    color: '#475569',
+    color: "#475569",
     fontSize: 12,
     lineHeight: 18,
   },
-});
+  viewDataButton: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    backgroundColor: "#0f766e",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  viewDataButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  trackDataOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  trackDataSheet: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: "80%",
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  trackDataTitle: {
+    color: "#0f172a",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  trackDataList: {
+    marginBottom: 16,
+  },
+  trackDataRow: {
+    flexDirection: "row",
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#e2e8f0",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  trackDataIndex: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
+    minWidth: 24,
+    textAlign: "right",
+  },
+  trackDataCoords: {
+    flex: 1,
+  },
+  trackDataText: {
+    color: "#334155",
+    fontSize: 12,
+    fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
+  },
+  trackDataPlace: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  trackDataClose: {
+    backgroundColor: "#0f172a",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  trackDataCloseText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+})

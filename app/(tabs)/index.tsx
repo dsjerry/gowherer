@@ -1,48 +1,38 @@
-
-import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   AudioModule,
   RecordingPresets,
   setAudioModeAsync,
-  useAudioPlayer,
-  useAudioPlayerStatus,
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActiveJourneyCard } from '@/components/active-journey-card';
+import { JourneyCreateCard } from '@/components/journey-create-card';
+import { MediaPreviewModal } from '@/components/media-preview-modal';
+import { TemplateModal } from '@/components/template-modal';
+import { TimelineList } from '@/components/timeline-list';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import {
-  isBackgroundLocationTrackingAvailable,
-  isLocationTrackingActive,
-  startLocationTracking,
-  stopLocationTracking,
-} from '@/lib/background-location';
-import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
+import { useJourneys } from '@/hooks/use-journeys';
+import { useLocationTracking } from '@/hooks/use-location-tracking';
+import { stopLocationTracking } from '@/lib/background-location';
 import {
   getLocalLogFileUri,
-  initLocalLogFile,
   logLocalError,
   logLocalInfo,
 } from '@/lib/local-log';
@@ -53,7 +43,6 @@ import {
   saveEntryTemplateConfig,
 } from '@/lib/template-storage-i18n';
 import {
-  Journey,
   JourneyKind,
   MediaType,
   TimelineEntry,
@@ -62,43 +51,12 @@ import {
 } from '@/types/journey';
 import { EntryTemplate, EntryTemplateConfig } from '@/types/template';
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function AudioPlayer({ uri, label }: { uri: string; label: string }) {
-  const player = useAudioPlayer(uri);
-  const status = useAudioPlayerStatus(player);
-  const isPlaying = status?.playing ?? false;
-
-  const togglePlayback = async () => {
-    if (isPlaying) {
-      await player.pause();
-      return;
-    }
-    if (status?.duration && status.currentTime >= status.duration) {
-      await player.seekTo(0);
-    }
-    await player.play();
-  };
-
-  return (
-    <Pressable style={styles.audioCard} onPress={togglePlayback}>
-      <MaterialIcons name={isPlaying ? 'pause-circle-filled' : 'play-circle-filled'} size={20} color="#0f766e" />
-      <Text style={styles.audioLabel} numberOfLines={1} ellipsizeMode="tail">
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function formatDateTime(iso: string) {
-  const date = new Date(iso);
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  const hh = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
-  return `${mm}/${dd} ${hh}:${min}`;
 }
 
 function parseTagsInput(raw: string) {
@@ -106,64 +64,20 @@ function parseTagsInput(raw: string) {
     new Set(
       raw
         .split(/[,，、]/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-    )
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
   );
-}
-
-function mediaPreviewUri(media: TimelineMedia) {
-  if (media.type === 'video') {
-    return media.thumbnailUri;
-  }
-  if (media.type === 'audio') {
-    return undefined;
-  }
-  return media.uri;
 }
 
 function buildTimelineMedia(asset: ImagePicker.ImagePickerAsset): TimelineMedia {
   const type: MediaType = asset.type === 'video' ? 'video' : 'photo';
-
-  return {
-    id: createId('media'),
-    uri: asset.uri,
-    type,
-    thumbnailUri: undefined,
-  };
+  return { id: createId('media'), uri: asset.uri, type, thumbnailUri: undefined };
 }
 
-function PreviewVideo({ uri }: { uri: string }) {
-  const player = useVideoPlayer({ uri }, (videoPlayer) => {
-    videoPlayer.loop = false;
-    videoPlayer.play();
-  });
-
-  return (
-    <VideoView
-      player={player}
-      style={styles.previewMedia}
-      nativeControls
-      contentFit="contain"
-    />
-  );
-}
-
-function MediaVideoCover({ uri }: { uri: string }) {
-  const player = useVideoPlayer({ uri }, (videoPlayer) => {
-    videoPlayer.loop = false;
-    videoPlayer.muted = true;
-  });
-
-  return (
-    <VideoView
-      player={player}
-      style={styles.mediaPreview}
-      nativeControls={false}
-      contentFit="cover"
-    />
-  );
-}
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
 
 export default function JourneyScreen() {
   const router = useRouter();
@@ -171,185 +85,73 @@ export default function JourneyScreen() {
   const colorScheme = useColorScheme();
   const { t, locale } = useI18n();
   const isDark = colorScheme === 'dark';
-  const themed = {
-    pageTitle: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
-    },
-    pageSubTitle: {
-      color: isDark ? '#94a3b8' : '#475569',
-    },
-    card: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
-    },
-    sectionTitle: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
-    },
-    mutedText: {
-      color: isDark ? '#94a3b8' : '#64748b',
-    },
-    input: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#cbd5e1',
-      color: isDark ? '#e2e8f0' : '#0f172a',
-    },
-    inputPlaceholder: isDark ? '#94a3b8' : '#64748b',
-    tagChip: {
-      backgroundColor: isDark ? '#334155' : '#e0f2fe',
-    },
-    tagChipText: {
-      color: isDark ? '#e2e8f0' : '#0c4a6e',
-    },
-    kindButton: {
-      backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
-      borderColor: isDark ? '#334155' : '#cbd5e1',
-    },
-    kindButtonText: {
-      color: isDark ? '#cbd5e1' : '#0f172a',
-    },
-    ghostButton: {
-      borderColor: isDark ? '#f59e0b' : '#f59e0b',
-      backgroundColor: isDark ? '#1f2937' : '#ffffff',
-    },
-    ghostButtonText: {
-      color: isDark ? '#fbbf24' : '#b45309',
-    },
-    editorLabel: {
-      color: isDark ? '#cbd5e1' : '#334155',
-    },
-    secondaryButton: {
-      backgroundColor: isDark ? '#334155' : '#e2e8f0',
-    },
-    secondaryButtonText: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
-    },
-    cancelButton: {
-      borderColor: isDark ? '#334155' : '#cbd5e1',
-      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-    },
-    cancelButtonText: {
-      color: isDark ? '#cbd5e1' : '#334155',
-    },
-    locationText: {
-      color: isDark ? '#cbd5e1' : '#334155',
-    },
-    timelineDot: {
-      backgroundColor: isDark ? '#22d3ee' : '#0f766e',
-    },
-    timelineLine: {
-      backgroundColor: isDark ? '#475569' : '#cbd5e1',
-    },
-    timelineTime: {
-      color: isDark ? '#94a3b8' : '#64748b',
-    },
-    timelineText: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
-    },
-    templateChip: {
-      borderColor: isDark ? '#334155' : '#cbd5e1',
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-    },
-    templateChipText: {
-      color: isDark ? '#cbd5e1' : '#334155',
-    },
-    mediaPreviewBox: {
-      borderColor: isDark ? '#334155' : '#e2e8f0',
-      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-    },
-    mediaFooter: {
-      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
-    },
-    mediaBadge: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
-    },
-    mediaPlaceholder: {
-      backgroundColor: isDark ? '#334155' : '#0f172a',
-    },
-    mediaPlaceholderText: {
-      color: '#ffffff',
-    },
-    modalCard: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
-    },
-    modalTitle: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
-    },
-    templateItem: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
-    },
-    templateItemTitle: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
-    },
-    templateItemText: {
-      color: isDark ? '#cbd5e1' : '#334155',
-    },
-  };
-  const [journeys, setJourneys] = useState<Journey[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [savingEntry, setSavingEntry] = useState(false);
-  const [openingLocationPicker, setOpeningLocationPicker] = useState(false);
-  const [pickingMedia, setPickingMedia] = useState(false);
-  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
-  const [journeyTitle, setJourneyTitle] = useState('');
-  const [journeyTagsInput, setJourneyTagsInput] = useState('');
-  const [journeyKind, setJourneyKind] = useState<JourneyKind>('travel');
+  const pageTitleColor = { color: isDark ? '#e2e8f0' : '#0f172a' };
+  const pageSubTitleColor = { color: isDark ? '#94a3b8' : '#475569' };
+
+  // ---- Journey data -------------------------------------------------------
+  const {
+    loading,
+    activeJourney,
+    completedJourneysCount,
+    addJourney,
+    completeJourney,
+    addEntry,
+    updateEntry,
+    removeEntry,
+    refreshJourneys,
+  } = useJourneys();
+
+  // ---- Location tracking --------------------------------------------------
+  const { locationTracking, trackingBusy, handleTrackingChange } =
+    useLocationTracking(activeJourney, refreshJourneys);
+
+  // ---- Draft entry state --------------------------------------------------
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryText, setEntryText] = useState('');
   const [entryTagsInput, setEntryTagsInput] = useState('');
   const [draftLocation, setDraftLocation] = useState<TimelineLocation>();
   const [draftMedia, setDraftMedia] = useState<TimelineMedia[]>([]);
-  const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(audioRecorder);
+
+  // ---- New-journey form ---------------------------------------------------
+  const [journeyTitle, setJourneyTitle] = useState('');
+  const [journeyTagsInput, setJourneyTagsInput] = useState('');
+  const [journeyKind, setJourneyKind] = useState<JourneyKind>('travel');
+  const [creating, setCreating] = useState(false);
+
+  // ---- Templates ----------------------------------------------------------
   const [templateConfig, setTemplateConfig] = useState<EntryTemplateConfig>(
-    getDefaultEntryTemplateConfig(locale)
+    getDefaultEntryTemplateConfig(locale),
   );
   const [templateModalVisible, setTemplateModalVisible] = useState(false);
-  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
-    null
-  );
-  const [templateLabelInput, setTemplateLabelInput] = useState('');
-  const [templateTextInput, setTemplateTextInput] = useState('');
-  const [templateTagsInput, setTemplateTagsInput] = useState('');
-
-  const [locationTracking, setLocationTracking] = useState(false);
-  const [trackingBusy, setTrackingBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      await initLocalLogFile();
-      const storedJourneys = await loadJourneys();
-      if (!active) {
-        return;
-      }
-      setJourneys(storedJourneys);
-      setLoading(false);
+      const stored = await loadEntryTemplateConfig(locale);
+      if (!active) return;
+      setTemplateConfig(stored);
     })();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      const storedTemplateConfig = await loadEntryTemplateConfig(locale);
-      if (!active) {
-        return;
-      }
-      setTemplateConfig(storedTemplateConfig);
-    })();
-
     return () => {
       active = false;
     };
   }, [locale]);
 
+  const templateKind: JourneyKind = activeJourney?.kind ?? journeyKind;
+  const entryTemplates = useMemo(
+    () => templateConfig[templateKind],
+    [templateConfig, templateKind],
+  );
+
+  // ---- Media / audio state ------------------------------------------------
+  const [pickingMedia, setPickingMedia] = useState(false);
+  const [openingLocationPicker, setOpeningLocationPicker] = useState(false);
+  const [savingEntry, setSavingEntry] = useState(false);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
+  const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
+
+  // ---- Pending location from picker page ----------------------------------
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -360,69 +162,48 @@ export default function JourneyScreen() {
           void logLocalInfo('JourneyScreen', 'location selected from picker page', picked);
         }
       })();
-
       return () => {
         active = false;
       };
-    }, [])
+    }, []),
   );
 
-  const activeJourney = useMemo(
-    () => journeys.find((item) => item.status === 'active'),
-    [journeys]
-  );
+  // ---- Handlers: journey CRUD --------------------------------------------
 
-  useEffect(() => {
-    let active = true;
-
-    (async () => {
-      if (!activeJourney) {
-        if (active) {
-          setLocationTracking(false);
-        }
-        return;
-      }
-
-      const started = await isLocationTrackingActive();
-      if (active) {
-        setLocationTracking(started);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [activeJourney?.id]);
-
-  useEffect(() => {
-    if (!locationTracking || !activeJourney) {
+  async function handleCreateJourney() {
+    const title = journeyTitle.trim();
+    if (!title) {
+      Alert.alert(t('journey.alertEnterTitleTitle'), t('journey.alertEnterTitleBody'));
       return;
     }
+    if (activeJourney) {
+      Alert.alert(t('journey.alertActiveJourneyTitle'), t('journey.alertActiveJourneyBody'));
+      return;
+    }
+    setCreating(true);
+    try {
+      const tags = parseTagsInput(journeyTagsInput);
+      await addJourney(title, journeyKind, tags);
+      setJourneyTitle('');
+      setJourneyTagsInput('');
+      setJourneyKind('travel');
+    } finally {
+      setCreating(false);
+    }
+  }
 
-    const intervalId = setInterval(() => {
-      void loadJourneys().then((storedJourneys) => {
-        setJourneys(storedJourneys);
-      });
-    }, 10000);
+  async function handleEndJourney() {
+    if (!activeJourney) return;
+    try {
+      await stopLocationTracking();
+    } catch (error) {
+      void logLocalError('JourneyScreen', 'failed to stop location tracking while ending journey', error);
+    }
+    await completeJourney(activeJourney.id);
+    resetDraft();
+  }
 
-    return () => clearInterval(intervalId);
-  }, [locationTracking, activeJourney]);
-
-  const completedJourneysCount = useMemo(
-    () => journeys.filter((item) => item.status === 'completed').length,
-    [journeys]
-  );
-
-  const kindLabel = useCallback(
-    (kind: JourneyKind) => t(kind === 'travel' ? 'journey.kind.travel' : 'journey.kind.commute'),
-    [t]
-  );
-
-  const templateKind = activeJourney?.kind ?? journeyKind;
-  const entryTemplates = useMemo(
-    () => templateConfig[templateKind],
-    [templateConfig, templateKind]
-  );
+  // ---- Handlers: entry draft ----------------------------------------------
 
   function resetDraft() {
     setEditingEntryId(null);
@@ -435,131 +216,103 @@ export default function JourneyScreen() {
     }
   }
 
-  async function updateJourneys(next: Journey[]) {
-    setJourneys(next);
-    await saveJourneys(next);
+  function startEditEntry(entry: TimelineEntry) {
+    setEditingEntryId(entry.id);
+    setEntryText(entry.text);
+    setEntryTagsInput(entry.tags.join(', '));
+    setDraftLocation(entry.location);
+    setDraftMedia(entry.media);
   }
 
-  async function handleLocationTrackingChange(nextValue: boolean) {
-    if (!activeJourney || trackingBusy) {
+  async function handleDeleteEntry(entryId: string) {
+    if (!activeJourney) return;
+    await removeEntry(activeJourney.id, entryId);
+    if (editingEntryId === entryId) {
+      resetDraft();
+    }
+  }
+
+  async function handleSaveEntry() {
+    if (!activeJourney) return;
+    const text = entryText.trim();
+    const tags = parseTagsInput(entryTagsInput);
+    if (!text && draftMedia.length === 0 && !draftLocation && tags.length === 0) {
+      Alert.alert(t('journey.recordEmptyTitle'), t('journey.recordEmptyBody'));
       return;
     }
 
-    setTrackingBusy(true);
-
+    setSavingEntry(true);
     try {
-      if (!nextValue) {
-        await stopLocationTracking();
-        setLocationTracking(false);
-        const storedJourneys = await loadJourneys();
-        setJourneys(storedJourneys);
-        return;
+      if (editingEntryId) {
+        const original = activeJourney.entries.find((e) => e.id === editingEntryId);
+        const entry: TimelineEntry = {
+          id: editingEntryId,
+          createdAt: original?.createdAt ?? new Date().toISOString(),
+          text,
+          tags,
+          location: draftLocation,
+          media: draftMedia,
+        };
+        await updateEntry(activeJourney.id, entry);
+      } else {
+        const entry: TimelineEntry = {
+          id: createId('entry'),
+          createdAt: new Date().toISOString(),
+          text,
+          tags,
+          location: draftLocation,
+          media: draftMedia,
+        };
+        await addEntry(activeJourney.id, entry);
       }
-
-      const available = await isBackgroundLocationTrackingAvailable();
-      if (!available) {
-        Alert.alert(
-          t('journey.alertTrackingUnavailableTitle'),
-          t('journey.alertTrackingUnavailableBody')
-        );
-        return;
-      }
-
-      const foregroundPermission = await Location.requestForegroundPermissionsAsync();
-      if (foregroundPermission.status !== 'granted') {
-        Alert.alert(
-          t('journey.alertTrackingPermissionTitle'),
-          t('journey.alertTrackingPermissionBody')
-        );
-        return;
-      }
-
-      const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
-      if (backgroundPermission.status !== 'granted') {
-        Alert.alert(
-          t('journey.alertTrackingPermissionTitle'),
-          t('journey.alertTrackingPermissionBody')
-        );
-        return;
-      }
-
-      await startLocationTracking(activeJourney.id, {
-        notificationTitle: t('journey.trackingNotificationTitle'),
-        notificationBody: t('journey.trackingNotificationBody'),
-      });
-      setLocationTracking(true);
-    } catch (error) {
-      void logLocalError('JourneyScreen', 'failed to toggle location tracking', error);
-      Alert.alert(
-        t('journey.alertTrackingStartFailedTitle'),
-        t('journey.alertTrackingStartFailedBody')
-      );
+      resetDraft();
     } finally {
-      setTrackingBusy(false);
+      setSavingEntry(false);
     }
   }
 
-  async function createJourney() {
-    const title = journeyTitle.trim();
-    if (!title) {
-      Alert.alert(t('journey.alertEnterTitleTitle'), t('journey.alertEnterTitleBody'));
-      return;
-    }
+  // ---- Handlers: template CRUD -------------------------------------------
 
-    if (activeJourney) {
-      Alert.alert(t('journey.alertActiveJourneyTitle'), t('journey.alertActiveJourneyBody'));
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const now = new Date().toISOString();
-      const tags = parseTagsInput(journeyTagsInput);
-      const nextJourney: Journey = {
-        id: createId('journey'),
-        title,
-        kind: journeyKind,
-        createdAt: now,
-        status: 'active',
-        tags,
-        entries: [],
-        trackLocations: [],
-      };
-
-      await updateJourneys([nextJourney, ...journeys]);
-      setJourneyTitle('');
-      setJourneyTagsInput('');
-      setJourneyKind('travel');
-    } finally {
-      setCreating(false);
-    }
+  async function updateTemplateConfig(next: EntryTemplateConfig) {
+    setTemplateConfig(next);
+    await saveEntryTemplateConfig(locale, next);
   }
 
-  async function endCurrentJourney() {
-    if (!activeJourney) {
-      return;
-    }
-
-    try {
-      await stopLocationTracking();
-    } catch (error) {
-      void logLocalError('JourneyScreen', 'failed to stop location tracking while ending journey', error);
-    }
-    setLocationTracking(false);
-
-    const storedJourneys = await loadJourneys();
-    const next = storedJourneys.map((item) =>
-      item.id === activeJourney.id
-        ? {
-            ...item,
-            status: 'completed' as const,
-            endedAt: new Date().toISOString(),
-          }
-        : item
-    );
-    await updateJourneys(next);
-    resetDraft();
+  async function handleSaveTemplate(
+    label: string,
+    text: string,
+    tags: string[],
+    editingId: string | null,
+  ) {
+    const templates = templateConfig[templateKind];
+    const nextTemplate: EntryTemplate = {
+      id: editingId ?? createId(`template-${templateKind}`),
+      label,
+      text,
+      tags,
+    };
+    const nextTemplates = editingId
+      ? templates.map((t) => (t.id === editingId ? nextTemplate : t))
+      : [...templates, nextTemplate];
+    await updateTemplateConfig({ ...templateConfig, [templateKind]: nextTemplates });
   }
+
+  async function handleRemoveTemplate(templateId: string) {
+    const templates = templateConfig[templateKind];
+    const nextTemplates = templates.filter((t) => t.id !== templateId);
+    if (nextTemplates.length === 0) return; // guarded by modal
+    await updateTemplateConfig({ ...templateConfig, [templateKind]: nextTemplates });
+  }
+
+  async function handleResetTemplates() {
+    const defaults = getDefaultEntryTemplateConfig(locale);
+    await updateTemplateConfig({
+      ...templateConfig,
+      [templateKind]: defaults[templateKind],
+    });
+  }
+
+  // ---- Handlers: media / audio / location ---------------------------------
 
   async function pickMediaFromLibrary() {
     setPickingMedia(true);
@@ -569,84 +322,59 @@ export default function JourneyScreen() {
         Alert.alert(t('journey.alertAlbumDeniedTitle'), t('journey.alertAlbumDeniedBody'));
         return;
       }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All,
         quality: 0.8,
       });
-
-      if (result.canceled || result.assets.length === 0) {
-        return;
-      }
-
-      const picked = result.assets.map((asset) => buildTimelineMedia(asset));
-      setDraftMedia((prev) => [...prev, ...picked]);
+      if (result.canceled || result.assets.length === 0) return;
+      setDraftMedia((prev) => [...prev, ...result.assets.map(buildTimelineMedia)]);
     } finally {
       setPickingMedia(false);
-    }
-  }
-
-  async function startRecording() {
-    const permission = await AudioModule.requestRecordingPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(t('journey.alertMicDeniedTitle'), t('journey.alertMicDeniedBody'));
-      return;
-    }
-    await setAudioModeAsync({
-      allowsRecording: true,
-      playsInSilentMode: true,
-    });
-    await audioRecorder.prepareToRecordAsync();
-    audioRecorder.record();
-  }
-
-  async function stopRecording() {
-    if (!recorderState.isRecording) {
-      return;
-    }
-    await audioRecorder.stop();
-    await setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: true,
-    });
-    const uri = audioRecorder.uri;
-    if (uri) {
-      setDraftMedia((prev) => [
-        ...prev,
-        {
-          id: createId('audio'),
-          uri,
-          type: 'audio',
-          thumbnailUri: undefined,
-        },
-      ]);
     }
   }
 
   async function captureMediaWithCamera(type: MediaType) {
     setPickingMedia(true);
     try {
-      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!cameraPermission.granted) {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
         Alert.alert(t('journey.alertCameraDeniedTitle'), t('journey.alertCameraDeniedBody'));
         return;
       }
-
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes:
           type === 'video' ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,
         videoMaxDuration: 120,
       });
-
-      if (result.canceled || result.assets.length === 0) {
-        return;
-      }
-
-      const captured = result.assets.map((asset) => buildTimelineMedia(asset));
-      setDraftMedia((prev) => [...prev, ...captured]);
+      if (result.canceled || result.assets.length === 0) return;
+      setDraftMedia((prev) => [...prev, ...result.assets.map(buildTimelineMedia)]);
     } finally {
       setPickingMedia(false);
+    }
+  }
+
+  async function startRecording() {
+    const perm = await AudioModule.requestRecordingPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(t('journey.alertMicDeniedTitle'), t('journey.alertMicDeniedBody'));
+      return;
+    }
+    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+    await audioRecorder.prepareToRecordAsync();
+    audioRecorder.record();
+  }
+
+  async function stopRecording() {
+    if (!recorderState.isRecording) return;
+    await audioRecorder.stop();
+    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+    const uri = audioRecorder.uri;
+    if (uri) {
+      setDraftMedia((prev) => [
+        ...prev,
+        { id: createId('audio'), uri, type: 'audio' as const, thumbnailUri: undefined },
+      ]);
     }
   }
 
@@ -657,13 +385,11 @@ export default function JourneyScreen() {
         Alert.alert(t('journey.alertMapUnsupportedTitle'), t('journey.alertMapUnsupportedBody'));
         return;
       }
-
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (!perm.granted) {
         Alert.alert(t('journey.alertLocationDeniedTitle'), t('journey.alertLocationDeniedBody'));
         return;
       }
-
       void logLocalInfo('JourneyScreen', 'open map picker page');
       const initial = draftLocation
         ? JSON.stringify({
@@ -672,192 +398,19 @@ export default function JourneyScreen() {
             placeName: draftLocation.placeName,
           })
         : undefined;
-      router.push({
-        pathname: '/location-picker',
-        params: initial ? { initial } : {},
-      });
+      router.push({ pathname: '/location-picker', params: initial ? { initial } : {} });
     } catch (error) {
       void logLocalError('JourneyScreen', error, { stage: 'open-map-picker' });
       Alert.alert(
         t('journey.alertOpenMapFailedTitle'),
-        t('journey.alertOpenMapFailedBody', { uri: getLocalLogFileUri() })
+        t('journey.alertOpenMapFailedBody', { uri: getLocalLogFileUri() }),
       );
     } finally {
       setOpeningLocationPicker(false);
     }
   }
 
-  function startEditEntry(entry: TimelineEntry) {
-    setEditingEntryId(entry.id);
-    setEntryText(entry.text);
-    setEntryTagsInput(entry.tags.join(', '));
-    setDraftLocation(entry.location);
-    setDraftMedia(entry.media);
-  }
-
-  async function deleteEntry(entryId: string) {
-    if (!activeJourney) {
-      return;
-    }
-
-    const next = journeys.map((item) =>
-      item.id === activeJourney.id
-        ? {
-            ...item,
-            entries: item.entries.filter((entry) => entry.id !== entryId),
-          }
-        : item
-    );
-    await updateJourneys(next);
-
-    if (editingEntryId === entryId) {
-      resetDraft();
-    }
-  }
-
-  async function saveTimelineEntry() {
-    if (!activeJourney) {
-      return;
-    }
-
-    const text = entryText.trim();
-    const tags = parseTagsInput(entryTagsInput);
-    if (!text && draftMedia.length === 0 && !draftLocation && tags.length === 0) {
-      Alert.alert(t('journey.recordEmptyTitle'), t('journey.recordEmptyBody'));
-      return;
-    }
-
-    setSavingEntry(true);
-    try {
-      const next = journeys.map((item) => {
-        if (item.id !== activeJourney.id) {
-          return item;
-        }
-
-        if (editingEntryId) {
-          return {
-            ...item,
-            entries: item.entries.map((entry) =>
-              entry.id === editingEntryId
-                ? {
-                    ...entry,
-                    text,
-                    tags,
-                    location: draftLocation,
-                    media: draftMedia,
-                  }
-                : entry
-            ),
-          };
-        }
-
-        const nextEntry: TimelineEntry = {
-          id: createId('entry'),
-          createdAt: new Date().toISOString(),
-          text,
-          tags,
-          location: draftLocation,
-          media: draftMedia,
-        };
-        return {
-          ...item,
-          entries: [...item.entries, nextEntry],
-        };
-      });
-
-      await updateJourneys(next);
-      resetDraft();
-    } finally {
-      setSavingEntry(false);
-    }
-  }
-
-  function applyTemplate(template: EntryTemplate) {
-    const currentText = entryText.trim();
-    const nextText = currentText ? `${currentText}\n${template.text}` : template.text;
-    const currentTags = parseTagsInput(entryTagsInput);
-    const mergedTags = Array.from(new Set([...currentTags, ...template.tags]));
-
-    setEntryText(nextText);
-    setEntryTagsInput(mergedTags.join(', '));
-  }
-
-  function resetTemplateEditor() {
-    setEditingTemplateId(null);
-    setTemplateLabelInput('');
-    setTemplateTextInput('');
-    setTemplateTagsInput('');
-  }
-
-  function startEditTemplate(template: EntryTemplate) {
-    setEditingTemplateId(template.id);
-    setTemplateLabelInput(template.label);
-    setTemplateTextInput(template.text);
-    setTemplateTagsInput(template.tags.join(', '));
-  }
-
-  async function updateTemplateConfig(next: EntryTemplateConfig) {
-    setTemplateConfig(next);
-    await saveEntryTemplateConfig(locale, next);
-  }
-
-  async function saveTemplate() {
-    const label = templateLabelInput.trim();
-    const text = templateTextInput.trim();
-    const tags = parseTagsInput(templateTagsInput);
-
-    if (!label || !text) {
-      Alert.alert(t('journey.alertTemplateIncompleteTitle'), t('journey.alertTemplateIncompleteBody'));
-      return;
-    }
-
-    const templates = templateConfig[templateKind];
-    const nextTemplate: EntryTemplate = {
-      id: editingTemplateId ?? createId(`template-${templateKind}`),
-      label,
-      text,
-      tags,
-    };
-    const nextTemplates = editingTemplateId
-      ? templates.map((template) =>
-          template.id === editingTemplateId ? nextTemplate : template
-        )
-      : [...templates, nextTemplate];
-
-    await updateTemplateConfig({
-      ...templateConfig,
-      [templateKind]: nextTemplates,
-    });
-    resetTemplateEditor();
-  }
-
-  async function removeTemplate(templateId: string) {
-    const templates = templateConfig[templateKind];
-    const nextTemplates = templates.filter((template) => template.id !== templateId);
-
-    if (nextTemplates.length === 0) {
-      Alert.alert(t('journey.alertTemplateMinimumTitle'), t('journey.alertTemplateMinimumBody'));
-      return;
-    }
-
-    await updateTemplateConfig({
-      ...templateConfig,
-      [templateKind]: nextTemplates,
-    });
-
-    if (editingTemplateId === templateId) {
-      resetTemplateEditor();
-    }
-  }
-
-  async function resetTemplatesToDefault() {
-    const defaults = getDefaultEntryTemplateConfig(locale);
-    await updateTemplateConfig({
-      ...templateConfig,
-      [templateKind]: defaults[templateKind],
-    });
-    resetTemplateEditor();
-  }
+  // ---- Render -------------------------------------------------------------
 
   if (loading) {
     return (
@@ -870,541 +423,112 @@ export default function JourneyScreen() {
   return (
     <View style={styles.pageWrap}>
       <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          { paddingTop: insets.top + 12 },
-        ]}>
+        contentContainerStyle={[styles.container, { paddingTop: insets.top + 12 }]}
+      >
+        {/* Page header */}
         <View style={styles.pageHeader}>
-          <Text style={[styles.pageTitle, themed.pageTitle]}>{t('journey.screenTitle')}</Text>
+          <Text style={[styles.pageTitle, pageTitleColor]}>{t('journey.screenTitle')}</Text>
         </View>
-        <Text style={[styles.pageSubTitle, themed.pageSubTitle]}>
+        <Text style={[styles.pageSubTitle, pageSubTitleColor]}>
           {t('journey.screenSummary', {
             count: completedJourneysCount,
             status: activeJourney ? t('journey.statusActive') : t('journey.statusInactive'),
           })}
         </Text>
 
+        {/* Create or Active journey card */}
         {!activeJourney ? (
-          <View style={[styles.card, themed.card]}>
-            <Text style={[styles.sectionTitle, themed.sectionTitle]}>{t('journey.startNew')}</Text>
-            <View style={styles.kindRow}>
-              <Pressable
-                style={[
-                  styles.kindButton,
-                  themed.kindButton,
-                  journeyKind === 'travel' && styles.kindButtonActive,
-                ]}
-                onPress={() => setJourneyKind('travel')}>
-                <Text
-                  style={[
-                    styles.kindButtonText,
-                    themed.kindButtonText,
-                    journeyKind === 'travel' && styles.kindButtonTextActive,
-                  ]}>
-                  {t('journey.kind.travel')}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.kindButton,
-                  themed.kindButton,
-                  journeyKind === 'commute' && styles.kindButtonActive,
-                ]}
-                onPress={() => setJourneyKind('commute')}>
-                <Text
-                  style={[
-                    styles.kindButtonText,
-                    themed.kindButtonText,
-                    journeyKind === 'commute' && styles.kindButtonTextActive,
-                  ]}>
-                  {t('journey.kind.commute')}
-                </Text>
-              </Pressable>
-            </View>
-            <TextInput
-              value={journeyTitle}
-              onChangeText={setJourneyTitle}
-              placeholder={t('journey.journeyTitlePlaceholder')}
-              placeholderTextColor={themed.inputPlaceholder}
-              style={[styles.input, themed.input]}
-            />
-            <TextInput
-              value={journeyTagsInput}
-              onChangeText={setJourneyTagsInput}
-              placeholder={t('journey.journeyTagsPlaceholder')}
-              placeholderTextColor={themed.inputPlaceholder}
-              style={[styles.input, themed.input]}
-            />
-            <Pressable style={styles.primaryButton} onPress={createJourney} disabled={creating}>
-              <Text style={styles.primaryButtonText}>
-                {creating ? t('journey.creatingJourney') : t('journey.createJourney')}
-              </Text>
-            </Pressable>
-          </View>
+          <JourneyCreateCard
+            journeyTitle={journeyTitle}
+            onChangeTitle={setJourneyTitle}
+            journeyTagsInput={journeyTagsInput}
+            onChangeTagsInput={setJourneyTagsInput}
+            journeyKind={journeyKind}
+            onChangeKind={setJourneyKind}
+            creating={creating}
+            onCreateJourney={handleCreateJourney}
+          />
         ) : (
-          <View style={[styles.card, themed.card]}>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={[styles.sectionTitle, themed.sectionTitle]}>{activeJourney.title}</Text>
-                <Text style={[styles.mutedText, themed.mutedText]}>
-                  {t('journey.currentJourneyMeta', {
-                    kind: kindLabel(activeJourney.kind),
-                    date: formatDateTime(activeJourney.createdAt),
-                    count: activeJourney.entries.length,
-                  })}
-                </Text>
-              </View>
-              <Pressable
-                style={[styles.ghostButton, themed.ghostButton]}
-                onPress={() => void endCurrentJourney()}>
-                <Text style={[styles.ghostButtonText, themed.ghostButtonText]}>
-                  {t('journey.endJourney')}
-                </Text>
-              </Pressable>
-            </View>
+          <>
+            <ActiveJourneyCard
+              activeJourney={activeJourney}
+              onEndJourney={handleEndJourney}
+              locationTracking={locationTracking}
+              trackingBusy={trackingBusy}
+              onLocationTrackingChange={handleTrackingChange}
+              editingEntryId={editingEntryId}
+              entryText={entryText}
+              onEntryTextChange={setEntryText}
+              entryTagsInput={entryTagsInput}
+              onEntryTagsInputChange={setEntryTagsInput}
+              draftLocation={draftLocation}
+              onRemoveDraftLocation={() => setDraftLocation(undefined)}
+              draftMedia={draftMedia}
+              onRemoveDraftMedia={(id) =>
+                setDraftMedia((prev) => prev.filter((m) => m.id !== id))
+              }
+              entryTemplates={entryTemplates}
+              onApplyTemplate={(template) => {
+                const text = entryText.trim();
+                const nextText = text
+                  ? `${text}\n${template.text}`
+                  : template.text;
+                const currentTags = parseTagsInput(entryTagsInput);
+                const merged = Array.from(new Set([...currentTags, ...template.tags]));
+                setEntryText(nextText);
+                setEntryTagsInput(merged.join(', '));
+              }}
+              onOpenTemplateModal={() => setTemplateModalVisible(true)}
+              savingEntry={savingEntry}
+              onSaveEntry={handleSaveEntry}
+              onResetDraft={resetDraft}
+              openingLocationPicker={openingLocationPicker}
+              onOpenLocationPicker={openAmapPlacePicker}
+              pickingMedia={pickingMedia}
+              onPickMediaFromLibrary={pickMediaFromLibrary}
+              onCapturePhoto={() => captureMediaWithCamera('photo')}
+              onCaptureVideo={() => captureMediaWithCamera('video')}
+              isRecording={recorderState.isRecording}
+              onStartRecording={startRecording}
+              onStopRecording={stopRecording}
+            />
 
-            <View style={styles.trackingRow}>
-              <Text style={[styles.trackingLabel, themed.sectionTitle]}>
-                {t('journey.locationTracking')}
-              </Text>
-              <Switch
-                value={locationTracking}
-                onValueChange={(val) => void handleLocationTrackingChange(val)}
-                disabled={trackingBusy}
-                trackColor={{ false: '#94a3b8', true: '#0f766e' }}
-                thumbColor="#ffffff"
+            {/* Timeline */}
+            {activeJourney.entries.length > 0 ? (
+              <TimelineList
+                entries={activeJourney.entries}
+                onEditEntry={startEditEntry}
+                onDeleteEntry={handleDeleteEntry}
+                onPreviewMedia={setPreviewMedia}
               />
-            </View>
-            {locationTracking && activeJourney.trackLocations.length > 0 ? (
-              <Text style={[styles.mutedText, themed.mutedText]}>
-                {t('journey.trackingPoints', { count: activeJourney.trackLocations.length })}
-              </Text>
             ) : null}
-
-            <Text style={[styles.sectionTitle, themed.sectionTitle]}>
-              {t('journey.recordEditorTitle', {
-                mode: editingEntryId ? t('journey.modeEdit') : t('journey.modeCreate'),
-              })}
-            </Text>
-
-            <View style={styles.templateWrap}>
-              <View style={styles.templateHeaderRow}>
-                <Text style={[styles.mutedText, themed.mutedText]}>
-                  {t('journey.templateShortcuts', { kind: kindLabel(templateKind) })}
-                </Text>
-                <Pressable onPress={() => setTemplateModalVisible(true)}>
-                  <Text style={styles.linkText}>{t('journey.manageTemplates')}</Text>
-                </Pressable>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.templateRow}>
-                {entryTemplates.map((template) => (
-                  <Pressable
-                    key={template.id}
-                    style={[styles.templateChip, themed.templateChip]}
-                    onPress={() => applyTemplate(template)}>
-                    <Text style={[styles.templateChipText, themed.templateChipText]}>
-                      {template.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-
-            <TextInput
-              value={entryText}
-              onChangeText={setEntryText}
-              placeholder={t('journey.entryTextPlaceholder')}
-              placeholderTextColor={themed.inputPlaceholder}
-              style={[styles.input, styles.textArea, themed.input]}
-              multiline
-            />
-            <TextInput
-              value={entryTagsInput}
-              onChangeText={setEntryTagsInput}
-              placeholder={t('journey.entryTagsPlaceholder')}
-              placeholderTextColor={themed.inputPlaceholder}
-              style={[styles.input, themed.input]}
-            />
-
-            <View style={styles.actionRow}>
-              <View style={styles.locationTextContainer}>
-                <Text style={[styles.locationText, themed.locationText]}>
-                  {t('journey.locationLabel')}
-                  {draftLocation
-                    ? `${draftLocation.placeName ? `${draftLocation.placeName} · ` : ''}${draftLocation.latitude.toFixed(5)}, ${draftLocation.longitude.toFixed(5)}`
-                    : '-'}
-                </Text>
-              </View>
-              {draftLocation ? (
-                <Pressable style={styles.inlineAction} onPress={() => setDraftLocation(undefined)}>
-                  <Text style={styles.linkText}>{t('journey.removeLocation')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-
-            {draftMedia.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaRow}>
-                {draftMedia.map((item) => (
-                  item.type === 'audio' ? (
-                    <View key={item.id} style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
-                      <AudioPlayer uri={item.uri} label={t('journey.audioBadge')} />
-                      <View style={[styles.mediaFooter, themed.mediaFooter]}>
-                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('journey.audioBadge')}</Text>
-                        <Pressable
-                          onPress={() => setDraftMedia((prev) => prev.filter((media) => media.id !== item.id))}>
-                          <Text style={styles.linkText}>{t('common.delete')}</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <View key={item.id} style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
-                      {mediaPreviewUri(item) ? (
-                        <Image
-                          source={{ uri: mediaPreviewUri(item) }}
-                          style={styles.mediaPreview}
-                          contentFit="cover"
-                        />
-                      ) : item.type === 'video' ? (
-                        <MediaVideoCover uri={item.uri} />
-                      ) : (
-                        <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
-                          <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>
-                            {t('journey.mediaBadgeVideo')}
-                          </Text>
-                        </View>
-                      )}
-                      <View style={[styles.mediaFooter, themed.mediaFooter]}>
-                        <Text style={[styles.mediaBadge, themed.mediaBadge]}>
-                          {item.type === 'video' ? t('journey.mediaBadgeVideo') : t('journey.mediaBadgePhoto')}
-                        </Text>
-                        <Pressable
-                          onPress={() => setDraftMedia((prev) => prev.filter((media) => media.id !== item.id))}>
-                          <Text style={styles.linkText}>{t('common.delete')}</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  )
-                ))}
-              </ScrollView>
-            ) : null}
-
-            <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={openAmapPlacePicker}
-                disabled={openingLocationPicker}>
-                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {openingLocationPicker ? t('journey.openingMap') : `📍 ${t('journey.addLocation')}`}
-                </Text>
-              </Pressable>
-            </View>
-            <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={pickMediaFromLibrary}
-                disabled={pickingMedia}>
-                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {pickingMedia ? t('journey.readingAlbum') : `🖼️ ${t('journey.addFromAlbum')}`}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={() => captureMediaWithCamera('photo')}
-                disabled={pickingMedia}>
-                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {pickingMedia ? t('journey.processingMedia') : `📷 ${t('journey.takePhoto')}`}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={() => captureMediaWithCamera('video')}
-                disabled={pickingMedia}>
-                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {pickingMedia ? t('journey.processingMedia') : `🎥 ${t('journey.takeVideo')}`}
-                </Text>
-              </Pressable>
-            </View>
-            <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.secondaryButton, themed.secondaryButton]}
-                onPress={() => (recorderState.isRecording ? void stopRecording() : void startRecording())}
-                disabled={pickingMedia}>
-                <Text style={[styles.secondaryButtonText, themed.secondaryButtonText]}>
-                  {recorderState.isRecording ? `⏹️ ${t('journey.stopRecording')}` : `🎙️ ${t('journey.recordAudio')}`}
-                </Text>
-              </Pressable>
-            </View>
-
-            <Pressable style={styles.primaryButton} onPress={saveTimelineEntry} disabled={savingEntry}>
-              <Text style={styles.primaryButtonText}>
-                {savingEntry
-                  ? t('journey.savingEntry')
-                  : editingEntryId
-                    ? t('journey.updateEntry')
-                    : t('journey.saveEntry')}
-              </Text>
-            </Pressable>
-            {editingEntryId ? (
-              <Pressable style={[styles.cancelButton, themed.cancelButton]} onPress={resetDraft}>
-                <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
-                  {t('journey.cancelEdit')}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
+          </>
         )}
 
-        {activeJourney && activeJourney.entries.length > 0 ? (
-          <View style={[styles.card, themed.card]}>
-            <Text style={[styles.sectionTitle, themed.sectionTitle]}>{t('journey.timelineTitle')}</Text>
-            {activeJourney.entries.map((entry, index) => (
-              <View key={entry.id} style={styles.timelineItem}>
-                <View style={[styles.timelineDot, themed.timelineDot]} />
-                <View style={styles.timelineContent}>
-                  <View style={styles.entryHeader}>
-                    <Text style={[styles.timelineTime, themed.timelineTime]}>{formatDateTime(entry.createdAt)}</Text>
-                    <View style={styles.inlineRow}>
-                      <Pressable onPress={() => startEditEntry(entry)}>
-                        <Text style={styles.linkText}>{t('common.edit')}</Text>
-                      </Pressable>
-                      <Text style={[styles.mutedText, themed.mutedText]}> · </Text>
-                      <Pressable
-                        onPress={() =>
-                          Alert.alert(
-                            t('journey.alertDeleteEntryTitle'),
-                            t('journey.alertDeleteEntryBody'),
-                            [
-                              { text: t('common.cancel'), style: 'cancel' },
-                              {
-                                text: t('common.delete'),
-                                style: 'destructive',
-                                onPress: () => {
-                                  void deleteEntry(entry.id);
-                                },
-                              },
-                            ]
-                          )
-                        }>
-                        <Text style={styles.deleteText}>{t('common.delete')}</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                  {entry.text ? <Text style={[styles.timelineText, themed.timelineText]}>{entry.text}</Text> : null}
-                  {entry.tags.length > 0 ? (
-                    <View style={styles.tagRow}>
-                      {entry.tags.map((tag) => (
-                        <View key={tag} style={[styles.tagChip, themed.tagChip]}>
-                          <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-                  {entry.location ? (
-                    <Text style={[styles.mutedText, themed.mutedText]}>
-                      📍
-                      {entry.location.placeName ? ` ${entry.location.placeName} · ` : ' '}
-                      {entry.location.latitude.toFixed(5)}, {entry.location.longitude.toFixed(5)}
-                    </Text>
-                  ) : null}
-                  {entry.media.length > 0 ? (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {entry.media.map((media) => (
-                        media.type === 'audio' ? (
-                          <View key={media.id} style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
-                            <AudioPlayer uri={media.uri} label={t('journey.audioBadge')} />
-                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('journey.audioBadge')}</Text>
-                          </View>
-                        ) : (
-                          <Pressable
-                            key={media.id}
-                            style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
-                            onPress={() => setPreviewMedia(media)}>
-                            {mediaPreviewUri(media) ? (
-                              <Image
-                                source={{ uri: mediaPreviewUri(media) }}
-                                style={styles.mediaPreview}
-                                contentFit="cover"
-                              />
-                            ) : media.type === 'video' ? (
-                              <MediaVideoCover uri={media.uri} />
-                            ) : (
-                              <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
-                                <Text style={[styles.mediaPlaceholderText, themed.mediaPlaceholderText]}>
-                                  {t('journey.mediaBadgeVideo')}
-                                </Text>
-                              </View>
-                            )}
-                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>
-                              {media.type === 'video' ? t('journey.mediaBadgeVideo') : t('journey.mediaBadgePhoto')}
-                            </Text>
-                          </Pressable>
-                        )
-                      ))}
-                    </ScrollView>
-                  ) : null}
-                </View>
-                {index < activeJourney.entries.length - 1 ? (
-                  <View style={[styles.timelineLine, themed.timelineLine]} />
-                ) : null}
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        <Modal
+        {/* Template modal */}
+        <TemplateModal
           visible={templateModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            setTemplateModalVisible(false);
-            resetTemplateEditor();
-          }}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.templateModalCard, themed.modalCard]}>
-              <View style={styles.templateModalHeader}>
-                <Text style={[styles.templateModalTitle, themed.modalTitle]}>
-                  {t('journey.templateManagerTitle', { kind: kindLabel(templateKind) })}
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    setTemplateModalVisible(false);
-                    resetTemplateEditor();
-                  }}>
-                  <Text style={styles.linkText}>{t('common.close')}</Text>
-                </Pressable>
-              </View>
+          onClose={() => setTemplateModalVisible(false)}
+          templateKind={templateKind}
+          entryTemplates={entryTemplates}
+          onSave={handleSaveTemplate}
+          onRemove={handleRemoveTemplate}
+          onReset={handleResetTemplates}
+        />
 
-              <ScrollView style={styles.templateModalList}>
-                {entryTemplates.map((template) => (
-                  <View
-                    key={template.id}
-                    style={[styles.templateItemCard, themed.templateItem]}>
-                    <Text style={[styles.templateItemTitle, themed.templateItemTitle]}>
-                      {template.label}
-                    </Text>
-                    <Text style={[styles.templateItemText, themed.templateItemText]}>
-                      {template.text}
-                    </Text>
-                    {template.tags.length > 0 ? (
-                      <Text style={[styles.templateItemText, themed.templateItemText]}>
-                        {t('common.tags')}：{template.tags.map((tag) => `#${tag}`).join(' ')}
-                      </Text>
-                    ) : null}
-                    <View style={styles.inlineRow}>
-                      <Pressable onPress={() => startEditTemplate(template)}>
-                        <Text style={styles.linkText}>{t('common.edit')}</Text>
-                      </Pressable>
-                      <Text style={[styles.mutedText, themed.mutedText]}> · </Text>
-                      <Pressable
-                        onPress={() =>
-                          Alert.alert(
-                            t('journey.alertDeleteTemplateTitle'),
-                            t('journey.alertDeleteTemplateBody'),
-                            [
-                              { text: t('common.cancel'), style: 'cancel' },
-                              {
-                                text: t('common.delete'),
-                                style: 'destructive',
-                                onPress: () => {
-                                  void removeTemplate(template.id);
-                                },
-                              },
-                            ]
-                          )
-                        }>
-                        <Text style={styles.deleteText}>{t('common.delete')}</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
-
-              <View style={styles.templateEditorCard}>
-                <Text style={[styles.editorLabel, themed.editorLabel]}>
-                  {t('journey.templateEditorTitle', {
-                    mode: editingTemplateId ? t('journey.templateModeEdit') : t('journey.templateModeCreate'),
-                  })}
-                </Text>
-                <TextInput
-                  value={templateLabelInput}
-                  onChangeText={setTemplateLabelInput}
-                  placeholder={t('journey.templateNamePlaceholder')}
-                  placeholderTextColor={themed.inputPlaceholder}
-                  style={[styles.input, themed.input]}
-                />
-                <TextInput
-                  value={templateTextInput}
-                  onChangeText={setTemplateTextInput}
-                  placeholder={t('journey.templateTextPlaceholder')}
-                  placeholderTextColor={themed.inputPlaceholder}
-                  style={[styles.input, styles.textArea, themed.input]}
-                  multiline
-                />
-                <TextInput
-                  value={templateTagsInput}
-                  onChangeText={setTemplateTagsInput}
-                  placeholder={t('journey.templateTagsPlaceholder')}
-                  placeholderTextColor={themed.inputPlaceholder}
-                  style={[styles.input, themed.input]}
-                />
-                <View style={styles.actionRow}>
-                  <Pressable
-                    style={[styles.primaryButton, styles.templateSaveButton]}
-                    onPress={() => void saveTemplate()}>
-                    <Text style={styles.primaryButtonText}>
-                      {editingTemplateId ? t('journey.updateTemplate') : t('journey.saveTemplate')}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.cancelButton, themed.cancelButton, styles.templateResetButton]}
-                    onPress={resetTemplateEditor}>
-                    <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
-                      {t('journey.clearTemplateEdit')}
-                    </Text>
-                  </Pressable>
-                </View>
-                <Pressable
-                  style={[styles.cancelButton, themed.cancelButton]}
-                  onPress={() =>
-                    Alert.alert(
-                      t('journey.alertResetTemplatesTitle'),
-                      t('journey.alertResetTemplatesBody'),
-                      [
-                        { text: t('common.cancel'), style: 'cancel' },
-                        {
-                          text: t('common.confirm'),
-                          onPress: () => {
-                            void resetTemplatesToDefault();
-                          },
-                        },
-                      ]
-                    )
-                  }>
-                  <Text style={[styles.cancelButtonText, themed.cancelButtonText]}>
-                    {t('journey.resetTemplates')}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
-          <View style={styles.previewOverlay}>
-            <Pressable style={styles.previewClose} onPress={() => setPreviewMedia(null)}>
-              <Text style={styles.previewCloseText}>{t('common.close')}</Text>
-            </Pressable>
-            {previewMedia?.type === 'video' ? (
-              <PreviewVideo uri={previewMedia.uri} />
-            ) : previewMedia ? (
-              <Image source={{ uri: previewMedia.uri }} style={styles.previewMedia} contentFit="contain" />
-            ) : null}
-          </View>
-        </Modal>
+        {/* Media preview */}
+        <MediaPreviewModal
+          previewMedia={previewMedia}
+          onClose={() => setPreviewMedia(null)}
+        />
       </ScrollView>
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Remaining styles
+// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   pageWrap: {
@@ -1435,372 +559,4 @@ const styles = StyleSheet.create({
     color: '#475569',
     marginBottom: 4,
   },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 10,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  mutedText: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    backgroundColor: '#f8fafc',
-  },
-  textArea: {
-    minHeight: 84,
-    textAlignVertical: 'top',
-  },
-  editorLabel: {
-    color: '#334155',
-    fontWeight: '600',
-  },
-  primaryButton: {
-    backgroundColor: '#0f766e',
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  secondaryButtonText: {
-    color: '#0f172a',
-    fontWeight: '500',
-  },
-  kindRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  kindButton: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  kindButtonActive: {
-    backgroundColor: '#0f766e',
-    borderColor: '#0f766e',
-  },
-  kindButtonText: {
-    color: '#0f172a',
-    fontWeight: '600',
-  },
-  kindButtonTextActive: {
-    color: '#ffffff',
-  },
-  ghostButton: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#f59e0b',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  trackingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  trackingLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  ghostButtonText: {
-    color: '#b45309',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  cancelButton: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#334155',
-    fontWeight: '600',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  inlineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  locationTextContainer: {
-    flex: 1,
-    minWidth: 0,
-  },
-  locationText: {
-    color: '#334155',
-    fontSize: 13,
-    flexShrink: 1,
-  },
-  inlineAction: {
-    flexShrink: 0,
-    paddingTop: 1,
-  },
-  linkText: {
-    color: '#0369a1',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  deleteText: {
-    color: '#b91c1c',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  mediaRow: {
-    maxHeight: 110,
-  },
-  mediaPreviewBox: {
-    marginRight: 10,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    width: 110,
-  },
-  mediaPreview: {
-    width: 110,
-    height: 80,
-  },
-  mediaPlaceholder: {
-    width: 110,
-    height: 80,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mediaPlaceholderText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  mediaFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    backgroundColor: '#f8fafc',
-  },
-  mediaBadge: {
-    fontSize: 11,
-    color: '#0f172a',
-    padding: 4,
-  },
-  timelineItem: {
-    position: 'relative',
-    paddingLeft: 18,
-    paddingBottom: 14,
-  },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#0f766e',
-    position: 'absolute',
-    left: 0,
-    top: 5,
-  },
-  timelineLine: {
-    position: 'absolute',
-    left: 4,
-    top: 16,
-    bottom: -4,
-    width: 2,
-    backgroundColor: '#cbd5e1',
-  },
-  timelineContent: {
-    gap: 6,
-  },
-  entryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  timelineTime: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  timelineText: {
-    fontSize: 15,
-    color: '#0f172a',
-    lineHeight: 22,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  tagChip: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#e0f2fe',
-  },
-  tagChipText: {
-    fontSize: 11,
-    color: '#0c4a6e',
-    fontWeight: '600',
-  },
-  templateWrap: {
-    gap: 6,
-  },
-  templateHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
-  templateRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingRight: 6,
-  },
-  templateChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  templateChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#334155',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  templateModalCard: {
-    width: '100%',
-    maxHeight: '86%',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-    padding: 12,
-    gap: 10,
-  },
-  templateModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
-  },
-  templateModalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  templateModalList: {
-    maxHeight: 220,
-  },
-  templateItemCard: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    padding: 10,
-    gap: 6,
-    marginBottom: 8,
-  },
-  templateItemTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  templateItemText: {
-    color: '#334155',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  templateEditorCard: {
-    gap: 8,
-  },
-  templateResetButton: {
-    flex: 1,
-  },
-  templateSaveButton: {
-    flex: 1,
-  },
-  previewOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 12,
-  },
-  previewMedia: {
-    width: '100%',
-    height: '78%',
-  },
-  previewClose: {
-    position: 'absolute',
-    top: 48,
-    right: 20,
-    zIndex: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  previewCloseText: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  audioCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  audioLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
-  },
 });
-
