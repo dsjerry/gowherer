@@ -1,19 +1,30 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/hooks/locale-preference';
-import { smoothTrackLocations } from '@/lib/track-utils';
+import { sanitizeTrackLocations, smoothTrackLocations } from '@/lib/track-utils';
 import { TimelineLocation } from '@/types/journey';
 
-export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
-  const { t } = useI18n();
-  const displayLocations = smoothTrackLocations(locations);
+type TrackMapProps = {
+  routeLocations: TimelineLocation[];
+  markerLocations?: TimelineLocation[];
+};
 
-  if (displayLocations.length === 0) {
+export function TrackMap({
+  routeLocations,
+  markerLocations = routeLocations,
+}: TrackMapProps) {
+  const { t } = useI18n();
+  const displayRouteLocations = smoothTrackLocations(sanitizeTrackLocations(routeLocations));
+  const displayMarkerLocations = sanitizeTrackLocations(markerLocations);
+  const summaryLocations =
+    displayRouteLocations.length > 0 ? displayRouteLocations : displayMarkerLocations;
+
+  if (summaryLocations.length === 0) {
     return null;
   }
 
-  const first = displayLocations[0];
-  const last = displayLocations[displayLocations.length - 1];
+  const first = summaryLocations[0];
+  const last = summaryLocations[summaryLocations.length - 1];
 
   return (
     <View style={styles.fallbackBox}>
@@ -24,7 +35,7 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
       <Text style={styles.line}>
         {t('trackMap.webEnd', { lat: last.latitude.toFixed(5), lng: last.longitude.toFixed(5) })}
       </Text>
-      <Text style={styles.line}>{t('trackMap.webCount', { count: displayLocations.length })}</Text>
+      <Text style={styles.line}>{t('trackMap.webCount', { count: displayMarkerLocations.length })}</Text>
     </View>
   );
 }

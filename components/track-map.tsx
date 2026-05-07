@@ -79,11 +79,24 @@ function getAmapZoom(locations: TimelineLocation[]) {
   return 10
 }
 
-export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
+type TrackMapProps = {
+  routeLocations: TimelineLocation[]
+  markerLocations?: TimelineLocation[]
+}
+
+export function TrackMap({
+  routeLocations,
+  markerLocations = routeLocations,
+}: TrackMapProps) {
   const { t } = useI18n()
-  const displayLocations = smoothTrackLocations(
-    sanitizeTrackLocations(locations),
+  const displayRouteLocations = smoothTrackLocations(
+    sanitizeTrackLocations(routeLocations),
   )
+  const displayMarkerLocations = sanitizeTrackLocations(markerLocations)
+  const allDisplayLocations = sanitizeTrackLocations([
+    ...displayRouteLocations,
+    ...displayMarkerLocations,
+  ])
   const amapAndroidApiKey =
     Constants.expoConfig?.extra?.amap?.androidApiKey ??
     process.env.EXPO_PUBLIC_AMAP_ANDROID_API_KEY
@@ -92,8 +105,12 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
   const [showTrackData, setShowTrackData] = useState(false)
 
   const amapLocations = useMemo(
-    () => displayLocations.map(item => toGcj02(item.latitude, item.longitude)),
-    [displayLocations],
+    () => displayRouteLocations.map(item => toGcj02(item.latitude, item.longitude)),
+    [displayRouteLocations],
+  )
+  const amapMarkerLocations = useMemo(
+    () => displayMarkerLocations.map(item => toGcj02(item.latitude, item.longitude)),
+    [displayMarkerLocations],
   )
 
   useEffect(() => {
@@ -118,7 +135,7 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
     }
   }, [amapAndroidApiKey, t])
 
-  if (displayLocations.length === 0) {
+  if (allDisplayLocations.length === 0) {
     return null
   }
 
@@ -155,7 +172,7 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
                 {t("trackMap.trackDataTitle")}
               </Text>
               <ScrollView style={styles.trackDataList}>
-                {displayLocations.map((loc, index) => (
+                {allDisplayLocations.map((loc, index) => (
                   <View key={index} style={styles.trackDataRow}>
                     <Text style={styles.trackDataIndex}>{index + 1}</Text>
                     <View style={styles.trackDataCoords}>
@@ -192,7 +209,8 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
       Marker: AMapMarker,
       Polyline: AMapPolyline,
     } = require("react-native-amap3d")
-    const center = amapLocations[Math.floor(amapLocations.length / 2)]
+    const centerSource = amapLocations.length > 0 ? amapLocations : amapMarkerLocations
+    const center = centerSource[Math.floor(centerSource.length / 2)]
     return (
       <View style={styles.mapWrap}>
         <AMapView
@@ -202,18 +220,22 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
           zoomControlsEnabled={false}
           initialCameraPosition={{
             target: center,
-            zoom: getAmapZoom(amapLocations),
+            zoom: getAmapZoom(
+              amapLocations.length > 0 ? amapLocations : amapMarkerLocations,
+            ),
           }}
         >
-          <AMapPolyline
-            points={amapLocations}
-            width={4}
-            color="#0f766e"
-            colors={[]}
-          />
-          {amapLocations.map((point, index) => {
+          {amapLocations.length >= 2 ? (
+            <AMapPolyline
+              points={amapLocations}
+              width={4}
+              color="#0f766e"
+              colors={[]}
+            />
+          ) : null}
+          {amapMarkerLocations.map((point, index) => {
             const isStart = index === 0
-            const isEnd = index === amapLocations.length - 1
+            const isEnd = index === amapMarkerLocations.length - 1
             return (
               <AMapMarker
                 key={`${point.latitude}-${point.longitude}-${index}`}
@@ -235,27 +257,29 @@ export function TrackMap({ locations }: { locations: TimelineLocation[] }) {
 
   return (
     <View style={styles.mapWrap}>
-      <MapView style={styles.map} initialRegion={getRegion(displayLocations)}>
-        <Polyline
-          coordinates={displayLocations}
-          strokeWidth={4}
-          strokeColor="#0f766e"
-        />
-        {displayLocations.map((location, index) => (
+      <MapView style={styles.map} initialRegion={getRegion(allDisplayLocations)}>
+        {displayRouteLocations.length >= 2 ? (
+          <Polyline
+            coordinates={displayRouteLocations}
+            strokeWidth={4}
+            strokeColor="#0f766e"
+          />
+        ) : null}
+        {displayMarkerLocations.map((location, index) => (
           <Marker
             key={`${location.latitude}-${location.longitude}-${index}`}
             coordinate={location}
             pinColor={
               index === 0
                 ? "#0284c7"
-                : index === displayLocations.length - 1
+                : index === displayMarkerLocations.length - 1
                   ? "#dc2626"
                   : "#0f766e"
             }
             title={
               index === 0
                 ? t("trackMap.startPoint")
-                : index === displayLocations.length - 1
+                : index === displayMarkerLocations.length - 1
                   ? t("trackMap.endPoint")
                   : t("trackMap.nodePoint", { index: index + 1 })
             }

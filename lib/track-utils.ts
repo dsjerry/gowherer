@@ -1,6 +1,10 @@
 import { TimelineLocation } from '@/types/journey';
 
-function normalizeTrackLocation(location: unknown): TimelineLocation | null {
+const MAX_TRACKING_ACCURACY_METERS = 100;
+const MAX_TRACKING_SPEED_KMH = 180;
+const MIN_TRACKING_DISTANCE_METERS = 3;
+
+export function normalizeTrackLocation(location: unknown): TimelineLocation | null {
   if (!location || typeof location !== 'object') {
     return null;
   }
@@ -10,6 +14,8 @@ function normalizeTrackLocation(location: unknown): TimelineLocation | null {
     longitude?: unknown;
     accuracy?: unknown;
     placeName?: unknown;
+    capturedAt?: unknown;
+    source?: unknown;
   };
   const latitude = Number(raw.latitude);
   const longitude = Number(raw.longitude);
@@ -25,11 +31,19 @@ function normalizeTrackLocation(location: unknown): TimelineLocation | null {
     return null;
   }
 
+  const capturedAt =
+    typeof raw.capturedAt === 'string' && Number.isFinite(Date.parse(raw.capturedAt))
+      ? new Date(raw.capturedAt).toISOString()
+      : undefined;
+  const source = raw.source === 'tracking' ? 'tracking' : raw.source === 'manual' ? 'manual' : undefined;
+
   return {
     latitude,
     longitude,
     accuracy: Number.isFinite(raw.accuracy) ? Number(raw.accuracy) : undefined,
     placeName: typeof raw.placeName === 'string' ? raw.placeName : undefined,
+    capturedAt,
+    source,
   };
 }
 
@@ -53,6 +67,15 @@ export function haversineKm(a: TimelineLocation, b: TimelineLocation) {
   return earthKm * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+function sortLocationsByCapturedAt(locations: TimelineLocation[]) {
+  return [...locations].sort((a, b) => {
+    if (!a.capturedAt || !b.capturedAt) {
+      return 0;
+    }
+    return Date.parse(a.capturedAt) - Date.parse(b.capturedAt);
+  });
+}
+
 function mergeLocationMeta(
   base: TimelineLocation,
   previous?: TimelineLocation,
@@ -61,6 +84,8 @@ function mergeLocationMeta(
   return {
     accuracy: base.accuracy ?? previous?.accuracy ?? next?.accuracy,
     placeName: base.placeName ?? previous?.placeName ?? next?.placeName,
+    capturedAt: base.capturedAt ?? previous?.capturedAt ?? next?.capturedAt,
+    source: base.source ?? previous?.source ?? next?.source,
     latitude: base.latitude,
     longitude: base.longitude,
   };
@@ -102,6 +127,52 @@ export function smoothTrackLocations(locations: TimelineLocation[]): TimelineLoc
   smoothed.push(safeLocations[safeLocations.length - 1]);
 
   return smoothed;
+}
+
+export function prepareTrackRouteLocations(locations: TimelineLocation[]) {
+  const safeLocations = sortLocationsByCapturedAt(sanitizeTrackLocations(locations));
+  if (safeLocations.length < 2) {
+    return safeLocations;
+  }
+
+  const filtered: TimelineLocation[] = [];
+  for (const location of safeLocations) {
+    const previous = filtered[filtered.length - 1];
+    const isTrackingPoint = location.source !== 'manual';
+
+    if (
+      isTrackingPoint &&
+      typeof location.accuracy === 'number' &&
+      location.accuracy > MAX_TRACKING_ACCURACY_METERS
+    ) {
+      continue;
+    }
+
+    if (!previous) {
+      filtered.push(location);
+      continue;
+    }
+
+    const distanceKm = haversineKm(previous, location);
+    if (distanceKm * 1000 < MIN_TRACKING_DISTANCE_METERS) {
+      continue;
+    }
+
+    if (previous.capturedAt && location.capturedAt) {
+      const durationHours =
+        (Date.parse(location.capturedAt) - Date.parse(previous.capturedAt)) / 3600000;
+      if (durationHours > 0) {
+        const speedKmh = distanceKm / durationHours;
+        if (speedKmh > MAX_TRACKING_SPEED_KMH) {
+          continue;
+        }
+      }
+    }
+
+    filtered.push(location);
+  }
+
+  return filtered;
 }
 
 export function calculateTrackDistanceKm(locations: TimelineLocation[]) {

@@ -31,11 +31,13 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useJourneys } from '@/hooks/use-journeys';
 import { useLocationTracking } from '@/hooks/use-location-tracking';
 import { stopLocationTracking } from '@/lib/background-location';
+import { syncBufferedTrackLocations } from '@/lib/background-location';
 import {
   getLocalLogFileUri,
   logLocalError,
   logLocalInfo,
 } from '@/lib/local-log';
+import { persistTimelineMedia } from '@/lib/media-storage';
 import { consumePendingLocation } from '@/lib/pending-location';
 import {
   getDefaultEntryTemplateConfig,
@@ -73,6 +75,21 @@ function parseTagsInput(raw: string) {
 function buildTimelineMedia(asset: ImagePicker.ImagePickerAsset): TimelineMedia {
   const type: MediaType = asset.type === 'video' ? 'video' : 'photo';
   return { id: createId('media'), uri: asset.uri, type, thumbnailUri: undefined };
+}
+
+function buildManualTimelineLocation(
+  location: TimelineLocation | undefined,
+  capturedAt: string,
+): TimelineLocation | undefined {
+  if (!location) {
+    return undefined;
+  }
+
+  return {
+    ...location,
+    capturedAt: location.capturedAt ?? capturedAt,
+    source: 'manual',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +213,7 @@ export default function JourneyScreen() {
     if (!activeJourney) return;
     try {
       await stopLocationTracking();
+      await syncBufferedTrackLocations(activeJourney.id);
     } catch (error) {
       void logLocalError('JourneyScreen', 'failed to stop location tracking while ending journey', error);
     }
@@ -243,25 +261,31 @@ export default function JourneyScreen() {
 
     setSavingEntry(true);
     try {
+      const persistedMedia = await persistTimelineMedia(draftMedia);
       if (editingEntryId) {
         const original = activeJourney.entries.find((e) => e.id === editingEntryId);
+        const createdAt = original?.createdAt ?? new Date().toISOString();
         const entry: TimelineEntry = {
           id: editingEntryId,
-          createdAt: original?.createdAt ?? new Date().toISOString(),
+          createdAt,
           text,
           tags,
-          location: draftLocation,
-          media: draftMedia,
+          location: buildManualTimelineLocation(
+            draftLocation,
+            original?.location?.capturedAt ?? createdAt,
+          ),
+          media: persistedMedia,
         };
         await updateEntry(activeJourney.id, entry);
       } else {
+        const createdAt = new Date().toISOString();
         const entry: TimelineEntry = {
           id: createId('entry'),
-          createdAt: new Date().toISOString(),
+          createdAt,
           text,
           tags,
-          location: draftLocation,
-          media: draftMedia,
+          location: buildManualTimelineLocation(draftLocation, createdAt),
+          media: persistedMedia,
         };
         await addEntry(activeJourney.id, entry);
       }

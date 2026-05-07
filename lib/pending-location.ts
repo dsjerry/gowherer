@@ -1,38 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { normalizeTrackLocation } from '@/lib/track-utils';
 import { TimelineLocation } from '@/types/journey';
 
 const PENDING_LOCATION_KEY = 'gowherer:pending-location:v1';
 
 function normalizeLocation(value: unknown): TimelineLocation | null {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-  const data = value as {
-    latitude?: unknown;
-    longitude?: unknown;
-    placeName?: unknown;
-    accuracy?: unknown;
-  };
-  const latitude = Number(data.latitude);
-  const longitude = Number(data.longitude);
-  if (
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude) ||
-    latitude < -90 ||
-    latitude > 90 ||
-    longitude < -180 ||
-    longitude > 180
-  ) {
-    return null;
-  }
-
-  return {
-    latitude,
-    longitude,
-    placeName: typeof data.placeName === 'string' ? data.placeName : undefined,
-    accuracy: Number.isFinite(data.accuracy) ? Number(data.accuracy) : undefined,
-  };
+  return normalizeTrackLocation(value);
 }
 
 export async function setPendingLocation(location: TimelineLocation): Promise<void> {

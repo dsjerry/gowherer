@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
+import {
+  createJourney,
+  deleteJourneyEntry,
+  insertJourneyEntry,
+  markJourneyCompleted,
+  overwriteJourneys,
+  replaceJourneyEntry,
+} from '@/lib/journey-repository';
+import { loadJourneys } from '@/lib/journey-storage';
 import { initLocalLogFile } from '@/lib/local-log';
 import { Journey, JourneyKind, TimelineEntry } from '@/types/journey';
-
-function createId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 export function useJourneys() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
@@ -27,67 +31,33 @@ export function useJourneys() {
   }, []);
 
   async function updateJourneys(next: Journey[]) {
-    setJourneys(next);
-    await saveJourneys(next);
+    const stored = await overwriteJourneys(next);
+    setJourneys(stored);
   }
 
   async function addJourney(title: string, kind: JourneyKind, tags: string[]) {
-    const now = new Date().toISOString();
-    const next: Journey = {
-      id: createId('journey'),
-      title,
-      kind,
-      createdAt: now,
-      status: 'active',
-      tags,
-      entries: [],
-      trackLocations: [],
-    };
-    await updateJourneys([next, ...journeys]);
+    const next = await createJourney(title, kind, tags);
+    setJourneys(next);
   }
 
   async function completeJourney(journeyId: string) {
-    const next = journeys.map((item) =>
-      item.id === journeyId
-        ? { ...item, status: 'completed' as const, endedAt: new Date().toISOString() }
-        : item
-    );
-    await updateJourneys(next);
+    const next = await markJourneyCompleted(journeyId);
+    setJourneys(next);
   }
 
   async function addEntry(journeyId: string, entry: TimelineEntry) {
-    const next = journeys.map((item) =>
-      item.id === journeyId
-        ? { ...item, entries: [...item.entries, entry] }
-        : item
-    );
-    await updateJourneys(next);
+    const next = await insertJourneyEntry(journeyId, entry);
+    setJourneys(next);
   }
 
   async function updateEntry(journeyId: string, entry: TimelineEntry) {
-    const next = journeys.map((item) =>
-      item.id === journeyId
-        ? {
-            ...item,
-            entries: item.entries.map((e) =>
-              e.id === entry.id ? entry : e
-            ),
-          }
-        : item
-    );
-    await updateJourneys(next);
+    const next = await replaceJourneyEntry(journeyId, entry);
+    setJourneys(next);
   }
 
   async function removeEntry(journeyId: string, entryId: string) {
-    const next = journeys.map((item) =>
-      item.id === journeyId
-        ? {
-            ...item,
-            entries: item.entries.filter((e) => e.id !== entryId),
-          }
-        : item
-    );
-    await updateJourneys(next);
+    const next = await deleteJourneyEntry(journeyId, entryId);
+    setJourneys(next);
   }
 
   async function refreshJourneys() {

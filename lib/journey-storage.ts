@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { JOURNEY_STORAGE_KEY } from "@/lib/storage-keys";
 import { Journey } from "@/types/journey";
+import { normalizeTrackLocation } from "@/lib/track-utils";
 
 function normalizeTags(tags: unknown): string[] {
   if (!Array.isArray(tags)) {
@@ -57,19 +58,22 @@ export function normalizeJourneyList(raw: unknown): Journey[] {
     ...item,
     kind: item.kind === "commute" ? "commute" : "travel",
     tags: normalizeTags(item.tags),
-    entries: Array.isArray(item.entries)
-      ? item.entries.map((entry) => ({
-          ...entry,
-          tags: normalizeTags(entry.tags),
-          media: Array.isArray(entry.media)
-            ? entry.media
-                .map((media) => normalizeMediaItem(media))
+      entries: Array.isArray(item.entries)
+        ? item.entries.map((entry) => ({
+            ...entry,
+            tags: normalizeTags(entry.tags),
+            location: normalizeTrackLocation(entry.location) ?? undefined,
+            media: Array.isArray(entry.media)
+              ? entry.media
+                  .map((media) => normalizeMediaItem(media))
                 .filter(Boolean)
             : [],
         }))
       : [],
     trackLocations: Array.isArray(item.trackLocations)
       ? item.trackLocations
+          .map((location) => normalizeTrackLocation(location))
+          .filter(Boolean)
       : [],
   })) as Journey[];
 }

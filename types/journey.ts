@@ -7,6 +7,8 @@ export type TimelineLocation = {
   longitude: number;
   accuracy?: number | null;
   placeName?: string;
+  capturedAt?: string;
+  source?: 'manual' | 'tracking';
 };
 
 export type TimelineMedia = {

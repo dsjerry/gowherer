@@ -7,6 +7,7 @@ import { useI18n } from '@/hooks/locale-preference';
 import {
   isBackgroundLocationTrackingAvailable,
   isLocationTrackingActive,
+  syncBufferedTrackLocations,
   startLocationTracking,
   stopLocationTracking,
 } from '@/lib/background-location';
@@ -30,8 +31,12 @@ export function useLocationTracking(
         if (active) setLocationTracking(false);
         return;
       }
+      await syncBufferedTrackLocations(activeJourney.id);
       const started = await isLocationTrackingActive();
       if (active) setLocationTracking(started);
+      if (started) {
+        onRefreshRef.current?.();
+      }
     })();
     return () => {
       active = false;
@@ -41,7 +46,10 @@ export function useLocationTracking(
   useEffect(() => {
     if (!locationTracking || !activeJourney) return;
     const intervalId = setInterval(() => {
-      onRefreshRef.current?.();
+      void (async () => {
+        await syncBufferedTrackLocations(activeJourney.id);
+        onRefreshRef.current?.();
+      })();
     }, 10000);
     return () => clearInterval(intervalId);
   }, [locationTracking, activeJourney]);
@@ -53,6 +61,7 @@ export function useLocationTracking(
       try {
         if (!nextValue) {
           await stopLocationTracking();
+          await syncBufferedTrackLocations(activeJourney.id);
           setLocationTracking(false);
           onRefreshRef.current?.();
           return;

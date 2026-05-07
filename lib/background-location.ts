@@ -3,10 +3,13 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
-import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
+import { appendJourneyTrackLocations } from '@/lib/journey-repository';
+import { normalizeTrackLocation } from '@/lib/track-utils';
+import { TimelineLocation } from '@/types/journey';
 
 const TRACKING_TASK_NAME = 'gowherer-background-location-task';
 const TRACKING_JOURNEY_ID_KEY = 'gowherer:tracking:journey-id:v1';
+const TRACKING_BATCH_PREFIX = 'gowherer:tracking:batch:v1';
 
 type StartTrackingOptions = {
   notificationTitle: string;
@@ -27,23 +30,18 @@ async function appendTrackLocations(locations: Location.LocationObject[]) {
     return;
   }
 
-  const journeys = await loadJourneys();
-  const nextLocations = locations.map((item) => ({
+  const nextLocations: TimelineLocation[] = locations.map((item) => ({
     latitude: item.coords.latitude,
     longitude: item.coords.longitude,
     accuracy: item.coords.accuracy ?? undefined,
+    capturedAt: new Date(item.timestamp).toISOString(),
+    source: 'tracking',
   }));
 
-  const nextJourneys = journeys.map((journey) =>
-    journey.id === trackedJourneyId
-      ? {
-          ...journey,
-          trackLocations: [...journey.trackLocations, ...nextLocations],
-        }
-      : journey
-  );
-
-  await saveJourneys(nextJourneys);
+  const batchKey = `${TRACKING_BATCH_PREFIX}:${trackedJourneyId}:${Date.now()}:${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  await AsyncStorage.setItem(batchKey, JSON.stringify(nextLocations));
 }
 
 if (!TaskManager.isTaskDefined(TRACKING_TASK_NAME)) {
@@ -111,4 +109,36 @@ export async function stopLocationTracking() {
   }
 
   await AsyncStorage.removeItem(TRACKING_JOURNEY_ID_KEY);
+}
+
+export async function syncBufferedTrackLocations(journeyId: string) {
+  const allKeys = await AsyncStorage.getAllKeys();
+  const prefix = `${TRACKING_BATCH_PREFIX}:${journeyId}:`;
+  const batchKeys = allKeys.filter((key) => key.startsWith(prefix));
+
+  if (batchKeys.length === 0) {
+    return 0;
+  }
+
+  const rawItems = await AsyncStorage.multiGet(batchKeys);
+  const nextLocations = rawItems.flatMap(([, raw]) => {
+    if (!raw) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed
+            .map((location) => normalizeTrackLocation(location))
+            .filter((location): location is TimelineLocation => Boolean(location))
+        : [];
+    } catch {
+      return [];
+    }
+  });
+
+  await appendJourneyTrackLocations(journeyId, nextLocations);
+  await AsyncStorage.multiRemove(batchKeys);
+  return nextLocations.length;
 }

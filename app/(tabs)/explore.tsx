@@ -24,9 +24,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TrackMap } from '@/components/track-map';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
+import { deleteJourney as deleteJourneyById } from '@/lib/journey-repository';
+import { loadJourneys } from '@/lib/journey-storage';
 import {
   calculateTrackDistanceKm,
+  prepareTrackRouteLocations,
   sanitizeTrackLocations,
   smoothTrackLocations,
 } from '@/lib/track-utils';
@@ -66,17 +68,33 @@ function formatDuration(durationMs: number, t: TFunction) {
   return t('duration.hoursMinutes', { hours, minutes });
 }
 
-function getJourneyLocations(journey: Journey, smooth = true) {
-  const entryLocations = journey.entries.map((entry) => entry.location);
-  const trackLocations = journey.trackLocations ?? [];
-  const locations = sanitizeTrackLocations([...trackLocations, ...entryLocations]);
+function getJourneyTrackLocations(journey: Journey, smooth = true) {
+  const trackLocations = prepareTrackRouteLocations(journey.trackLocations ?? []);
+  return smooth ? smoothTrackLocations(trackLocations) : trackLocations;
+}
 
-  return smooth ? smoothTrackLocations(locations) : locations;
+function getJourneyEntryLocations(journey: Journey) {
+  return sanitizeTrackLocations(journey.entries.map((entry) => entry.location));
+}
+
+function getJourneyTrackMapMarkerLocations(journey: Journey) {
+  const routeLocations = getJourneyTrackLocations(journey);
+  const entryLocations = getJourneyEntryLocations(journey);
+
+  if (routeLocations.length === 0) {
+    return entryLocations;
+  }
+
+  const start = routeLocations[0];
+  const end = routeLocations[routeLocations.length - 1];
+  return [start, ...entryLocations, end];
 }
 
 function computeJourneyStats(journey: Journey) {
-  const locations = getJourneyLocations(journey);
-  const distanceKm = calculateTrackDistanceKm(locations);
+  const trackLocations = getJourneyTrackLocations(journey);
+  const entryLocations = getJourneyEntryLocations(journey);
+  const distanceSource = trackLocations.length >= 2 ? trackLocations : entryLocations;
+  const distanceKm = calculateTrackDistanceKm(distanceSource);
 
   const endMs = journey.endedAt
     ? new Date(journey.endedAt).getTime()
@@ -88,7 +106,7 @@ function computeJourneyStats(journey: Journey) {
   const avgSpeedKmh = durationMs > 0 ? distanceKm / (durationMs / 3600000) : 0;
 
   return {
-    locationPoints: locations.length,
+    locationPoints: trackLocations.length + entryLocations.length,
     distanceKm,
     durationMs,
     avgSpeedKmh,
@@ -168,7 +186,9 @@ function buildTrackSvgDataUri(
 
 function journeyToHtml(journey: Journey, t: TFunction) {
   const stats = computeJourneyStats(journey);
-  const locations = getJourneyLocations(journey);
+  const routeLocations = getJourneyTrackLocations(journey);
+  const fallbackLocations = getJourneyEntryLocations(journey);
+  const locations = routeLocations.length >= 2 ? routeLocations : fallbackLocations;
   const trackSvgUri = buildTrackSvgDataUri(locations, {
     start: t('review.html.start'),
     end: t('review.html.end'),
@@ -534,9 +554,8 @@ export default function JourneyHistoryScreen() {
   }, [completedJourneys, filter, searchQuery, selectedTag, t]);
 
   async function removeJourney(journeyId: string) {
-    const next = journeys.filter((item) => item.id !== journeyId);
+    const next = await deleteJourneyById(journeyId);
     setJourneys(next);
-    await saveJourneys(next);
     setCollapsedJourneyIds((prev) => prev.filter((id) => id !== journeyId));
   }
 
@@ -688,7 +707,9 @@ export default function JourneyHistoryScreen() {
         filteredJourneys.map((journey) => {
           const isCollapsed = collapsedJourneyIds.includes(journey.id);
           const stats = computeJourneyStats(journey);
-          const locations = getJourneyLocations(journey);
+          const routeLocations = getJourneyTrackLocations(journey);
+          const markerLocations = getJourneyTrackMapMarkerLocations(journey);
+          const hasTrackMap = routeLocations.length > 0 || markerLocations.length > 0;
 
           return (
             <View key={journey.id} style={[styles.card, themed.card]}>
@@ -777,10 +798,13 @@ export default function JourneyHistoryScreen() {
                     </View>
                   </View>
 
-                  {locations.length > 0 ? (
+                  {hasTrackMap ? (
                     <View>
                       <Text style={[styles.mapTitle, themed.mapTitle]}>{t('review.trackMapTitle')}</Text>
-                      <TrackMap locations={locations} />
+                      <TrackMap
+                        routeLocations={routeLocations}
+                        markerLocations={markerLocations}
+                      />
                     </View>
                   ) : (
                     <Text style={[styles.emptyText, themed.emptyText]}>
