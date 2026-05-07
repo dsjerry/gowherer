@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-01T13:10:12.690Z",
+  "generatedAt": "2026-05-07T03:26:57.913Z",
   "entries": [
     {
       "name": "@babel/code-frame",
@@ -2518,6 +2518,14 @@
       "version": "55.0.7",
       "licenses": "MIT",
       "licenseText": "# expo-constants\n\nProvides system information that remains constant throughout the lifetime of your app.\n\n# API documentation\n\n- [Documentation for the latest stable release](https://docs.expo.dev/versions/latest/sdk/constants/)\n- [Documentation for the main branch](https://docs.expo.dev/versions/unversioned/sdk/constants/)\n\n# Installation in managed Expo projects\n\nFor [managed](https://docs.expo.dev/archive/managed-vs-bare/) Expo projects, please follow the installation instructions in the [API documentation for the latest stable release](https://docs.expo.dev/versions/latest/sdk/constants/).\n\n# Installation in bare React Native projects\n\nFor bare React Native projects, you must ensure that you have [installed and configured the `expo` package](https://docs.expo.dev/bare/installing-expo-modules/) before continuing.\n\n### Add the package to your npm dependencies\n\n```\nnpx expo install expo-constants\n```\n\n# Contributing\n\nContributions are very welcome! Please refer to guidelines described in the [contributing guide](https://github.com/expo/expo#contributing).",
+      "repository": "https://github.com/expo/expo",
+      "publisher": ""
+    },
+    {
+      "name": "expo-document-picker",
+      "version": "55.0.13",
+      "licenses": "MIT",
+      "licenseText": "<p>\n  <a href=\"https://docs.expo.dev/versions/latest/sdk/document-picker/\">\n    <img\n      src=\"../../.github/resources/expo-document-picker.svg\"\n      alt=\"expo-document-picker\"\n      height=\"64\" />\n  </a>\n</p>\n\nProvides access to the system's UI for selecting documents from the available providers on the user's device.\n\n# API documentation\n\n- [Documentation for the latest stable release](https://docs.expo.dev/versions/latest/sdk/document-picker/)\n- [Documentation for the main branch](https://docs.expo.dev/versions/unversioned/sdk/document-picker/)\n\n# Installation in managed Expo projects\n\nFor [managed](https://docs.expo.dev/archive/managed-vs-bare/) Expo projects, please follow the installation instructions in the [API documentation for the latest stable release](https://docs.expo.dev/versions/latest/sdk/document-picker/).\n\n# Installation in bare React Native projects\n\nFor bare React Native projects, you must ensure that you have [installed and configured the `expo` package](https://docs.expo.dev/bare/installing-expo-modules/) before continuing.\n\n### Add the package to your npm dependencies\n\n```bash\nnpx expo install expo-document-picker\n```\n\n### Configure for Android\n\nNo additional set up necessary.\n\n### Configure for iOS\n\nRun `npx pod-install` after installing the npm package.\n\n### Plugin\n\nYou can change the `com.apple.developer.icloud-container-environment` entitlement using the `iCloudContainerEnvironment` property.\n\n`app.json`\n\n```json\n{\n  \"ios\": {\n    \"usesIcloudStorage\": true,\n    \"bundleIdentifier\": \"com.yourname.yourapp\"\n  },\n  \"plugins\": [\"expo-document-picker\"]\n}\n```\n\n> Running `npx expo prebuild` will generate the [native project locally](https://docs.expo.dev/workflow/customizing/) with the applied changes in your iOS Entitlements file.\n\n# Contributing\n\nContributions are very welcome! Please refer to guidelines described in the [contributing guide](https://github.com/expo/expo#contributing).",
       "repository": "https://github.com/expo/expo",
       "publisher": ""
     },

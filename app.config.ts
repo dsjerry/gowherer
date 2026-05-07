@@ -1,88 +1,84 @@
-import type { ExpoConfig } from 'expo/config';
+import type { ExpoConfig } from "expo/config";
 
 export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
   const projectId =
-    process.env.EAS_PROJECT_ID ??
-    '82904fd8-1c6c-4a9f-bae4-b3c2446c9ac9';
-  const appVersion = process.env.APP_VERSION ?? '1.0.0';
+    process.env.EAS_PROJECT_ID ?? "82904fd8-1c6c-4a9f-bae4-b3c2446c9ac9";
+  const appVersion = process.env.APP_VERSION ?? "1.0.0";
   const amapAndroidApiKey = process.env.AMAP_ANDROID_API_KEY;
   const amapWebKey = process.env.EXPO_PUBLIC_AMAP_WEB_KEY;
 
   return {
-    name: 'gowherer',
-    slug: 'gowherer',
+    name: "gowherer",
+    slug: "gowherer",
     version: appVersion,
-    orientation: 'portrait',
-    icon: './assets/images/icon.png',
-    scheme: 'gowherer',
-    userInterfaceStyle: 'automatic',
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    scheme: "gowherer",
+    userInterfaceStyle: "automatic",
 
     ios: {
-      bundleIdentifier: 'com.dsjerry.gowherer',
+      bundleIdentifier: "com.dsjerry.gowherer",
       supportsTablet: true,
     },
 
     android: {
-      package: 'com.dsjerry.gowherer',
+      package: "com.dsjerry.gowherer",
       predictiveBackGestureEnabled: false,
       adaptiveIcon: {
-        backgroundColor: '#E6F4FE',
-        foregroundImage:
-          './assets/images/android-icon-foreground.png',
-        backgroundImage:
-          './assets/images/android-icon-background.png',
-        monochromeImage:
-          './assets/images/android-icon-monochrome.png',
+        backgroundColor: "#E6F4FE",
+        foregroundImage: "./assets/images/android-icon-foreground.png",
+        backgroundImage: "./assets/images/android-icon-background.png",
+        monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
     },
 
     web: {
-      output: 'static',
-      favicon: './assets/images/favicon.png',
+      output: "static",
+      favicon: "./assets/images/favicon.png",
     },
 
     plugins: [
-      'expo-font',
-      'expo-image',
-      'expo-web-browser',
-      'expo-router',
+      "expo-audio",
+      "expo-font",
+      "expo-image",
+      "expo-localization",
+      "expo-sharing",
+      "expo-video",
+      "expo-web-browser",
+      "expo-router",
       [
-        'expo-image-picker',
+        "expo-image-picker",
         {
-          photosPermission:
-            '允许访问相册以将照片和视频添加到旅程时间线。',
-          cameraPermission:
-            '允许使用相机以拍照或拍视频记录旅程。',
-          microphonePermission:
-            '允许使用麦克风以录制带声音的视频。',
+          photosPermission: "允许访问相册以将照片和视频添加到旅程时间线。",
+          cameraPermission: "允许使用相机以拍照或拍视频记录旅程。",
+          microphonePermission: "允许使用麦克风以录制带声音的视频。",
         },
       ],
       [
-        'expo-location',
+        "expo-location",
         {
-          locationWhenInUsePermission:
-            '允许使用定位以记录旅程中的位置节点。',
+          locationWhenInUsePermission: "允许使用定位以记录旅程中的位置节点。",
           locationAlwaysAndWhenInUsePermission:
-            '允许始终访问定位，以便在后台持续记录跑步、骑行等旅程轨迹。',
+            "允许始终访问定位，以便在后台持续记录跑步、骑行等旅程轨迹。",
           locationAlwaysPermission:
-            '允许始终访问定位，以便在后台持续记录跑步、骑行等旅程轨迹。',
+            "允许始终访问定位，以便在后台持续记录跑步、骑行等旅程轨迹。",
           isIosBackgroundLocationEnabled: true,
           isAndroidBackgroundLocationEnabled: true,
         },
       ],
-      './plugins/with-android-pointer-tagging',
+      "./plugins/with-android-pointer-tagging",
       [
-        'expo-splash-screen',
+        "expo-splash-screen",
         {
-          image: './assets/images/splash-icon.png',
+          image: "./assets/images/splash-icon.png",
           imageWidth: 200,
-          resizeMode: 'contain',
-          backgroundColor: '#ffffff',
+          resizeMode: "contain",
+          backgroundColor: "#ffffff",
           dark: {
-            image: './assets/images/android-icon-foreground.png',
+            image: "./assets/images/android-icon-foreground.png",
             imageWidth: 200,
-            resizeMode: 'contain',
-            backgroundColor: '#000000',
+            resizeMode: "contain",
+            backgroundColor: "#000000",
           },
         },
       ],
@@ -98,8 +94,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
         projectId,
       },
       geocoding: {
-        provider:
-          process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ?? 'amap',
+        provider: process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ?? "amap",
         amapWebKey,
       },
       amap: {
