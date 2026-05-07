@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import * as Localization from 'expo-localization';
 
 import { createTranslator, getSystemLocale, Locale, LocalePreference } from '@/lib/i18n';
+import { LOCALE_PREFERENCE_KEY } from '@/lib/storage-keys';
 
 type LocalePreferenceContextValue = {
   preference: LocalePreference;
@@ -11,8 +12,6 @@ type LocalePreferenceContextValue = {
   setPreference: (next: LocalePreference) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
-
-const LOCALE_PREFERENCE_KEY = 'gowherer:locale-preference:v1';
 
 const LocalePreferenceContext = createContext<LocalePreferenceContextValue | null>(null);
 

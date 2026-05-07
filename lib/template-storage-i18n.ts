@@ -1,14 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Locale, getTemplateDefaults } from '@/lib/i18n';
+import { getEntryTemplateStorageKey } from '@/lib/storage-keys';
 import { JourneyKind } from '@/types/journey';
 import { EntryTemplate, EntryTemplateConfig } from '@/types/template';
-
-const ENTRY_TEMPLATE_STORAGE_KEY = 'gowherer:entry-templates:v1';
-
-function getStorageKey(locale: Locale) {
-  return `${ENTRY_TEMPLATE_STORAGE_KEY}:${locale}`;
-}
 
 function normalizeTemplateItem(item: unknown): EntryTemplate | null {
   if (!item || typeof item !== 'object') {
@@ -69,7 +64,7 @@ function normalizeTemplateList(
   return normalized;
 }
 
-function normalizeTemplateConfig(raw: unknown, fallback: EntryTemplateConfig): EntryTemplateConfig {
+export function normalizeTemplateConfig(raw: unknown, fallback: EntryTemplateConfig): EntryTemplateConfig {
   if (!raw || typeof raw !== 'object') {
     return fallback;
   }
@@ -88,7 +83,7 @@ export function getDefaultEntryTemplateConfig(locale: Locale): EntryTemplateConf
 
 export async function loadEntryTemplateConfig(locale: Locale): Promise<EntryTemplateConfig> {
   const fallback = getDefaultEntryTemplateConfig(locale);
-  const raw = await AsyncStorage.getItem(getStorageKey(locale));
+  const raw = await AsyncStorage.getItem(getEntryTemplateStorageKey(locale));
   if (!raw) {
     return fallback;
   }
@@ -105,5 +100,5 @@ export async function saveEntryTemplateConfig(
   locale: Locale,
   config: EntryTemplateConfig
 ): Promise<void> {
-  await AsyncStorage.setItem(getStorageKey(locale), JSON.stringify(config));
+  await AsyncStorage.setItem(getEntryTemplateStorageKey(locale), JSON.stringify(config));
 }

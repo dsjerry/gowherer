@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const LOG_FILE_NAME = 'gowherer-debug.log';
 const LOG_FILE_URI = `${FileSystem.documentDirectory ?? ''}${LOG_FILE_NAME}`;

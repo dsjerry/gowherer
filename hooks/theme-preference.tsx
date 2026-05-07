@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
+import { THEME_PREFERENCE_KEY } from '@/lib/storage-keys';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
@@ -12,8 +13,6 @@ type ThemePreferenceContextValue = {
   setPreference: (next: ThemePreference) => void;
   toggleTheme: () => void;
 };
-
-const THEME_PREFERENCE_KEY = 'gowherer:theme-preference:v1';
 
 const ThemePreferenceContext = createContext<ThemePreferenceContextValue | null>(null);
 

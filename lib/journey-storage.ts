@@ -1,8 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { JOURNEY_STORAGE_KEY } from "@/lib/storage-keys";
 import { Journey } from "@/types/journey";
-
-const JOURNEY_STORAGE_KEY = "gowherer:journeys:v1";
 
 function normalizeTags(tags: unknown): string[] {
   if (!Array.isArray(tags)) {
@@ -49,6 +48,32 @@ function normalizeMediaItem(media: unknown) {
   };
 }
 
+export function normalizeJourneyList(raw: unknown): Journey[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.map((item) => ({
+    ...item,
+    kind: item.kind === "commute" ? "commute" : "travel",
+    tags: normalizeTags(item.tags),
+    entries: Array.isArray(item.entries)
+      ? item.entries.map((entry) => ({
+          ...entry,
+          tags: normalizeTags(entry.tags),
+          media: Array.isArray(entry.media)
+            ? entry.media
+                .map((media) => normalizeMediaItem(media))
+                .filter(Boolean)
+            : [],
+        }))
+      : [],
+    trackLocations: Array.isArray(item.trackLocations)
+      ? item.trackLocations
+      : [],
+  })) as Journey[];
+}
+
 export async function loadJourneys(): Promise<Journey[]> {
   const raw = await AsyncStorage.getItem(JOURNEY_STORAGE_KEY);
   if (!raw) {
@@ -57,28 +82,7 @@ export async function loadJourneys(): Promise<Journey[]> {
 
   try {
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.map((item) => ({
-      ...item,
-      kind: item.kind === "commute" ? "commute" : "travel",
-      tags: normalizeTags(item.tags),
-      entries: Array.isArray(item.entries)
-        ? item.entries.map((entry) => ({
-            ...entry,
-            tags: normalizeTags(entry.tags),
-            media: Array.isArray(entry.media)
-              ? entry.media
-                  .map((media) => normalizeMediaItem(media))
-                  .filter(Boolean)
-              : [],
-          }))
-        : [],
-      trackLocations: Array.isArray(item.trackLocations)
-        ? item.trackLocations
-        : [],
-    })) as Journey[];
+    return normalizeJourneyList(parsed);
   } catch {
     return [];
   }
