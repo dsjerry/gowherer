@@ -14,6 +14,45 @@
         "simulator": false
       }
     },
+    "preview-split": {
+      "extends": "preview",
+      "buildArtifactPaths": [
+        "android/app/build/outputs/apk/release/*.apk"
+      ],
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -Pandroid.enableSeparateBuildPerCPUArchitecture=true",
+        "applicationArchivePath": "android/app/build/outputs/apk/release/*.apk"
+      }
+    },
+    "preview-armeabi-v7a": {
+      "extends": "preview",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=armeabi-v7a"
+      }
+    },
+    "preview-arm64-v8a": {
+      "extends": "preview",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a"
+      }
+    },
+    "preview-x86": {
+      "extends": "preview",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=x86"
+      }
+    },
+    "preview-x86_64": {
+      "extends": "preview",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=x86_64"
+      }
+    },
     "production": {}
   }
 }

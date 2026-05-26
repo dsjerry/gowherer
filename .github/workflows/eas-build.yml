@@ -19,6 +19,11 @@ on:
         type: choice
         options:
           - preview
+          - preview-split
+          - preview-armeabi-v7a
+          - preview-arm64-v8a
+          - preview-x86
+          - preview-x86_64
           - production
       app_version:
         description: App version (optional, SemVer like 1.2.3)
@@ -218,6 +223,14 @@ jobs:
             mv "$tmp_file" "dist/$file_name"
             rm -f "$header_file"
             echo "Saved $platform artifact -> dist/$file_name"
+
+            artifact_bundle_url=$(echo "$item" | jq -r '.artifacts.buildArtifactsUrl // empty')
+            if [ -n "$artifact_bundle_url" ] && [ "$artifact_bundle_url" != "$build_url" ]; then
+              artifact_bundle_name="gowherer-${platform}-${{ inputs.profile }}-${{ github.run_number }}-artifacts.tar.gz"
+              echo "Downloading $platform build artifacts from $artifact_bundle_url"
+              curl -fL "$artifact_bundle_url" -o "dist/$artifact_bundle_name"
+              echo "Saved $platform build artifacts -> dist/$artifact_bundle_name"
+            fi
           done
 
           count=$(ls -1 dist | wc -l | tr -d ' ')

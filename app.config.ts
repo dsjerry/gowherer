@@ -67,6 +67,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
         },
       ],
       "./plugins/with-android-pointer-tagging",
+      "./plugins/with-android-abi-splits",
       [
         "expo-splash-screen",
         {
