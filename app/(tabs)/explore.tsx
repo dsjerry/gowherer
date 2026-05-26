@@ -448,6 +448,7 @@ export default function JourneyHistoryScreen() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
   const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<string[]>([]);
+  const [mapInteracting, setMapInteracting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -601,7 +602,9 @@ export default function JourneyHistoryScreen() {
       contentContainerStyle={[
         styles.container,
         { paddingTop: insets.top + 12 },
-      ]}>
+      ]}
+      scrollEnabled={!mapInteracting}
+    >
       <View style={styles.pageHeader}>
         <Text style={[styles.title, themed.title]}>{t('review.title')}</Text>
       </View>
@@ -801,10 +804,16 @@ export default function JourneyHistoryScreen() {
                   {hasTrackMap ? (
                     <View>
                       <Text style={[styles.mapTitle, themed.mapTitle]}>{t('review.trackMapTitle')}</Text>
-                      <TrackMap
-                        routeLocations={routeLocations}
-                        markerLocations={markerLocations}
-                      />
+                      <View
+                        onTouchStart={() => setMapInteracting(true)}
+                        onTouchEnd={() => setMapInteracting(false)}
+                        onTouchCancel={() => setMapInteracting(false)}
+                      >
+                        <TrackMap
+                          routeLocations={routeLocations}
+                          markerLocations={markerLocations}
+                        />
+                      </View>
                     </View>
                   ) : (
                     <Text style={[styles.emptyText, themed.emptyText]}>
