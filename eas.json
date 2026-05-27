@@ -21,7 +21,8 @@
       ],
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease -Pandroid.enableSeparateBuildPerCPUArchitecture=true",
+        "resourceClass": "large",
+        "gradleCommand": ":app:assembleRelease -Pandroid.enableSeparateBuildPerCPUArchitecture=true -Dorg.gradle.parallel=false -Dorg.gradle.workers.max=2",
         "applicationArchivePath": "android/app/build/outputs/apk/release/*.apk"
       }
     },
