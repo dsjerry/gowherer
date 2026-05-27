@@ -14,7 +14,8 @@ const en = {
     theme: "Theme",
     themeHint: "Toggle light/dark mode.",
     dataTitle: "Data",
-    dataHint: "Export a local backup file or restore journeys, templates, and preferences from one.",
+    dataHint:
+      "Export a local backup file or restore journeys, templates, and preferences from one.",
     dataExportTitle: "Export",
     dataExportHint: "Generate a JSON backup file.",
     dataImportTitle: "Import",
@@ -27,11 +28,28 @@ const en = {
     dataExportFailedTitle: "Export failed",
     dataExportFailedBody: "Please try again later.",
     dataImportConfirmTitle: "Import backup?",
-    dataImportConfirmBody: "Importing will replace the current local journeys, templates, and preferences.",
+    dataImportConfirmBody:
+      "Importing will replace the current local journeys, templates, and preferences.",
     dataImportSuccessTitle: "Import successful",
-    dataImportSuccessBody: "Local data was restored from backup. Revisit other pages to reload the latest data.",
+    dataImportSuccessBody:
+      "Local data was restored from backup. Revisit other pages to reload the latest data.",
     dataImportFailedTitle: "Import failed",
     dataImportFailedBody: "The backup file is invalid or could not be read.",
+    mediaMigrationTitle: "Migrate media files",
+    mediaMigrationHint: "Move old media files to secure storage.",
+    mediaMigrationBusy: "Migrating media files...",
+    mediaMigrationSuccessTitle: "Migration successful",
+    mediaMigrationSuccessBody:
+      "{count} media files migrated to secure storage.",
+    mediaMigrationEmptyTitle: "No migration needed",
+    mediaMigrationEmptyBody:
+      "All media files are already in the new storage location.",
+    mediaMigrationPartialTitle: "Migration completed with errors",
+    mediaMigrationPartialBody:
+      "{count} files migrated successfully, but some files failed.",
+    mediaMigrationFailedTitle: "Migration failed",
+    mediaMigrationFailedBody:
+      "Failed to migrate media files. Please try again.",
     aboutTitle: "About",
     aboutIntro:
       "GoWherer (also known as “去哪儿”) records every journey moment on a timeline, where you can add notes, photos, videos, and locations freely.",
@@ -99,7 +117,8 @@ const en = {
     locationTracking: "Track location",
     trackingPoints: "Tracking {count} points",
     trackingNotificationTitle: "GoWherer is tracking your route",
-    trackingNotificationBody: "Background location tracking is active for this journey.",
+    trackingNotificationBody:
+      "Background location tracking is active for this journey.",
     alertTrackingUnavailableTitle: "Background tracking is unavailable",
     alertTrackingUnavailableBody:
       "Use a development build or production build to test background location. Expo Go has limitations here.",
