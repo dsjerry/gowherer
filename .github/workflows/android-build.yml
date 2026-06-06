@@ -1,0 +1,183 @@
+name: Android Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: Build type
+        required: true
+        default: apk
+        type: choice
+        options:
+          - apk
+          - aab
+      app_version:
+        description: App version (optional, SemVer like 1.2.3)
+        required: false
+        type: string
+      release_notes:
+        description: Release notes (optional, supports multi-line)
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER: ${{ vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER }}
+      AMAP_ANDROID_API_KEY: ${{ secrets.AMAP_ANDROID_API_KEY }}
+      EXPO_PUBLIC_AMAP_WEB_KEY: ${{ secrets.EXPO_PUBLIC_AMAP_WEB_KEY }}
+      APP_VERSION: ${{ inputs.app_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Resolve app version
+        run: |
+          set -euo pipefail
+          if [ -n "${APP_VERSION}" ]; then
+            resolved_version="${APP_VERSION}"
+          else
+            resolved_version=$(node -p "require('./package.json').version")
+          fi
+          echo "APP_VERSION=${resolved_version}" >> "$GITHUB_ENV"
+          echo "Resolved APP_VERSION=${resolved_version}"
+
+      - name: Validate version format
+        if: env.APP_VERSION != ''
+        run: |
+          if ! echo "${APP_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid app_version: ${APP_VERSION}. Expected SemVer like 1.2.3"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate licenses
+        run: npm run licenses:generate
+
+      - name: Prepare .env
+        run: |
+          set -euo pipefail
+          : > .env
+          echo "EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER=${EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER:-amap}" >> .env
+          echo "AMAP_ANDROID_API_KEY=${AMAP_ANDROID_API_KEY}" >> .env
+          echo "EXPO_PUBLIC_AMAP_WEB_KEY=${EXPO_PUBLIC_AMAP_WEB_KEY}" >> .env
+          if [ -n "${APP_VERSION}" ]; then
+            echo "APP_VERSION=${APP_VERSION}" >> .env
+          fi
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --clean
+
+      - name: Decode keystore
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > android/app/release.keystore
+
+      - name: Configure signing
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          cat >> android/app/build.gradle << 'GRADLE_SIGNING'
+
+          // GitHub Actions signing config
+          android.signingConfigs {
+            release {
+              storeFile file("release.keystore")
+              storePassword System.getenv("ANDROID_STORE_PASSWORD")
+              keyAlias System.getenv("ANDROID_KEY_ALIAS")
+              keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+          }
+          android.buildTypes.release.signingConfig = android.signingConfigs.release
+          GRADLE_SIGNING
+
+      - name: Build APK
+        if: inputs.build_type == 'apk'
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            --no-daemon
+
+      - name: Build AAB
+        if: inputs.build_type == 'aab'
+        run: |
+          cd android
+          ./gradlew bundleRelease \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            --no-daemon
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          if [ "${{ inputs.build_type }}" = "aab" ]; then
+            find android/app/build/outputs/bundle -name "*.aab" -exec cp {} dist/ \;
+            ext="aab"
+          else
+            find android/app/build/outputs/apk/release -name "*.apk" -exec cp {} dist/ \;
+            ext="apk"
+          fi
+
+          # Rename to consistent name
+          for f in dist/*."${ext}"; do
+            mv "$f" "dist/gowherer-android-${{ github.run_number }}.${ext}"
+            break
+          done
+
+          ls -lh dist/
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gowherer-android-${{ github.run_number }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="android-build-${{ github.run_number }}"
+          title="Android Build #${{ github.run_number }}"
+          notes_file=$(mktemp)
+          {
+            echo "Platform: android"
+            echo "Build Type: ${{ inputs.build_type }}"
+            echo "App Version: ${APP_VERSION:-default}"
+            if [ -n "${{ inputs.release_notes }}" ]; then
+              echo ""
+              echo "Release Notes:"
+              printf '%b\n' "${{ inputs.release_notes }}"
+            fi
+          } > "$notes_file"
+          gh release create "$tag" --title "$title" --notes-file "$notes_file" || true
+          rm -f "$notes_file"
+          gh release upload "$tag" dist/* --clobber
