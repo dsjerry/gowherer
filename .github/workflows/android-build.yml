@@ -6,10 +6,16 @@ on:
       build_type:
         description: Build type
         required: true
-        default: apk
+        default: universal
         type: choice
         options:
-          - apk
+          - all
+          - universal
+          - split
+          - arm64-v8a
+          - armeabi-v7a
+          - x86
+          - x86_64
           - aab
       app_version:
         description: App version (optional, SemVer like 1.2.3)
@@ -89,14 +95,13 @@ jobs:
         run: npx expo prebuild --platform android --clean
 
       - name: Decode keystore
-        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        if: secrets.ANDROID_KEYSTORE_BASE64 != ''
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > android/app/release.keystore
+        run: echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > android/app/release.keystore
 
       - name: Configure signing
-        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        if: secrets.ANDROID_KEYSTORE_BASE64 != ''
         env:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -116,41 +121,108 @@ jobs:
           android.buildTypes.release.signingConfig = android.signingConfigs.release
           GRADLE_SIGNING
 
-      - name: Build APK
-        if: inputs.build_type == 'apk'
+      # ========== Universal APK (全架构合一) ==========
+      - name: Build universal APK
+        if: inputs.build_type == 'universal' || inputs.build_type == 'all'
         run: |
           cd android
           ./gradlew assembleRelease \
             -Dorg.gradle.jvmargs="-Xmx4g" \
             --no-daemon
 
+      # ========== Split APKs (按架构拆分) ==========
+      - name: Build split APKs
+        if: inputs.build_type == 'split' || inputs.build_type == 'all'
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -Pandroid.enableSeparateBuildPerCPUArchitecture=true \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            -Dorg.gradle.parallel=false \
+            -Dorg.gradle.workers.max=2 \
+            --no-daemon
+
+      # ========== 单架构 APK ==========
+      - name: Build arm64-v8a APK
+        if: inputs.build_type == 'arm64-v8a'
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -PreactNativeArchitectures=arm64-v8a \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            --no-daemon
+
+      - name: Build armeabi-v7a APK
+        if: inputs.build_type == 'armeabi-v7a'
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -PreactNativeArchitectures=armeabi-v7a \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            --no-daemon
+
+      - name: Build x86 APK
+        if: inputs.build_type == 'x86'
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -PreactNativeArchitectures=x86 \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            --no-daemon
+
+      - name: Build x86_64 APK
+        if: inputs.build_type == 'x86_64'
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -PreactNativeArchitectures=x86_64 \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            --no-daemon
+
+      # ========== AAB ==========
       - name: Build AAB
-        if: inputs.build_type == 'aab'
+        if: inputs.build_type == 'aab' || inputs.build_type == 'all'
         run: |
           cd android
           ./gradlew bundleRelease \
             -Dorg.gradle.jvmargs="-Xmx4g" \
             --no-daemon
 
+      # ========== 收集产物 ==========
       - name: Collect artifacts
         run: |
           set -euo pipefail
           mkdir -p dist
 
-          if [ "${{ inputs.build_type }}" = "aab" ]; then
-            find android/app/build/outputs/bundle -name "*.aab" -exec cp {} dist/ \;
-            ext="aab"
-          else
-            find android/app/build/outputs/apk/release -name "*.apk" -exec cp {} dist/ \;
-            ext="apk"
+          # APK 文件
+          if [ -d android/app/build/outputs/apk/release ]; then
+            find android/app/build/outputs/apk/release -name "*.apk" | while read -r f; do
+              filename=$(basename "$f")
+              # 从文件名判断架构
+              if echo "$filename" | grep -q "arm64"; then
+                suffix="arm64-v8a"
+              elif echo "$filename" | grep -q "armeabi"; then
+                suffix="armeabi-v7a"
+              elif echo "$filename" | grep -q "x86_64"; then
+                suffix="x86_64"
+              elif echo "$filename" | grep -q "x86"; then
+                suffix="x86"
+              elif echo "$filename" | grep -q "universal"; then
+                suffix="universal"
+              else
+                suffix="release"
+              fi
+              cp "$f" "dist/gowherer-${suffix}-v${APP_VERSION:-0.0.0}.apk"
+            done
           fi
 
-          # Rename to consistent name
-          for f in dist/*."${ext}"; do
-            mv "$f" "dist/gowherer-android-${{ github.run_number }}.${ext}"
-            break
-          done
+          # AAB 文件
+          if [ -d android/app/build/outputs/bundle/release ]; then
+            find android/app/build/outputs/bundle/release -name "*.aab" -exec \
+              cp {} "dist/gowherer-v${APP_VERSION:-0.0.0}.aab" \;
+          fi
 
+          echo "=== 产物列表 ==="
           ls -lh dist/
 
       - name: Upload workflow artifacts
@@ -165,16 +237,29 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag="android-build-${{ github.run_number }}"
-          title="Android Build #${{ github.run_number }}"
+          tag="v${APP_VERSION:-0.0.0}"
+          title="GoWherer v${APP_VERSION:-${{ github.run_number }}}"
           notes_file=$(mktemp)
           {
-            echo "Platform: android"
-            echo "Build Type: ${{ inputs.build_type }}"
-            echo "App Version: ${APP_VERSION:-default}"
+            echo "## Android Build"
+            echo ""
+            echo "- Build Type: ${{ inputs.build_type }}"
+            echo "- App Version: ${APP_VERSION:-default}"
+            echo "- Run: #${{ github.run_number }}"
+            echo ""
+            echo "### 产物"
+            echo ""
+            echo "| 文件 | 架构 |"
+            echo "|------|------|"
+            for f in dist/*; do
+              name=$(basename "$f")
+              size=$(du -h "$f" | cut -f1)
+              echo "| \`${name}\` | ${size} |"
+            done
             if [ -n "${{ inputs.release_notes }}" ]; then
               echo ""
-              echo "Release Notes:"
+              echo "### Release Notes"
+              echo ""
               printf '%b\n' "${{ inputs.release_notes }}"
             fi
           } > "$notes_file"
