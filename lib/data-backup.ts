@@ -1,19 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system/legacy';
-
 import { ThemePreference } from '@/hooks/theme-preference';
 import { Locale, LocalePreference } from '@/lib/i18n';
-import { normalizeJourneyList } from '@/lib/journey-storage';
-import {
-  getEntryTemplateStorageKey,
-  JOURNEY_STORAGE_KEY,
-  LOCALE_PREFERENCE_KEY,
-  THEME_PREFERENCE_KEY,
-} from '@/lib/storage-keys';
-import {
-  getDefaultEntryTemplateConfig,
-  normalizeTemplateConfig,
-} from '@/lib/template-storage-i18n';
+import { exportBackupApi, importBackupApi } from '@/lib/api-client';
 import { Journey } from '@/types/journey';
 import { EntryTemplateConfig } from '@/types/template';
 
@@ -37,73 +24,25 @@ type ImportResult = {
   themePreference: ThemePreference;
 };
 
-function isLocalePreference(value: unknown): value is LocalePreference {
-  return value === 'system' || value === 'zh' || value === 'en';
-}
-
-function isThemePreference(value: unknown): value is ThemePreference {
-  return value === 'system' || value === 'light' || value === 'dark';
-}
-
-function buildBackupFilename(exportedAt: string) {
-  return `gowherer-backup-${exportedAt.replace(/[:.]/g, '-').replace('T', '_')}.json`;
-}
-
-async function loadPreference<T extends string>(
-  key: string,
-  fallback: T,
-  guard: (value: unknown) => value is T
-) {
-  const raw = await AsyncStorage.getItem(key);
-  return guard(raw) ? raw : fallback;
-}
-
-export async function buildAppBackup(appVersion: string): Promise<AppBackupV1> {
-  const journeysRaw = await AsyncStorage.getItem(JOURNEY_STORAGE_KEY);
-  const journeys = journeysRaw ? normalizeJourneyList(JSON.parse(journeysRaw)) : [];
-
-  const [localePreference, themePreference, zhTemplatesRaw, enTemplatesRaw] = await Promise.all([
-    loadPreference(LOCALE_PREFERENCE_KEY, 'system', isLocalePreference),
-    loadPreference(THEME_PREFERENCE_KEY, 'system', isThemePreference),
-    AsyncStorage.getItem(getEntryTemplateStorageKey('zh')),
-    AsyncStorage.getItem(getEntryTemplateStorageKey('en')),
-  ]);
-
-  const zhFallback = getDefaultEntryTemplateConfig('zh');
-  const enFallback = getDefaultEntryTemplateConfig('en');
-
+export async function buildAppBackup(_appVersion: string): Promise<AppBackupV1> {
+  const data = await exportBackupApi();
   return {
     version: 1,
-    exportedAt: new Date().toISOString(),
-    app: {
-      slug: 'gowherer',
-      version: appVersion,
-    },
-    preferences: {
-      locale: localePreference,
-      theme: themePreference,
-    },
-    journeys,
-    entryTemplates: {
-      zh: zhTemplatesRaw ? normalizeTemplateConfig(JSON.parse(zhTemplatesRaw), zhFallback) : zhFallback,
-      en: enTemplatesRaw ? normalizeTemplateConfig(JSON.parse(enTemplatesRaw), enFallback) : enFallback,
-    },
+    exportedAt: data.exportedAt || new Date().toISOString(),
+    app: data.app || { slug: 'gowherer', version: 'server' },
+    preferences: data.preferences || { locale: 'system', theme: 'system' },
+    journeys: data.journeys || [],
+    entryTemplates: data.templates || {},
   };
 }
 
 export async function writeBackupToFile(backup: AppBackupV1): Promise<{ fileName: string; uri: string }> {
-  const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
-  if (!directory) {
-    throw new Error('File system directory is unavailable.');
-  }
-
-  const fileName = buildBackupFilename(backup.exportedAt);
-  const uri = `${directory}${fileName}`;
-  await FileSystem.writeAsStringAsync(uri, JSON.stringify(backup, null, 2), {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-
-  return { fileName, uri };
+  // In API mode, export returns JSON string
+  const json = JSON.stringify(backup, null, 2);
+  const fileName = `gowherer-backup-${backup.exportedAt.replace(/[:.]/g, '-').replace('T', '_')}.json`;
+  // For React Native, we'd need expo-file-system to write to cache
+  // For now, return the JSON as a shareable string
+  return { fileName, uri: `data:application/json,${encodeURIComponent(json)}` };
 }
 
 export function serializeBackup(backup: AppBackupV1) {
@@ -111,62 +50,26 @@ export function serializeBackup(backup: AppBackupV1) {
 }
 
 export function parseBackupString(raw: string): AppBackupV1 {
-  const parsed = JSON.parse(raw) as Partial<AppBackupV1> & { preferences?: Record<string, unknown> };
+  const parsed = JSON.parse(raw) as Partial<AppBackupV1>;
 
   if (parsed.version !== 1) {
     throw new Error('Unsupported backup version.');
   }
 
-  if (!parsed.entryTemplates || typeof parsed.entryTemplates !== 'object') {
-    throw new Error('Backup templates are missing.');
-  }
-
-  const localePreference = isLocalePreference(parsed.preferences?.locale)
-    ? parsed.preferences.locale
-    : 'system';
-  const themePreference = isThemePreference(parsed.preferences?.theme)
-    ? parsed.preferences.theme
-    : 'system';
-
   return {
     version: 1,
-    exportedAt:
-      typeof parsed.exportedAt === 'string' && parsed.exportedAt.trim()
-        ? parsed.exportedAt
-        : new Date().toISOString(),
-    app: {
-      slug:
-        typeof parsed.app?.slug === 'string' && parsed.app.slug.trim()
-          ? parsed.app.slug
-          : 'gowherer',
-      version:
-        typeof parsed.app?.version === 'string' && parsed.app.version.trim()
-          ? parsed.app.version
-          : 'unknown',
-    },
-    preferences: {
-      locale: localePreference,
-      theme: themePreference,
-    },
-    journeys: normalizeJourneyList(parsed.journeys),
-    entryTemplates: {
-      zh: normalizeTemplateConfig(parsed.entryTemplates.zh, getDefaultEntryTemplateConfig('zh')),
-      en: normalizeTemplateConfig(parsed.entryTemplates.en, getDefaultEntryTemplateConfig('en')),
-    },
+    exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt : new Date().toISOString(),
+    app: parsed.app || { slug: 'gowherer', version: 'unknown' },
+    preferences: parsed.preferences || { locale: 'system', theme: 'system' },
+    journeys: Array.isArray(parsed.journeys) ? parsed.journeys : [],
+    entryTemplates: parsed.entryTemplates || {},
   };
 }
 
 export async function importBackup(backup: AppBackupV1): Promise<ImportResult> {
-  await Promise.all([
-    AsyncStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify(backup.journeys)),
-    AsyncStorage.setItem(getEntryTemplateStorageKey('zh'), JSON.stringify(backup.entryTemplates.zh)),
-    AsyncStorage.setItem(getEntryTemplateStorageKey('en'), JSON.stringify(backup.entryTemplates.en)),
-    AsyncStorage.setItem(LOCALE_PREFERENCE_KEY, backup.preferences.locale),
-    AsyncStorage.setItem(THEME_PREFERENCE_KEY, backup.preferences.theme),
-  ]);
-
+  await importBackupApi(backup);
   return {
-    localePreference: backup.preferences.locale,
-    themePreference: backup.preferences.theme,
+    localePreference: backup.preferences?.locale || 'system',
+    themePreference: backup.preferences?.theme || 'system',
   };
 }

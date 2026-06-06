@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
-import { appendJourneyTrackLocations } from '@/lib/journey-repository';
+import { appendTrackApi } from '@/lib/api-client';
 import { normalizeTrackLocation } from '@/lib/track-utils';
 import { TimelineLocation } from '@/types/journey';
 
@@ -20,7 +20,7 @@ type BackgroundLocationTaskData = {
   locations?: Location.LocationObject[];
 };
 
-async function appendTrackLocations(locations: Location.LocationObject[]) {
+async function bufferTrackLocations(locations: Location.LocationObject[]) {
   if (locations.length === 0) {
     return;
   }
@@ -38,6 +38,7 @@ async function appendTrackLocations(locations: Location.LocationObject[]) {
     source: 'tracking',
   }));
 
+  // Buffer locally (background tasks may not have network)
   const batchKey = `${TRACKING_BATCH_PREFIX}:${trackedJourneyId}:${Date.now()}:${Math.random()
     .toString(36)
     .slice(2, 8)}`;
@@ -51,7 +52,7 @@ if (!TaskManager.isTaskDefined(TRACKING_TASK_NAME)) {
       return;
     }
 
-    await appendTrackLocations(data?.locations ?? []);
+    await bufferTrackLocations(data?.locations ?? []);
   });
 }
 
@@ -111,6 +112,10 @@ export async function stopLocationTracking() {
   await AsyncStorage.removeItem(TRACKING_JOURNEY_ID_KEY);
 }
 
+/**
+ * Sync buffered track locations from AsyncStorage to the server API.
+ * Background tasks buffer locally because network may not be available.
+ */
 export async function syncBufferedTrackLocations(journeyId: string) {
   const allKeys = await AsyncStorage.getAllKeys();
   const prefix = `${TRACKING_BATCH_PREFIX}:${journeyId}:`;
@@ -138,7 +143,15 @@ export async function syncBufferedTrackLocations(journeyId: string) {
     }
   });
 
-  await appendJourneyTrackLocations(journeyId, nextLocations);
-  await AsyncStorage.multiRemove(batchKeys);
+  // Send to server
+  try {
+    await appendTrackApi(journeyId, nextLocations);
+    // Only remove from buffer after successful sync
+    await AsyncStorage.multiRemove(batchKeys);
+  } catch {
+    // Keep in buffer if sync fails — will retry next time
+    console.warn('Track sync failed, will retry');
+  }
+
   return nextLocations.length;
 }
