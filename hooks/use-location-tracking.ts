@@ -1,22 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 
-import * as Location from 'expo-location';
+import * as Location from "expo-location";
 
-import { useI18n } from '@/hooks/locale-preference';
+import { useI18n } from "@/hooks/locale-preference";
 import {
-  isBackgroundLocationTrackingAvailable,
-  isLocationTrackingActive,
-  syncBufferedTrackLocations,
-  startLocationTracking,
-  stopLocationTracking,
-} from '@/lib/background-location';
-import { logLocalError } from '@/lib/local-log';
-import { Journey } from '@/types/journey';
+    isBackgroundLocationTrackingAvailable,
+    isLocationTrackingActive,
+    startLocationTracking,
+    stopLocationTracking,
+    syncBufferedTrackLocations,
+} from "@/lib/background-location";
+import { logLocalError } from "@/lib/local-log";
+import { Journey } from "@/types/journey";
 
 export function useLocationTracking(
   activeJourney: Journey | undefined,
-  onRefreshJourneys?: () => void
+  onRefreshJourneys?: () => void,
 ) {
   const { t } = useI18n();
   const [locationTracking, setLocationTracking] = useState(false);
@@ -47,10 +47,12 @@ export function useLocationTracking(
     if (!locationTracking || !activeJourney) return;
     const intervalId = setInterval(() => {
       void (async () => {
-        await syncBufferedTrackLocations(activeJourney.id);
-        onRefreshRef.current?.();
+        const newCount = await syncBufferedTrackLocations(activeJourney.id);
+        if (newCount > 0) {
+          onRefreshRef.current?.();
+        }
       })();
-    }, 10000);
+    }, 15000);
     return () => clearInterval(intervalId);
   }, [locationTracking, activeJourney]);
 
@@ -70,52 +72,53 @@ export function useLocationTracking(
         const available = await isBackgroundLocationTrackingAvailable();
         if (!available) {
           Alert.alert(
-            t('journey.alertTrackingUnavailableTitle'),
-            t('journey.alertTrackingUnavailableBody')
+            t("journey.alertTrackingUnavailableTitle"),
+            t("journey.alertTrackingUnavailableBody"),
           );
           return;
         }
 
         const foregroundPermission =
           await Location.requestForegroundPermissionsAsync();
-        if (foregroundPermission.status !== 'granted') {
+        if (foregroundPermission.status !== "granted") {
           Alert.alert(
-            t('journey.alertTrackingPermissionTitle'),
-            t('journey.alertTrackingPermissionBody')
+            t("journey.alertTrackingPermissionTitle"),
+            t("journey.alertTrackingPermissionBody"),
           );
           return;
         }
 
         const backgroundPermission =
           await Location.requestBackgroundPermissionsAsync();
-        if (backgroundPermission.status !== 'granted') {
+        if (backgroundPermission.status !== "granted") {
           Alert.alert(
-            t('journey.alertTrackingPermissionTitle'),
-            t('journey.alertTrackingPermissionBody')
+            t("journey.alertTrackingPermissionTitle"),
+            t("journey.alertTrackingPermissionBody"),
           );
           return;
         }
 
         await startLocationTracking(activeJourney.id, {
-          notificationTitle: t('journey.trackingNotificationTitle'),
-          notificationBody: t('journey.trackingNotificationBody'),
+          notificationTitle: t("journey.trackingNotificationTitle"),
+          notificationBody: t("journey.trackingNotificationBody"),
+          journeyKind: activeJourney.kind,
         });
         setLocationTracking(true);
       } catch (error) {
         void logLocalError(
-          'JourneyScreen',
-          'failed to toggle location tracking',
-          error
+          "JourneyScreen",
+          "failed to toggle location tracking",
+          error,
         );
         Alert.alert(
-          t('journey.alertTrackingStartFailedTitle'),
-          t('journey.alertTrackingStartFailedBody')
+          t("journey.alertTrackingStartFailedTitle"),
+          t("journey.alertTrackingStartFailedBody"),
         );
       } finally {
         setTrackingBusy(false);
       }
     },
-    [activeJourney, trackingBusy, t]
+    [activeJourney, trackingBusy, t],
   );
 
   return { locationTracking, trackingBusy, handleTrackingChange };

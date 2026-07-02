@@ -1,19 +1,23 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
-import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Location from "expo-location";
+import * as TaskManager from "expo-task-manager";
+import { Platform } from "react-native";
 
-import { appendJourneyTrackLocations } from '@/lib/journey-repository';
-import { normalizeTrackLocation } from '@/lib/track-utils';
-import { TimelineLocation } from '@/types/journey';
+import { toTimelineLocation } from "@/lib/current-location";
+import { appendJourneyTrackLocations } from "@/lib/journey-repository";
+import { normalizeTrackLocation } from "@/lib/track-utils";
+import { TimelineLocation } from "@/types/journey";
 
-const TRACKING_TASK_NAME = 'gowherer-background-location-task';
-const TRACKING_JOURNEY_ID_KEY = 'gowherer:tracking:journey-id:v1';
-const TRACKING_BATCH_PREFIX = 'gowherer:tracking:batch:v1';
+const MAX_COLLECTION_ACCURACY_METERS = 100;
+
+const TRACKING_TASK_NAME = "gowherer-background-location-task";
+const TRACKING_JOURNEY_ID_KEY = "gowherer:tracking:journey-id:v1";
+const TRACKING_BATCH_PREFIX = "gowherer:tracking:batch:v1";
 
 type StartTrackingOptions = {
   notificationTitle: string;
   notificationBody: string;
+  journeyKind?: "travel" | "commute";
 };
 
 type BackgroundLocationTaskData = {
@@ -30,13 +34,18 @@ async function appendTrackLocations(locations: Location.LocationObject[]) {
     return;
   }
 
-  const nextLocations: TimelineLocation[] = locations.map((item) => ({
-    latitude: item.coords.latitude,
-    longitude: item.coords.longitude,
-    accuracy: item.coords.accuracy ?? undefined,
-    capturedAt: new Date(item.timestamp).toISOString(),
-    source: 'tracking',
-  }));
+  const nextLocations = locations
+    .map((item) => toTimelineLocation(item, "tracking"))
+    .filter((item): item is TimelineLocation => Boolean(item))
+    .filter(
+      (item) =>
+        typeof item.accuracy !== "number" ||
+        item.accuracy <= MAX_COLLECTION_ACCURACY_METERS,
+    );
+
+  if (nextLocations.length === 0) {
+    return;
+  }
 
   const batchKey = `${TRACKING_BATCH_PREFIX}:${trackedJourneyId}:${Date.now()}:${Math.random()
     .toString(36)
@@ -45,18 +54,21 @@ async function appendTrackLocations(locations: Location.LocationObject[]) {
 }
 
 if (!TaskManager.isTaskDefined(TRACKING_TASK_NAME)) {
-  TaskManager.defineTask<BackgroundLocationTaskData>(TRACKING_TASK_NAME, async ({ data, error }) => {
-    if (error) {
-      console.error('Background location task failed', error);
-      return;
-    }
+  TaskManager.defineTask<BackgroundLocationTaskData>(
+    TRACKING_TASK_NAME,
+    async ({ data, error }) => {
+      if (error) {
+        console.error("Background location task failed", error);
+        return;
+      }
 
-    await appendTrackLocations(data?.locations ?? []);
-  });
+      await appendTrackLocations(data?.locations ?? []);
+    },
+  );
 }
 
 export async function isBackgroundLocationTrackingAvailable() {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return false;
   }
 
@@ -64,7 +76,7 @@ export async function isBackgroundLocationTrackingAvailable() {
 }
 
 export async function isLocationTrackingActive() {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return false;
   }
 
@@ -73,9 +85,9 @@ export async function isLocationTrackingActive() {
 
 export async function startLocationTracking(
   journeyId: string,
-  options: StartTrackingOptions
+  options: StartTrackingOptions,
 ) {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return;
   }
 
@@ -86,10 +98,13 @@ export async function startLocationTracking(
   await AsyncStorage.setItem(TRACKING_JOURNEY_ID_KEY, journeyId);
 
   await Location.startLocationUpdatesAsync(TRACKING_TASK_NAME, {
-    accuracy: Location.Accuracy.BestForNavigation,
-    activityType: Location.ActivityType.Fitness,
+    accuracy: Location.Accuracy.High,
+    activityType:
+      options.journeyKind === "travel"
+        ? Location.ActivityType.AutomotiveNavigation
+        : Location.ActivityType.Fitness,
     timeInterval: 3000,
-    distanceInterval: 3,
+    distanceInterval: 10,
     deferredUpdatesInterval: 5000,
     deferredUpdatesDistance: 5,
     pausesUpdatesAutomatically: false,
@@ -97,14 +112,17 @@ export async function startLocationTracking(
     foregroundService: {
       notificationTitle: options.notificationTitle,
       notificationBody: options.notificationBody,
-      notificationColor: '#0f766e',
+      notificationColor: "#0f766e",
       killServiceOnDestroy: false,
     },
   });
 }
 
 export async function stopLocationTracking() {
-  if (Platform.OS !== 'web' && (await Location.hasStartedLocationUpdatesAsync(TRACKING_TASK_NAME))) {
+  if (
+    Platform.OS !== "web" &&
+    (await Location.hasStartedLocationUpdatesAsync(TRACKING_TASK_NAME))
+  ) {
     await Location.stopLocationUpdatesAsync(TRACKING_TASK_NAME);
   }
 
@@ -131,7 +149,9 @@ export async function syncBufferedTrackLocations(journeyId: string) {
       return Array.isArray(parsed)
         ? parsed
             .map((location) => normalizeTrackLocation(location))
-            .filter((location): location is TimelineLocation => Boolean(location))
+            .filter((location): location is TimelineLocation =>
+              Boolean(location),
+            )
         : [];
     } catch {
       return [];

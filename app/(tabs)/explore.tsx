@@ -1,12 +1,12 @@
-
-import { MaterialIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { Image } from 'expo-image';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import { useCallback, useMemo, useState } from 'react';
+import { MaterialIcons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import * as ExpoFileSystem from "expo-file-system";
+import { Image } from "expo-image";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { VideoView, useVideoPlayer } from "expo-video";
+import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   LayoutAnimation,
@@ -18,40 +18,49 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { TrackMap } from '@/components/track-map';
-import { useI18n } from '@/hooks/locale-preference';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { deleteJourney as deleteJourneyById } from '@/lib/journey-repository';
-import { loadJourneys } from '@/lib/journey-storage';
+import { TrackMap } from "@/components/track-map";
+import { useI18n } from "@/hooks/locale-preference";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { deleteJourney as deleteJourneyById } from "@/lib/journey-repository";
+import { loadJourneys } from "@/lib/journey-storage";
 import {
   calculateTrackDistanceKm,
   prepareTrackRouteLocations,
   sanitizeTrackLocations,
-  smoothTrackLocations,
-} from '@/lib/track-utils';
-import { Journey, JourneyKind, TimelineLocation, TimelineMedia } from '@/types/journey';
+} from "@/lib/track-utils";
+import {
+  Journey,
+  JourneyKind,
+  TimelineLocation,
+  TimelineMedia,
+} from "@/types/journey";
 
-type JourneyFilter = 'all' | JourneyKind;
+type JourneyFilter = "all" | JourneyKind;
 
-type TFunction = (key: string, params?: Record<string, string | number>) => string;
+type TFunction = (
+  key: string,
+  params?: Record<string, string | number>,
+) => string;
 
 function formatDateTime(iso?: string) {
   if (!iso) {
-    return '-';
+    return "-";
   }
   const date = new Date(iso);
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  const hh = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
   return `${mm}/${dd} ${hh}:${min}`;
 }
 
 function kindLabel(kind: JourneyKind, t: TFunction) {
-  return kind === 'travel' ? t('journey.kind.travel') : t('journey.kind.commute');
+  return kind === "travel"
+    ? t("journey.kind.travel")
+    : t("journey.kind.commute");
 }
 
 function formatDuration(durationMs: number, t: TFunction) {
@@ -60,17 +69,16 @@ function formatDuration(durationMs: number, t: TFunction) {
   const minutes = totalMinutes % 60;
 
   if (hours === 0) {
-    return t('duration.minutes', { minutes });
+    return t("duration.minutes", { minutes });
   }
   if (minutes === 0) {
-    return t('duration.hours', { hours });
+    return t("duration.hours", { hours });
   }
-  return t('duration.hoursMinutes', { hours, minutes });
+  return t("duration.hoursMinutes", { hours, minutes });
 }
 
-function getJourneyTrackLocations(journey: Journey, smooth = true) {
-  const trackLocations = prepareTrackRouteLocations(journey.trackLocations ?? []);
-  return smooth ? smoothTrackLocations(trackLocations) : trackLocations;
+function getJourneyTrackLocations(journey: Journey) {
+  return prepareTrackRouteLocations(journey.trackLocations ?? []);
 }
 
 function getJourneyEntryLocations(journey: Journey) {
@@ -87,22 +95,42 @@ function getJourneyTrackMapMarkerLocations(journey: Journey) {
 
   const start = routeLocations[0];
   const end = routeLocations[routeLocations.length - 1];
-  return [start, ...entryLocations, end];
+  const hasStartEntry = entryLocations.some(
+    (loc) =>
+      Math.abs(loc.latitude - start.latitude) < 0.0001 &&
+      Math.abs(loc.longitude - start.longitude) < 0.0001,
+  );
+  const hasEndEntry = entryLocations.some(
+    (loc) =>
+      Math.abs(loc.latitude - end.latitude) < 0.0001 &&
+      Math.abs(loc.longitude - end.longitude) < 0.0001,
+  );
+
+  const markers: TimelineLocation[] = [];
+  if (!hasStartEntry) markers.push(start);
+  markers.push(...entryLocations);
+  if (!hasEndEntry) markers.push(end);
+  return markers;
 }
 
 function computeJourneyStats(journey: Journey) {
   const trackLocations = getJourneyTrackLocations(journey);
   const entryLocations = getJourneyEntryLocations(journey);
-  const distanceSource = trackLocations.length >= 2 ? trackLocations : entryLocations;
+  const distanceSource =
+    trackLocations.length >= 2 ? trackLocations : entryLocations;
   const distanceKm = calculateTrackDistanceKm(distanceSource);
 
   const endMs = journey.endedAt
     ? new Date(journey.endedAt).getTime()
     : journey.entries.length > 0
-      ? new Date(journey.entries[journey.entries.length - 1].createdAt).getTime()
+      ? new Date(
+          journey.entries[journey.entries.length - 1].createdAt,
+        ).getTime()
       : new Date(journey.createdAt).getTime();
   const startMs = new Date(journey.createdAt).getTime();
-  const durationMs = Number.isFinite(endMs - startMs) ? Math.max(0, endMs - startMs) : 0;
+  const durationMs = Number.isFinite(endMs - startMs)
+    ? Math.max(0, endMs - startMs)
+    : 0;
   const avgSpeedKmh = durationMs > 0 ? distanceKm / (durationMs / 3600000) : 0;
 
   return {
@@ -126,7 +154,7 @@ function includesQueryText(source: string | undefined, query: string) {
 }
 
 function mediaPreviewUri(media: TimelineMedia) {
-  if (media.type === 'video') {
+  if (media.type === "video") {
     return media.thumbnailUri;
   }
   return media.uri;
@@ -134,19 +162,68 @@ function mediaPreviewUri(media: TimelineMedia) {
 
 function escapeHtml(text: string) {
   return text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+async function readImageAsBase64(uri: string): Promise<string | null> {
+  try {
+    if (!uri || uri.startsWith("data:")) return uri;
+    if (uri.startsWith("file://") || uri.startsWith("content://")) {
+      const base64 = await ExpoFileSystem.readAsStringAsync(uri, {
+        encoding: "base64" as const,
+      });
+      const ext = uri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const mime = ext === "png" ? "png" : ext === "webp" ? "webp" : "jpeg";
+      return `data:image/${mime};base64,${base64}`;
+    }
+    return uri;
+  } catch {
+    return null;
+  }
+}
+
+async function buildEntryMediaHtml(media: TimelineMedia[]): Promise<string> {
+  const photos = media.filter((m) => m.type === "photo");
+  if (photos.length === 0) {
+    const videoCount = media.filter((m) => m.type === "video").length;
+    const audioCount = media.filter((m) => m.type === "audio").length;
+    if (videoCount === 0 && audioCount === 0) return "";
+    return `<div style="color:#64748b;font-size:12px;margin-top:8px;">${videoCount} 视频 · ${audioCount} 音频</div>`;
+  }
+
+  const imageTags = await Promise.all(
+    photos.map(async (photo) => {
+      const src = await readImageAsBase64(photo.uri);
+      if (!src) return "";
+      return `<img src="${src}" style="width:100%;height:200px;object-fit:cover;border-radius:8px;" />`;
+    }),
+  );
+  const validImages = imageTags.filter(Boolean);
+  if (validImages.length === 0) return "";
+
+  if (validImages.length === 1) {
+    return `<div style="margin-top:10px;">${validImages[0]}</div>`;
+  }
+
+  const gridHtml = validImages
+    .map(
+      (img) =>
+        `<div style="flex:1;min-width:0;">${img.replace("height:200px", "height:140px")}</div>`,
+    )
+    .join("");
+  return `<div style="display:flex;gap:6px;margin-top:10px;">${gridHtml}</div>`;
 }
 
 function buildTrackSvgDataUri(
   locations: TimelineLocation[],
-  labels: { start: string; end: string }
+  labels: { start: string; end: string },
 ) {
   if (locations.length < 2) {
-    return '';
+    return "";
   }
 
   const width = 780;
@@ -163,20 +240,24 @@ function buildTrackSvgDataUri(
 
   const points = locations
     .map((item) => {
-      const x = padding + ((item.longitude - minLng) / lngSpan) * (width - padding * 2);
-      const y = height - padding - ((item.latitude - minLat) / latSpan) * (height - padding * 2);
+      const x =
+        padding + ((item.longitude - minLng) / lngSpan) * (width - padding * 2);
+      const y =
+        height -
+        padding -
+        ((item.latitude - minLat) / latSpan) * (height - padding * 2);
       return `${x.toFixed(2)},${y.toFixed(2)}`;
     })
-    .join(' ');
+    .join(" ");
 
-  const start = points.split(' ')[0];
-  const end = points.split(' ')[points.split(' ').length - 1];
+  const start = points.split(" ")[0];
+  const end = points.split(" ")[points.split(" ").length - 1];
 
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'>
     <rect x='0' y='0' width='${width}' height='${height}' fill='#f8fafc' rx='12' />
     <polyline points='${points}' fill='none' stroke='#0f766e' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' />
-    <circle cx='${start.split(',')[0]}' cy='${start.split(',')[1]}' r='7' fill='#0284c7' />
-    <circle cx='${end.split(',')[0]}' cy='${end.split(',')[1]}' r='7' fill='#dc2626' />
+    <circle cx='${start.split(",")[0]}' cy='${start.split(",")[1]}' r='7' fill='#0284c7' />
+    <circle cx='${end.split(",")[0]}' cy='${end.split(",")[1]}' r='7' fill='#dc2626' />
     <text x='20' y='24' font-size='12' fill='#334155'>${escapeHtml(labels.start)}</text>
     <text x='64' y='24' font-size='12' fill='#334155'>${escapeHtml(labels.end)}</text>
   </svg>`;
@@ -184,93 +265,113 @@ function buildTrackSvgDataUri(
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-function journeyToHtml(journey: Journey, t: TFunction) {
+async function journeyToHtml(journey: Journey, t: TFunction): Promise<string> {
   const stats = computeJourneyStats(journey);
   const routeLocations = getJourneyTrackLocations(journey);
   const fallbackLocations = getJourneyEntryLocations(journey);
-  const locations = routeLocations.length >= 2 ? routeLocations : fallbackLocations;
+  const locations =
+    routeLocations.length >= 2 ? routeLocations : fallbackLocations;
   const trackSvgUri = buildTrackSvgDataUri(locations, {
-    start: t('review.html.start'),
-    end: t('review.html.end'),
+    start: t("review.html.start"),
+    end: t("review.html.end"),
   });
 
+  const tagsHtml = journey.tags.length
+    ? `<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">${journey.tags
+        .map(
+          (tag) =>
+            `<span style="background:#e2e8f0;color:#334155;padding:3px 10px;border-radius:12px;font-size:12px;">#${escapeHtml(tag)}</span>`,
+        )
+        .join("")}</div>`
+    : "";
+
+  const statsHtml = `
+    <div style="display:flex;gap:20px;margin-top:20px;flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#0f766e;">${stats.distanceKm.toFixed(2)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">km</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#0f766e;">${formatDuration(stats.durationMs, t)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">${escapeHtml(t("review.statsDuration"))}</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#0f766e;">${stats.avgSpeedKmh.toFixed(1)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">km/h</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#0f766e;">${stats.locationPoints}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">${escapeHtml(t("review.statsLocationPoints"))}</div>
+      </div>
+    </div>`;
+
   const cover = `
-    <section style="height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:20px;">
-      <h1 style="margin:0;font-size:38px;color:#0f172a;">${escapeHtml(journey.title)}</h1>
-      <p style="margin:14px 0 0;color:#475569;font-size:16px;">
-        ${escapeHtml(kindLabel(journey.kind, t))} · ${formatDateTime(journey.createdAt)} - ${formatDateTime(journey.endedAt)}
+    <section style="min-height:90vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:40px 20px;background:linear-gradient(180deg,#f0fdfa 0%,#ffffff 100%);">
+      <div style="font-size:13px;color:#0f766e;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">${escapeHtml(kindLabel(journey.kind, t))}</div>
+      <h1 style="margin:0;font-size:36px;color:#0f172a;font-weight:700;">${escapeHtml(journey.title)}</h1>
+      <p style="margin:12px 0 0;color:#475569;font-size:14px;">
+        ${formatDateTime(journey.createdAt)} — ${journey.endedAt ? formatDateTime(journey.endedAt) : ""}
       </p>
-      ${
-        journey.tags.length > 0
-          ? `<p style="margin:8px 0 0;color:#334155;font-size:13px;">${escapeHtml(
-              t('review.html.tags', { tags: journey.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ') })
-            )}</p>`
-          : ''
-      }
-      <p style="margin:8px 0 0;color:#334155;font-size:13px;">
-        ${escapeHtml(
-          t('review.html.stats', {
-            distance: stats.distanceKm.toFixed(2),
-            duration: formatDuration(stats.durationMs, t),
-            speed: stats.avgSpeedKmh.toFixed(2),
-            points: stats.locationPoints,
-          })
-        )}
-      </p>
-      <p style="margin:6px 0 16px;color:#64748b;">${escapeHtml(
-        t('review.html.totalEntries', { count: journey.entries.length })
+      ${tagsHtml}
+      ${statsHtml}
+      <p style="margin:16px 0 0;color:#64748b;font-size:13px;">${escapeHtml(
+        t("review.html.totalEntries", { count: journey.entries.length }),
       )}</p>
       ${
         trackSvgUri
-          ? `<img src="${trackSvgUri}" alt="${escapeHtml(t('review.html.trackAlt'))}" style="width:95%;max-width:780px;border:1px solid #e2e8f0;border-radius:12px;" />`
-          : `<div style="padding:14px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#64748b;">${escapeHtml(
-              t('review.html.trackEmpty')
+          ? `<img src="${trackSvgUri}" alt="${escapeHtml(t("review.html.trackAlt"))}" style="width:90%;max-width:780px;margin-top:24px;border:1px solid #e2e8f0;border-radius:12px;" />`
+          : `<div style="margin-top:24px;padding:14px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#64748b;font-size:13px;">${escapeHtml(
+              t("review.html.trackEmpty"),
             )}</div>`
       }
     </section>
     <div style="page-break-after:always;"></div>
   `;
 
-  const items = journey.entries
-    .map((entry) => {
+  const entriesHtml = await Promise.all(
+    journey.entries.map(async (entry, index) => {
       const location = entry.location
-        ? `<div style="color:#475569;">${escapeHtml(
-            t('review.html.locationLabel', { location: formatLocationLabel(entry.location) })
+        ? `<div style="color:#64748b;font-size:12px;margin-top:4px;">📍 ${escapeHtml(
+            formatLocationLabel(entry.location),
           )}</div>`
-        : '';
-      const mediaCount = entry.media.length
-        ? `<div style="color:#475569;">${escapeHtml(
-            t('review.html.mediaLabel', {
-              photos: entry.media.filter((m) => m.type === 'photo').length,
-              videos: entry.media.filter((m) => m.type === 'video').length,
-              audios: entry.media.filter((m) => m.type === 'audio').length,
-            })
-          )}</div>`
-        : '';
+        : "";
       const tags = entry.tags.length
-        ? `<div style="color:#334155;">${escapeHtml(
-            t('review.html.tags', { tags: entry.tags.map((tag) => `#${escapeHtml(tag)}`).join(' ') })
-          )}</div>`
-        : '';
-      return `<div style="margin-bottom:12px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;">
-        <div style="font-size:12px;color:#64748b;">${formatDateTime(entry.createdAt)}</div>
-        <div style="margin-top:6px;line-height:1.6;color:#0f172a;">${escapeHtml(
-          entry.text || t('review.html.noText')
-        )}</div>
+        ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">${entry.tags
+            .map(
+              (tag) =>
+                `<span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:10px;font-size:11px;">#${escapeHtml(tag)}</span>`,
+            )
+            .join("")}</div>`
+        : "";
+      const mediaHtml = await buildEntryMediaHtml(entry.media);
+      const textHtml = entry.text
+        ? `<div style="margin-top:8px;line-height:1.7;color:#1e293b;font-size:14px;">${escapeHtml(entry.text)}</div>`
+        : `<div style="margin-top:8px;color:#94a3b8;font-size:13px;font-style:italic;">${escapeHtml(t("review.html.noText"))}</div>`;
+
+      return `<div style="margin-bottom:20px;padding:16px 20px;background:#ffffff;border-left:3px solid #0f766e;border-radius:0 8px 8px 0;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#0f766e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;">${index + 1}</div>
+          <div style="font-size:12px;color:#64748b;">${formatDateTime(entry.createdAt)}</div>
+        </div>
+        ${textHtml}
         ${tags}
         ${location}
-        ${mediaCount}
+        ${mediaHtml}
       </div>`;
-    })
-    .join('');
+    }),
+  );
+
+  const items = entriesHtml.join("");
 
   return `<!doctype html>
   <html>
-    <head><meta charset="utf-8" /></head>
-    <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px;">
+    <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
+    <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;margin:0;padding:0;background:#ffffff;color:#0f172a;">
       ${cover}
-      <h2 style="margin:0 0 12px;color:#0f172a;">${escapeHtml(t('review.html.title'))}</h2>
-      ${items || `<div style="color:#64748b;">${escapeHtml(t('review.html.emptyText'))}</div>`}
+      <section style="padding:30px 24px;">
+        <h2 style="margin:0 0 20px;color:#0f172a;font-size:22px;font-weight:700;border-bottom:2px solid #0f766e;padding-bottom:8px;">${escapeHtml(t("review.html.title"))}</h2>
+        ${items || `<div style="color:#64748b;text-align:center;padding:40px;">${escapeHtml(t("review.html.emptyText"))}</div>`}
+      </section>
     </body>
   </html>`;
 }
@@ -326,7 +427,7 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
   return (
     <Pressable style={styles.audioCard} onPress={togglePlayback}>
       <MaterialIcons
-        name={isPlaying ? 'pause-circle-filled' : 'play-circle-filled'}
+        name={isPlaying ? "pause-circle-filled" : "play-circle-filled"}
         size={20}
         color="#0f766e"
       />
@@ -340,111 +441,111 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
 export default function JourneyHistoryScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
   const { t, locale } = useI18n();
-  const tagSortLocale = locale === 'zh' ? 'zh-CN' : 'en';
+  const tagSortLocale = locale === "zh" ? "zh-CN" : "en";
   const themed = {
     title: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
+      color: isDark ? "#e2e8f0" : "#0f172a",
     },
     subTitle: {
-      color: isDark ? '#94a3b8' : '#475569',
+      color: isDark ? "#94a3b8" : "#475569",
     },
     card: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? "#1e293b" : "#ffffff",
+      borderColor: isDark ? "#334155" : "#e2e8f0",
     },
     searchInput: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#cbd5e1',
-      color: isDark ? '#e2e8f0' : '#0f172a',
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      borderColor: isDark ? "#334155" : "#cbd5e1",
+      color: isDark ? "#e2e8f0" : "#0f172a",
     },
-    placeholder: isDark ? '#94a3b8' : '#64748b',
+    placeholder: isDark ? "#94a3b8" : "#64748b",
     tagChip: {
-      backgroundColor: isDark ? '#334155' : '#e0f2fe',
+      backgroundColor: isDark ? "#334155" : "#e0f2fe",
     },
     tagChipText: {
-      color: isDark ? '#e2e8f0' : '#0c4a6e',
+      color: isDark ? "#e2e8f0" : "#0c4a6e",
     },
     tagFilterChip: {
-      backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
-      borderColor: isDark ? '#334155' : '#cbd5e1',
+      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
+      borderColor: isDark ? "#334155" : "#cbd5e1",
     },
     tagFilterText: {
-      color: isDark ? '#cbd5e1' : '#334155',
+      color: isDark ? "#cbd5e1" : "#334155",
     },
     filterButton: {
-      backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
-      borderColor: isDark ? '#334155' : '#cbd5e1',
+      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
+      borderColor: isDark ? "#334155" : "#cbd5e1",
     },
     filterButtonText: {
-      color: isDark ? '#cbd5e1' : '#0f172a',
+      color: isDark ? "#cbd5e1" : "#0f172a",
     },
     statsWrap: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      borderColor: isDark ? "#334155" : "#e2e8f0",
     },
     statItem: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? "#1e293b" : "#ffffff",
+      borderColor: isDark ? "#334155" : "#e2e8f0",
     },
     statLabel: {
-      color: isDark ? '#94a3b8' : '#64748b',
+      color: isDark ? "#94a3b8" : "#64748b",
     },
     statValue: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
+      color: isDark ? "#e2e8f0" : "#0f172a",
     },
     journeyTitle: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
+      color: isDark ? "#e2e8f0" : "#0f172a",
     },
     journeyMeta: {
-      color: isDark ? '#94a3b8' : '#64748b',
+      color: isDark ? "#94a3b8" : "#64748b",
     },
     mapTitle: {
-      color: isDark ? '#cbd5e1' : '#334155',
+      color: isDark ? "#cbd5e1" : "#334155",
     },
     emptyTitle: {
-      color: isDark ? '#e2e8f0' : '#334155',
+      color: isDark ? "#e2e8f0" : "#334155",
     },
     emptyText: {
-      color: isDark ? '#94a3b8' : '#64748b',
+      color: isDark ? "#94a3b8" : "#64748b",
     },
     divider: {
-      backgroundColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? "#334155" : "#e2e8f0",
     },
     entryItem: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
     },
     entryTime: {
-      color: isDark ? '#94a3b8' : '#64748b',
+      color: isDark ? "#94a3b8" : "#64748b",
     },
     entryText: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
+      color: isDark ? "#e2e8f0" : "#0f172a",
     },
     metaLine: {
-      color: isDark ? '#cbd5e1' : '#334155',
+      color: isDark ? "#cbd5e1" : "#334155",
     },
     mediaSectionTitle: {
-      color: isDark ? '#cbd5e1' : '#334155',
+      color: isDark ? "#cbd5e1" : "#334155",
     },
     mediaPreviewBox: {
-      borderColor: isDark ? '#334155' : '#e2e8f0',
-      backgroundColor: isDark ? '#0f172a' : '#ffffff',
+      borderColor: isDark ? "#334155" : "#e2e8f0",
+      backgroundColor: isDark ? "#0f172a" : "#ffffff",
     },
     mediaBadge: {
-      color: isDark ? '#e2e8f0' : '#0f172a',
-      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+      color: isDark ? "#e2e8f0" : "#0f172a",
+      backgroundColor: isDark ? "#1e293b" : "#f8fafc",
     },
     mediaPlaceholder: {
-      backgroundColor: isDark ? '#334155' : '#0f172a',
+      backgroundColor: isDark ? "#334155" : "#0f172a",
     },
     mediaPlaceholderText: {
-      color: '#ffffff',
+      color: "#ffffff",
     },
   };
   const [journeys, setJourneys] = useState<Journey[]>([]);
-  const [filter, setFilter] = useState<JourneyFilter>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<JourneyFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
   const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<string[]>([]);
@@ -463,12 +564,12 @@ export default function JourneyHistoryScreen() {
       return () => {
         active = false;
       };
-    }, [])
+    }, []),
   );
 
   const completedJourneys = useMemo(
-    () => journeys.filter((item) => item.status === 'completed'),
-    [journeys]
+    () => journeys.filter((item) => item.status === "completed"),
+    [journeys],
   );
 
   const availableTags = useMemo(
@@ -478,16 +579,16 @@ export default function JourneyHistoryScreen() {
           completedJourneys.flatMap((journey) => [
             ...journey.tags,
             ...journey.entries.flatMap((entry) => entry.tags),
-          ])
-        )
+          ]),
+        ),
       ).sort((a, b) => a.localeCompare(b, tagSortLocale)),
-    [completedJourneys, tagSortLocale]
+    [completedJourneys, tagSortLocale],
   );
 
   const filteredJourneys = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    if (filter === 'all') {
+    if (filter === "all") {
       return completedJourneys.filter((journey) => {
         const tagMatch =
           !selectedTag ||
@@ -515,7 +616,7 @@ export default function JourneyHistoryScreen() {
           (entry) =>
             includesQueryText(entry.text, query) ||
             includesQueryText(entry.location?.placeName, query) ||
-            entry.tags.some((tag) => includesQueryText(tag, query))
+            entry.tags.some((tag) => includesQueryText(tag, query)),
         );
       });
     }
@@ -549,7 +650,7 @@ export default function JourneyHistoryScreen() {
         (entry) =>
           includesQueryText(entry.text, query) ||
           includesQueryText(entry.location?.placeName, query) ||
-          entry.tags.some((tag) => includesQueryText(tag, query))
+          entry.tags.some((tag) => includesQueryText(tag, query)),
       );
     });
   }, [completedJourneys, filter, searchQuery, selectedTag, t]);
@@ -565,14 +666,14 @@ export default function JourneyHistoryScreen() {
     setCollapsedJourneyIds((prev) =>
       prev.includes(journeyId)
         ? prev.filter((id) => id !== journeyId)
-        : [...prev, journeyId]
+        : [...prev, journeyId],
     );
   }
 
   async function exportJourneyPdf(journey: Journey) {
     try {
-      const html = journeyToHtml(journey, t);
-      if (Platform.OS === 'web') {
+      const html = await journeyToHtml(journey, t);
+      if (Platform.OS === "web") {
         await Print.printAsync({ html });
         return;
       }
@@ -584,16 +685,19 @@ export default function JourneyHistoryScreen() {
 
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert(t('review.exportSuccessTitle'), t('review.exportSuccessBody', { uri: file.uri }));
+        Alert.alert(
+          t("review.exportSuccessTitle"),
+          t("review.exportSuccessBody", { uri: file.uri }),
+        );
         return;
       }
 
       await Sharing.shareAsync(file.uri, {
-        mimeType: 'application/pdf',
+        mimeType: "application/pdf",
         dialogTitle: `${journey.title}.pdf`,
       });
     } catch {
-      Alert.alert(t('review.exportFailedTitle'), t('review.exportFailedBody'));
+      Alert.alert(t("review.exportFailedTitle"), t("review.exportFailedBody"));
     }
   }
 
@@ -606,54 +710,72 @@ export default function JourneyHistoryScreen() {
       scrollEnabled={!mapInteracting}
     >
       <View style={styles.pageHeader}>
-        <Text style={[styles.title, themed.title]}>{t('review.title')}</Text>
+        <Text style={[styles.title, themed.title]}>{t("review.title")}</Text>
       </View>
       <Text style={[styles.subTitle, themed.subTitle]}>
-        {t('review.subtitle')}
+        {t("review.subtitle")}
       </Text>
       <TextInput
         value={searchQuery}
         onChangeText={setSearchQuery}
-        placeholder={t('review.searchPlaceholder')}
+        placeholder={t("review.searchPlaceholder")}
         placeholderTextColor={themed.placeholder}
         style={[styles.searchInput, themed.searchInput]}
       />
 
       <View style={styles.filterRow}>
         <Pressable
-          style={[styles.filterButton, themed.filterButton, filter === 'all' && styles.filterButtonActive]}
-          onPress={() => setFilter('all')}>
+          style={[
+            styles.filterButton,
+            themed.filterButton,
+            filter === "all" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilter("all")}
+        >
           <Text
             style={[
               styles.filterButtonText,
               themed.filterButtonText,
-              filter === 'all' && styles.filterButtonTextActive,
-            ]}>
-            {t('review.filterAll')}
+              filter === "all" && styles.filterButtonTextActive,
+            ]}
+          >
+            {t("review.filterAll")}
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.filterButton, themed.filterButton, filter === 'travel' && styles.filterButtonActive]}
-          onPress={() => setFilter('travel')}>
+          style={[
+            styles.filterButton,
+            themed.filterButton,
+            filter === "travel" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilter("travel")}
+        >
           <Text
             style={[
               styles.filterButtonText,
               themed.filterButtonText,
-              filter === 'travel' && styles.filterButtonTextActive,
-            ]}>
-            {t('review.filterTravel')}
+              filter === "travel" && styles.filterButtonTextActive,
+            ]}
+          >
+            {t("review.filterTravel")}
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.filterButton, themed.filterButton, filter === 'commute' && styles.filterButtonActive]}
-          onPress={() => setFilter('commute')}>
+          style={[
+            styles.filterButton,
+            themed.filterButton,
+            filter === "commute" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilter("commute")}
+        >
           <Text
             style={[
               styles.filterButtonText,
               themed.filterButtonText,
-              filter === 'commute' && styles.filterButtonTextActive,
-            ]}>
-            {t('review.filterCommute')}
+              filter === "commute" && styles.filterButtonTextActive,
+            ]}
+          >
+            {t("review.filterCommute")}
           </Text>
         </Pressable>
       </View>
@@ -666,14 +788,16 @@ export default function JourneyHistoryScreen() {
                 themed.tagFilterChip,
                 !selectedTag && styles.tagFilterChipActive,
               ]}
-              onPress={() => setSelectedTag(null)}>
+              onPress={() => setSelectedTag(null)}
+            >
               <Text
                 style={[
                   styles.tagFilterText,
                   themed.tagFilterText,
                   !selectedTag && styles.tagFilterTextActive,
-                ]}>
-                {t('review.filterAllTags')}
+                ]}
+              >
+                {t("review.filterAllTags")}
               </Text>
             </Pressable>
             {availableTags.map((tag) => (
@@ -684,13 +808,15 @@ export default function JourneyHistoryScreen() {
                   themed.tagFilterChip,
                   selectedTag === tag && styles.tagFilterChipActive,
                 ]}
-                onPress={() => setSelectedTag(tag)}>
+                onPress={() => setSelectedTag(tag)}
+              >
                 <Text
                   style={[
                     styles.tagFilterText,
                     themed.tagFilterText,
                     selectedTag === tag && styles.tagFilterTextActive,
-                  ]}>
+                  ]}
+                >
                   #{tag}
                 </Text>
               </Pressable>
@@ -701,9 +827,11 @@ export default function JourneyHistoryScreen() {
 
       {filteredJourneys.length === 0 ? (
         <View style={[styles.card, themed.card]}>
-          <Text style={[styles.emptyTitle, themed.emptyTitle]}>{t('review.emptyTitle')}</Text>
+          <Text style={[styles.emptyTitle, themed.emptyTitle]}>
+            {t("review.emptyTitle")}
+          </Text>
           <Text style={[styles.emptyText, themed.emptyText]}>
-            {t('review.emptyBody')}
+            {t("review.emptyBody")}
           </Text>
         </View>
       ) : (
@@ -712,25 +840,38 @@ export default function JourneyHistoryScreen() {
           const stats = computeJourneyStats(journey);
           const routeLocations = getJourneyTrackLocations(journey);
           const markerLocations = getJourneyTrackMapMarkerLocations(journey);
-          const hasTrackMap = routeLocations.length > 0 || markerLocations.length > 0;
+          const hasTrackMap =
+            routeLocations.length > 0 || markerLocations.length > 0;
 
           return (
             <View key={journey.id} style={[styles.card, themed.card]}>
               <View style={styles.journeyHeader}>
                 <View>
-                  <Text style={[styles.journeyTitle, themed.journeyTitle]}>{journey.title}</Text>
+                  <Text style={[styles.journeyTitle, themed.journeyTitle]}>
+                    {journey.title}
+                  </Text>
                   <Text style={[styles.journeyMeta, themed.journeyMeta]}>
-                    {kindLabel(journey.kind, t)} · {formatDateTime(journey.createdAt)} -{' '}
+                    {kindLabel(journey.kind, t)} ·{" "}
+                    {formatDateTime(journey.createdAt)} -{" "}
                     {formatDateTime(journey.endedAt)}
                   </Text>
                   <Text style={[styles.journeyMeta, themed.journeyMeta]}>
-                    {t('review.journeyCount', { count: journey.entries.length })}
+                    {t("review.journeyCount", {
+                      count: journey.entries.length,
+                    })}
                   </Text>
                   {journey.tags.length > 0 ? (
                     <View style={styles.tagRow}>
                       {journey.tags.map((tag) => (
-                        <View key={tag} style={[styles.tagChip, themed.tagChip]}>
-                          <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
+                        <View
+                          key={tag}
+                          style={[styles.tagChip, themed.tagChip]}
+                        >
+                          <Text
+                            style={[styles.tagChipText, themed.tagChipText]}
+                          >
+                            #{tag}
+                          </Text>
                         </View>
                       ))}
                     </View>
@@ -739,9 +880,9 @@ export default function JourneyHistoryScreen() {
                 <View style={styles.journeyHeaderActions}>
                   <Pressable onPress={() => toggleJourneyCollapsed(journey.id)}>
                     <MaterialIcons
-                      name={isCollapsed ? 'expand-more' : 'expand-less'}
+                      name={isCollapsed ? "expand-more" : "expand-less"}
                       size={22}
-                      color={isDark ? '#cbd5e1' : '#334155'}
+                      color={isDark ? "#cbd5e1" : "#334155"}
                     />
                   </Pressable>
                   {!isCollapsed ? (
@@ -749,7 +890,7 @@ export default function JourneyHistoryScreen() {
                       <MaterialIcons
                         name="picture-as-pdf"
                         size={20}
-                        color={isDark ? '#7dd3fc' : '#0369a1'}
+                        color={isDark ? "#7dd3fc" : "#0369a1"}
                       />
                     </Pressable>
                   ) : null}
@@ -757,24 +898,25 @@ export default function JourneyHistoryScreen() {
                     <Pressable
                       onPress={() =>
                         Alert.alert(
-                          t('review.deleteJourneyTitle'),
-                          t('review.deleteJourneyBody'),
+                          t("review.deleteJourneyTitle"),
+                          t("review.deleteJourneyBody"),
                           [
-                            { text: t('common.cancel'), style: 'cancel' },
+                            { text: t("common.cancel"), style: "cancel" },
                             {
-                              text: t('common.delete'),
-                              style: 'destructive',
+                              text: t("common.delete"),
+                              style: "destructive",
                               onPress: () => {
                                 void removeJourney(journey.id);
                               },
                             },
-                          ]
+                          ],
                         )
-                      }>
+                      }
+                    >
                       <MaterialIcons
                         name="delete-outline"
                         size={20}
-                        color={isDark ? '#fca5a5' : '#b91c1c'}
+                        color={isDark ? "#fca5a5" : "#b91c1c"}
                       />
                     </Pressable>
                   ) : null}
@@ -784,26 +926,44 @@ export default function JourneyHistoryScreen() {
                 <>
                   <View style={[styles.statsWrap, themed.statsWrap]}>
                     <View style={[styles.statItem, themed.statItem]}>
-                      <Text style={[styles.statLabel, themed.statLabel]}>{t('review.statsDistance')}</Text>
-                      <Text style={[styles.statValue, themed.statValue]}>{stats.distanceKm.toFixed(2)} km</Text>
+                      <Text style={[styles.statLabel, themed.statLabel]}>
+                        {t("review.statsDistance")}
+                      </Text>
+                      <Text style={[styles.statValue, themed.statValue]}>
+                        {stats.distanceKm.toFixed(2)} km
+                      </Text>
                     </View>
                     <View style={[styles.statItem, themed.statItem]}>
-                      <Text style={[styles.statLabel, themed.statLabel]}>{t('review.statsDuration')}</Text>
-                      <Text style={[styles.statValue, themed.statValue]}>{formatDuration(stats.durationMs, t)}</Text>
+                      <Text style={[styles.statLabel, themed.statLabel]}>
+                        {t("review.statsDuration")}
+                      </Text>
+                      <Text style={[styles.statValue, themed.statValue]}>
+                        {formatDuration(stats.durationMs, t)}
+                      </Text>
                     </View>
                     <View style={[styles.statItem, themed.statItem]}>
-                      <Text style={[styles.statLabel, themed.statLabel]}>{t('review.statsAvgSpeed')}</Text>
-                      <Text style={[styles.statValue, themed.statValue]}>{stats.avgSpeedKmh.toFixed(2)} km/h</Text>
+                      <Text style={[styles.statLabel, themed.statLabel]}>
+                        {t("review.statsAvgSpeed")}
+                      </Text>
+                      <Text style={[styles.statValue, themed.statValue]}>
+                        {stats.avgSpeedKmh.toFixed(2)} km/h
+                      </Text>
                     </View>
                     <View style={[styles.statItem, themed.statItem]}>
-                      <Text style={[styles.statLabel, themed.statLabel]}>{t('review.statsLocationPoints')}</Text>
-                      <Text style={[styles.statValue, themed.statValue]}>{stats.locationPoints}</Text>
+                      <Text style={[styles.statLabel, themed.statLabel]}>
+                        {t("review.statsLocationPoints")}
+                      </Text>
+                      <Text style={[styles.statValue, themed.statValue]}>
+                        {stats.locationPoints}
+                      </Text>
                     </View>
                   </View>
 
                   {hasTrackMap ? (
                     <View>
-                      <Text style={[styles.mapTitle, themed.mapTitle]}>{t('review.trackMapTitle')}</Text>
+                      <Text style={[styles.mapTitle, themed.mapTitle]}>
+                        {t("review.trackMapTitle")}
+                      </Text>
                       <View
                         onTouchStart={() => setMapInteracting(true)}
                         onTouchEnd={() => setMapInteracting(false)}
@@ -817,46 +977,83 @@ export default function JourneyHistoryScreen() {
                     </View>
                   ) : (
                     <Text style={[styles.emptyText, themed.emptyText]}>
-                      {t('review.trackMapEmpty')}
+                      {t("review.trackMapEmpty")}
                     </Text>
                   )}
 
                   <View style={[styles.divider, themed.divider]} />
 
                   {journey.entries.length === 0 ? (
-                    <Text style={[styles.emptyText, themed.emptyText]}>{t('review.emptyEntries')}</Text>
+                    <Text style={[styles.emptyText, themed.emptyText]}>
+                      {t("review.emptyEntries")}
+                    </Text>
                   ) : (
                     journey.entries.map((entry) => (
-                      <View key={entry.id} style={[styles.entryItem, themed.entryItem]}>
+                      <View
+                        key={entry.id}
+                        style={[styles.entryItem, themed.entryItem]}
+                      >
                         {(() => {
-                          const photos = entry.media.filter((media) => media.type === 'photo');
-                          const videos = entry.media.filter((media) => media.type === 'video');
-                          const audios = entry.media.filter((media) => media.type === 'audio');
+                          const photos = entry.media.filter(
+                            (media) => media.type === "photo",
+                          );
+                          const videos = entry.media.filter(
+                            (media) => media.type === "video",
+                          );
+                          const audios = entry.media.filter(
+                            (media) => media.type === "audio",
+                          );
 
                           return (
                             <>
-                              <Text style={[styles.entryTime, themed.entryTime]}>
+                              <Text
+                                style={[styles.entryTime, themed.entryTime]}
+                              >
                                 {formatDateTime(entry.createdAt)}
                               </Text>
-                              {entry.text ? <Text style={[styles.entryText, themed.entryText]}>{entry.text}</Text> : null}
+                              {entry.text ? (
+                                <Text
+                                  style={[styles.entryText, themed.entryText]}
+                                >
+                                  {entry.text}
+                                </Text>
+                              ) : null}
                               {entry.tags.length > 0 ? (
                                 <View style={styles.tagRow}>
                                   {entry.tags.map((tag) => (
-                                    <View key={tag} style={[styles.tagChip, themed.tagChip]}>
-                                      <Text style={[styles.tagChipText, themed.tagChipText]}>#{tag}</Text>
+                                    <View
+                                      key={tag}
+                                      style={[styles.tagChip, themed.tagChip]}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.tagChipText,
+                                          themed.tagChipText,
+                                        ]}
+                                      >
+                                        #{tag}
+                                      </Text>
                                     </View>
                                   ))}
                                 </View>
                               ) : null}
                               {entry.location ? (
-                                <Text style={[styles.metaLine, themed.metaLine]}>
-                                  {t('review.locationLine', { location: formatLocationLabel(entry.location) })}
+                                <Text
+                                  style={[styles.metaLine, themed.metaLine]}
+                                >
+                                  {t("review.locationLine", {
+                                    location: formatLocationLabel(
+                                      entry.location,
+                                    ),
+                                  })}
                                 </Text>
                               ) : null}
                               {entry.media.length > 0 ? (
                                 <>
-                                  <Text style={[styles.metaLine, themed.metaLine]}>
-                                    {t('review.mediaLine', {
+                                  <Text
+                                    style={[styles.metaLine, themed.metaLine]}
+                                  >
+                                    {t("review.mediaLine", {
                                       photos: photos.length,
                                       videos: videos.length,
                                       audios: audios.length,
@@ -864,21 +1061,42 @@ export default function JourneyHistoryScreen() {
                                   </Text>
                                   {photos.length > 0 ? (
                                     <>
-                                      <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>
-                                        {t('review.sectionPhotos')}
+                                      <Text
+                                        style={[
+                                          styles.mediaSectionTitle,
+                                          themed.mediaSectionTitle,
+                                        ]}
+                                      >
+                                        {t("review.sectionPhotos")}
                                       </Text>
-                                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                      <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                      >
                                         {photos.map((media) => (
                                           <Pressable
                                             key={media.id}
-                                            style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
-                                            onPress={() => setPreviewMedia(media)}>
+                                            style={[
+                                              styles.mediaPreviewBox,
+                                              themed.mediaPreviewBox,
+                                            ]}
+                                            onPress={() =>
+                                              setPreviewMedia(media)
+                                            }
+                                          >
                                             <Image
                                               source={{ uri: media.uri }}
                                               style={styles.mediaPreview}
                                               contentFit="cover"
                                             />
-                                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('common.photo')}</Text>
+                                            <Text
+                                              style={[
+                                                styles.mediaBadge,
+                                                themed.mediaBadge,
+                                              ]}
+                                            >
+                                              {t("common.photo")}
+                                            </Text>
                                           </Pressable>
                                         ))}
                                       </ScrollView>
@@ -886,35 +1104,66 @@ export default function JourneyHistoryScreen() {
                                   ) : null}
                                   {videos.length > 0 ? (
                                     <>
-                                      <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>
-                                        {t('review.sectionVideos')}
+                                      <Text
+                                        style={[
+                                          styles.mediaSectionTitle,
+                                          themed.mediaSectionTitle,
+                                        ]}
+                                      >
+                                        {t("review.sectionVideos")}
                                       </Text>
-                                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                      <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                      >
                                         {videos.map((media) => (
                                           <Pressable
                                             key={media.id}
-                                            style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}
-                                            onPress={() => setPreviewMedia(media)}>
+                                            style={[
+                                              styles.mediaPreviewBox,
+                                              themed.mediaPreviewBox,
+                                            ]}
+                                            onPress={() =>
+                                              setPreviewMedia(media)
+                                            }
+                                          >
                                             {mediaPreviewUri(media) ? (
                                               <Image
-                                                source={{ uri: mediaPreviewUri(media) }}
+                                                source={{
+                                                  uri: mediaPreviewUri(media),
+                                                }}
                                                 style={styles.mediaPreview}
                                                 contentFit="cover"
                                               />
-                                            ) : media.type === 'video' ? (
-                                              <MediaVideoCover uri={media.uri} />
+                                            ) : media.type === "video" ? (
+                                              <MediaVideoCover
+                                                uri={media.uri}
+                                              />
                                             ) : (
-                                              <View style={[styles.mediaPlaceholder, themed.mediaPlaceholder]}>
+                                              <View
+                                                style={[
+                                                  styles.mediaPlaceholder,
+                                                  themed.mediaPlaceholder,
+                                                ]}
+                                              >
                                                 <Text
                                                   style={[
                                                     styles.mediaPlaceholderText,
                                                     themed.mediaPlaceholderText,
-                                                  ]}>
-                                                  {t('common.video')}
+                                                  ]}
+                                                >
+                                                  {t("common.video")}
                                                 </Text>
                                               </View>
                                             )}
-                                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>{t('common.video')}</Text>
+                                            <Text
+                                              style={[
+                                                styles.mediaBadge,
+                                                themed.mediaBadge,
+                                              ]}
+                                            >
+                                              {t("common.video")}
+                                            </Text>
                                           </Pressable>
                                         ))}
                                       </ScrollView>
@@ -922,17 +1171,37 @@ export default function JourneyHistoryScreen() {
                                   ) : null}
                                   {audios.length > 0 ? (
                                     <>
-                                      <Text style={[styles.mediaSectionTitle, themed.mediaSectionTitle]}>
-                                        {t('review.sectionAudios')}
+                                      <Text
+                                        style={[
+                                          styles.mediaSectionTitle,
+                                          themed.mediaSectionTitle,
+                                        ]}
+                                      >
+                                        {t("review.sectionAudios")}
                                       </Text>
-                                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                      <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                      >
                                         {audios.map((media) => (
                                           <View
                                             key={media.id}
-                                            style={[styles.mediaPreviewBox, themed.mediaPreviewBox]}>
-                                            <AudioPlayer uri={media.uri} label={t('common.audio')} />
-                                            <Text style={[styles.mediaBadge, themed.mediaBadge]}>
-                                              {t('common.audio')}
+                                            style={[
+                                              styles.mediaPreviewBox,
+                                              themed.mediaPreviewBox,
+                                            ]}
+                                          >
+                                            <AudioPlayer
+                                              uri={media.uri}
+                                              label={t("common.audio")}
+                                            />
+                                            <Text
+                                              style={[
+                                                styles.mediaBadge,
+                                                themed.mediaBadge,
+                                              ]}
+                                            >
+                                              {t("common.audio")}
                                             </Text>
                                           </View>
                                         ))}
@@ -954,15 +1223,29 @@ export default function JourneyHistoryScreen() {
         })
       )}
 
-      <Modal visible={Boolean(previewMedia)} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
+      <Modal
+        visible={Boolean(previewMedia)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewMedia(null)}
+      >
         <View style={styles.previewOverlay}>
-          <Pressable style={styles.previewClose} onPress={() => setPreviewMedia(null)}>
-            <Text style={styles.previewCloseText}>{t('review.previewClose')}</Text>
+          <Pressable
+            style={styles.previewClose}
+            onPress={() => setPreviewMedia(null)}
+          >
+            <Text style={styles.previewCloseText}>
+              {t("review.previewClose")}
+            </Text>
           </Pressable>
-          {previewMedia?.type === 'video' ? (
+          {previewMedia?.type === "video" ? (
             <PreviewVideo uri={previewMedia.uri} />
           ) : previewMedia ? (
-            <Image source={{ uri: previewMedia.uri }} style={styles.previewMedia} contentFit="contain" />
+            <Image
+              source={{ uri: previewMedia.uri }}
+              style={styles.previewMedia}
+              contentFit="contain"
+            />
           ) : null}
         </View>
       </Modal>
@@ -978,34 +1261,34 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontWeight: "700",
+    color: "#0f172a",
   },
   pageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 10,
   },
   subTitle: {
-    color: '#475569',
+    color: "#475569",
     marginBottom: 4,
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: "#cbd5e1",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f8fafc",
   },
   filterRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   tagFilterRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     paddingRight: 6,
   },
@@ -1013,148 +1296,148 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: "#f1f5f9",
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: "#cbd5e1",
   },
   tagFilterChipActive: {
-    backgroundColor: '#0f766e',
-    borderColor: '#0f766e',
+    backgroundColor: "#0f766e",
+    borderColor: "#0f766e",
   },
   tagFilterText: {
     fontSize: 12,
-    color: '#334155',
-    fontWeight: '600',
+    color: "#334155",
+    fontWeight: "600",
   },
   tagFilterTextActive: {
-    color: '#ffffff',
+    color: "#ffffff",
   },
   filterButton: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: "#f1f5f9",
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: "#cbd5e1",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   filterButtonActive: {
-    backgroundColor: '#0f766e',
-    borderColor: '#0f766e',
+    backgroundColor: "#0f766e",
+    borderColor: "#0f766e",
   },
   filterButtonText: {
-    color: '#0f172a',
-    fontWeight: '600',
+    color: "#0f172a",
+    fontWeight: "600",
     fontSize: 13,
   },
   filterButtonTextActive: {
-    color: '#ffffff',
+    color: "#ffffff",
   },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: "#e2e8f0",
     gap: 8,
   },
   journeyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     gap: 10,
   },
   journeyHeaderActions: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     gap: 6,
   },
   statsWrap: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
     padding: 10,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   statItem: {
-    minWidth: '47%',
-    backgroundColor: '#ffffff',
+    minWidth: "47%",
+    backgroundColor: "#ffffff",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: "#e2e8f0",
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#64748b',
+    color: "#64748b",
   },
   statValue: {
     fontSize: 14,
-    color: '#0f172a',
-    fontWeight: '600',
+    color: "#0f172a",
+    fontWeight: "600",
   },
   journeyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: "600",
+    color: "#0f172a",
   },
   journeyMeta: {
-    color: '#64748b',
+    color: "#64748b",
     fontSize: 13,
   },
   mapTitle: {
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: "600",
+    color: "#334155",
   },
   exportText: {
-    color: '#0369a1',
-    fontWeight: '600',
+    color: "#0369a1",
+    fontWeight: "600",
     fontSize: 12,
   },
   deleteText: {
-    color: '#b91c1c',
-    fontWeight: '600',
+    color: "#b91c1c",
+    fontWeight: "600",
     fontSize: 12,
   },
   divider: {
     height: 1,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: "#e2e8f0",
     marginVertical: 4,
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: "600",
+    color: "#334155",
   },
   emptyText: {
-    color: '#64748b',
+    color: "#64748b",
     lineHeight: 20,
   },
   entryItem: {
     borderRadius: 10,
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f8fafc",
     padding: 10,
     gap: 4,
   },
   entryTime: {
-    color: '#64748b',
+    color: "#64748b",
     fontSize: 12,
   },
   entryText: {
-    color: '#0f172a',
+    color: "#0f172a",
     lineHeight: 21,
     fontSize: 15,
   },
   metaLine: {
-    color: '#334155',
+    color: "#334155",
     fontSize: 12,
   },
   tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
     marginTop: 2,
   },
@@ -1162,19 +1445,19 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: "#e0f2fe",
   },
   tagChipText: {
     fontSize: 11,
-    color: '#0c4a6e',
-    fontWeight: '600',
+    color: "#0c4a6e",
+    fontWeight: "600",
   },
   mediaPreviewBox: {
     marginRight: 10,
     borderRadius: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: "#e2e8f0",
     width: 110,
   },
   mediaPreview: {
@@ -1184,63 +1467,62 @@ const styles = StyleSheet.create({
   mediaPlaceholder: {
     width: 110,
     height: 80,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#0f172a",
+    alignItems: "center",
+    justifyContent: "center",
   },
   mediaPlaceholderText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   mediaSectionTitle: {
-    color: '#334155',
+    color: "#334155",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 2,
   },
   mediaBadge: {
     fontSize: 11,
-    color: '#0f172a',
+    color: "#0f172a",
     padding: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f8fafc",
   },
   audioCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   audioLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     flex: 1,
   },
   previewOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 12,
   },
   previewMedia: {
-    width: '100%',
-    height: '78%',
+    width: "100%",
+    height: "78%",
   },
   previewClose: {
-    position: 'absolute',
+    position: "absolute",
     top: 48,
     right: 20,
     zIndex: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   previewCloseText: {
-    color: '#ffffff',
-    fontWeight: '700',
+    color: "#ffffff",
+    fontWeight: "700",
   },
 });
-

@@ -2,7 +2,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,6 +17,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/locale-preference';
+import {
+  getBestCurrentTimelineLocation,
+  requestForegroundLocationAccess,
+} from '@/lib/current-location';
 import { setPendingLocation } from '@/lib/pending-location';
 import {
   NearbyPlace,
@@ -208,45 +211,44 @@ export default function LocationPickerScreen() {
     setLoadingLocation(true);
     let hasPosition = false;
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const granted = await requestForegroundLocationAccess();
       if (!screenActiveRef.current) {
         return;
       }
-      if (!permission.granted) {
+      if (!granted) {
         Alert.alert(t('mapPicker.locationDeniedTitle'), t('mapPicker.locationDeniedBody'));
         return;
       }
 
-      const lastKnown = await Location.getLastKnownPositionAsync({
-        maxAge: 1000 * 60 * 5,
-        requiredAccuracy: 300,
-      });
-
-      if (lastKnown?.coords) {
-        hasPosition = true;
-        selectPoint(
-          {
-            latitude: lastKnown.coords.latitude,
-            longitude: lastKnown.coords.longitude,
-          },
-          'wgs84'
-        );
-      }
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+      const location = await getBestCurrentTimelineLocation({
+        source: 'manual',
+        onLastKnownLocation: (lastKnown) => {
+          if (!screenActiveRef.current) {
+            return;
+          }
+          hasPosition = true;
+          selectPoint(
+            {
+              latitude: lastKnown.latitude,
+              longitude: lastKnown.longitude,
+            },
+            'wgs84'
+          );
+        },
       });
       if (!screenActiveRef.current) {
         return;
       }
-      hasPosition = true;
-      selectPoint(
-        {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        },
-        'wgs84'
-      );
+      if (location) {
+        hasPosition = true;
+        selectPoint(
+          {
+            latitude: location.latitude,
+            longitude: location.longitude,
+          },
+          'wgs84'
+        );
+      }
     } catch {
       if (screenActiveRef.current && !hasPosition) {
         Alert.alert(t('mapPicker.locationFailedTitle'), t('mapPicker.locationFailedBody'));
