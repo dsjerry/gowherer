@@ -1,21 +1,28 @@
-import Constants from 'expo-constants';
-import * as Location from 'expo-location';
-import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+    ExpoGaodeMapModule,
+    MapView,
+    Marker,
+    type MapViewRef,
+} from "expo-gaode-map";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 
-import { useI18n } from '@/hooks/locale-preference';
-import { getLocalLogFileUri, logLocalError, logLocalInfo } from '@/lib/local-log';
-import { reverseGeocodePlaceName } from '@/lib/reverse-geocode';
-import { TimelineLocation } from '@/types/journey';
+import { useI18n } from "@/hooks/locale-preference";
+import {
+    getLocalLogFileUri,
+    logLocalError,
+    logLocalInfo,
+} from "@/lib/local-log";
+import { reverseGeocodePlaceName } from "@/lib/reverse-geocode";
+import { TimelineLocation } from "@/types/journey";
 
 type AMapLatLng = {
   latitude: number;
@@ -43,18 +50,13 @@ export function AMapPlacePicker({
   onConfirm,
 }: Props) {
   const { t } = useI18n();
-  const initedRef = useRef(false);
   const pendingCameraTargetRef = useRef<AMapLatLng | null>(null);
-  const mapRef = useRef<{
-    moveCamera?: (cameraPosition: { target: AMapLatLng; zoom?: number }, duration?: number) => void;
-  } | null>(null);
+  const mapRef = useRef<MapViewRef | null>(null);
   const [selected, setSelected] = useState<AMapLatLng | null>(null);
   const [cameraTarget, setCameraTarget] = useState<AMapLatLng>(DEFAULT_CENTER);
-  const [placeName, setPlaceName] = useState('');
+  const [placeName, setPlaceName] = useState("");
   const [resolving, setResolving] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [sdkReady, setSdkReady] = useState(false);
-  const [sdkError, setSdkError] = useState<string | null>(null);
 
   const center = useMemo<AMapLatLng>(() => {
     if (selected) {
@@ -69,14 +71,10 @@ export function AMapPlacePicker({
     return DEFAULT_CENTER;
   }, [initialLocation, selected]);
 
-  const amapAndroidApiKey =
-    Constants.expoConfig?.extra?.amap?.androidApiKey ??
-    process.env.EXPO_PUBLIC_AMAP_ANDROID_API_KEY;
-
   function moveCameraTo(target: AMapLatLng, duration = 300) {
     setCameraTarget(target);
     pendingCameraTargetRef.current = target;
-    mapRef.current?.moveCamera?.({ target, zoom: 16 }, duration);
+    mapRef.current?.moveCamera({ target, zoom: 16 }, duration);
   }
 
   useEffect(() => {
@@ -90,7 +88,7 @@ export function AMapPlacePicker({
             latitude: initialLocation.latitude,
             longitude: initialLocation.longitude,
           }
-        : DEFAULT_CENTER
+        : DEFAULT_CENTER,
     );
     setSelected(
       initialLocation
@@ -98,45 +96,13 @@ export function AMapPlacePicker({
             latitude: initialLocation.latitude,
             longitude: initialLocation.longitude,
           }
-        : null
+        : null,
     );
-    setPlaceName(initialLocation?.placeName ?? '');
-
-    if (Platform.OS !== 'android') {
-      setSdkReady(false);
-      setSdkError(t('amapPicker.androidOnly'));
-      void logLocalInfo('AMapPicker', 'platform not supported', {
-        platform: Platform.OS,
-      });
-      return;
-    }
-
-    if (!amapAndroidApiKey) {
-      setSdkReady(false);
-      setSdkError(t('amapPicker.missingKey'));
-      void logLocalInfo('AMapPicker', 'missing android api key');
-      return;
-    }
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { AMapSdk } = require('react-native-amap3d');
-      if (!initedRef.current) {
-        AMapSdk.init(amapAndroidApiKey);
-        initedRef.current = true;
-        void logLocalInfo('AMapPicker', 'sdk initialized');
-      }
-      setSdkError(null);
-      setSdkReady(true);
-    } catch (error) {
-      void logLocalError('AMapPicker', error, { stage: 'init-sdk' });
-      setSdkReady(false);
-      setSdkError(t('amapPicker.sdkUnavailable'));
-    }
-  }, [amapAndroidApiKey, initialLocation, t, visible]);
+    setPlaceName(initialLocation?.placeName ?? "");
+  }, [initialLocation, visible]);
 
   useEffect(() => {
-    if (!visible || Platform.OS !== 'android' || !sdkReady) {
+    if (!visible) {
       return;
     }
     if (!pendingCameraTargetRef.current) {
@@ -144,37 +110,41 @@ export function AMapPlacePicker({
     }
 
     const target = pendingCameraTargetRef.current;
-    mapRef.current?.moveCamera?.({ target, zoom: 16 }, 300);
-  }, [sdkReady, visible]);
+    mapRef.current?.moveCamera({ target, zoom: 16 }, 300);
+  }, [visible]);
 
   useEffect(() => {
-    if (!visible || Platform.OS !== 'android') {
+    if (!visible) {
       return;
     }
 
     let active = true;
     (async () => {
       try {
-        const permission = await Location.requestForegroundPermissionsAsync();
+        const permission = await ExpoGaodeMapModule.requestLocationPermission();
         if (!active || !permission.granted) {
           return;
         }
 
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const position = await ExpoGaodeMapModule.getCurrentLocation();
         if (!active) {
           return;
         }
 
         const target = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude: position.latitude,
+          longitude: position.longitude,
         };
         moveCameraTo(target, 300);
-        void logLocalInfo('AMapPicker', 'camera moved to current location', target);
+        void logLocalInfo(
+          "AMapPicker",
+          "camera moved to current location",
+          target,
+        );
       } catch (error) {
-        void logLocalError('AMapPicker', error, { stage: 'load-current-position' });
+        void logLocalError("AMapPicker", error, {
+          stage: "load-current-position",
+        });
       }
     })();
 
@@ -186,37 +156,52 @@ export function AMapPlacePicker({
   async function resolvePlaceName(target: AMapLatLng) {
     setResolving(true);
     try {
-      const maybeName = await reverseGeocodePlaceName(target.latitude, target.longitude);
-      setPlaceName(maybeName ?? '');
+      const maybeName = await reverseGeocodePlaceName(
+        target.latitude,
+        target.longitude,
+      );
+      setPlaceName(maybeName ?? "");
     } catch (error) {
-      void logLocalError('AMapPicker', error, {
-        stage: 'reverse-geocode',
+      void logLocalError("AMapPicker", error, {
+        stage: "reverse-geocode",
         target,
       });
-      setPlaceName('');
+      setPlaceName("");
     } finally {
       setResolving(false);
     }
   }
 
   async function selectByMapTap(target: AMapLatLng) {
-    if (!Number.isFinite(target.latitude) || !Number.isFinite(target.longitude)) {
-      void logLocalInfo('AMapPicker', 'invalid map tap coordinates', target);
+    if (
+      !Number.isFinite(target.latitude) ||
+      !Number.isFinite(target.longitude)
+    ) {
+      void logLocalInfo("AMapPicker", "invalid map tap coordinates", target);
       return;
     }
     setSelected(target);
-    void logLocalInfo('AMapPicker', 'map pressed', target);
+    void logLocalInfo("AMapPicker", "map pressed", target);
     await resolvePlaceName(target);
   }
 
   async function confirmSelection() {
     if (!selected) {
-      Alert.alert(t('amapPicker.selectFirstTitle'), t('amapPicker.selectFirstBody'));
+      Alert.alert(
+        t("amapPicker.selectFirstTitle"),
+        t("amapPicker.selectFirstBody"),
+      );
       return;
     }
-    if (!Number.isFinite(selected.latitude) || !Number.isFinite(selected.longitude)) {
-      Alert.alert(t('amapPicker.invalidPointTitle'), t('amapPicker.invalidPointBody'));
-      void logLocalInfo('AMapPicker', 'invalid selected coordinates', selected);
+    if (
+      !Number.isFinite(selected.latitude) ||
+      !Number.isFinite(selected.longitude)
+    ) {
+      Alert.alert(
+        t("amapPicker.invalidPointTitle"),
+        t("amapPicker.invalidPointBody"),
+      );
+      void logLocalInfo("AMapPicker", "invalid selected coordinates", selected);
       return;
     }
 
@@ -228,61 +213,51 @@ export function AMapPlacePicker({
     };
 
     try {
-      void logLocalInfo('AMapPicker', 'confirm selection', location);
+      void logLocalInfo("AMapPicker", "confirm selection", location);
       await Promise.resolve(onConfirm(location));
       onClose();
     } catch (error) {
-      void logLocalError('AMapPicker', error, {
-        stage: 'confirm',
+      void logLocalError("AMapPicker", error, {
+        stage: "confirm",
         location,
       });
       Alert.alert(
-        t('amapPicker.saveFailedTitle'),
-        t('amapPicker.saveFailedBody', { uri: getLocalLogFileUri() })
+        t("amapPicker.saveFailedTitle"),
+        t("amapPicker.saveFailedBody", { uri: getLocalLogFileUri() }),
       );
     } finally {
       setConfirming(false);
     }
   }
 
-  function renderAndroidMap() {
-    if (!sdkReady) {
-      return (
-        <View style={styles.sdkHintWrap}>
-          <Text style={styles.sdkHintText}>{sdkError ?? t('amapPicker.sdkInit')}</Text>
-        </View>
-      );
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { MapView, Marker } = require('react-native-amap3d');
+  function renderMap() {
     return (
       <MapView
-        ref={(ref: typeof mapRef.current) => {
+        ref={(ref) => {
           mapRef.current = ref;
           if (ref && pendingCameraTargetRef.current) {
-            ref.moveCamera?.({ target: pendingCameraTargetRef.current, zoom: 16 }, 300);
+            ref.moveCamera(
+              { target: pendingCameraTargetRef.current, zoom: 16 },
+              300,
+            );
           }
         }}
         style={styles.map}
         myLocationEnabled
         myLocationButtonEnabled
-        onPress={({ nativeEvent }: { nativeEvent: AMapLatLng }) => {
+        onMapPress={({ nativeEvent }) => {
           void selectByMapTap(nativeEvent);
         }}
-        onPressPoi={({
-          nativeEvent,
-        }: {
-          nativeEvent: { name: string; position: AMapLatLng };
-        }) => {
-          void logLocalInfo('AMapPicker', 'poi pressed', nativeEvent);
+        onPressPoi={({ nativeEvent }) => {
+          void logLocalInfo("AMapPicker", "poi pressed", nativeEvent);
           setSelected(nativeEvent.position);
-          setPlaceName(nativeEvent.name ?? '');
+          setPlaceName(nativeEvent.name ?? "");
         }}
         initialCameraPosition={{
           target: cameraTarget ?? center,
           zoom: 16,
-        }}>
+        }}
+      >
         {selected ? <Marker position={selected} /> : null}
       </MapView>
     );
@@ -290,64 +265,77 @@ export function AMapPlacePicker({
 
   return (
     <View
-      pointerEvents={visible ? 'auto' : 'none'}
-      style={[styles.host, visible ? styles.hostVisible : styles.hostHidden]}>
+      pointerEvents={visible ? "auto" : "none"}
+      style={[styles.host, visible ? styles.hostVisible : styles.hostHidden]}
+    >
       <View style={styles.mask}>
         <View
           style={[
             styles.card,
             {
-              backgroundColor: isDark ? '#1e293b' : '#ffffff',
-              borderColor: isDark ? '#334155' : '#e2e8f0',
+              backgroundColor: isDark ? "#1e293b" : "#ffffff",
+              borderColor: isDark ? "#334155" : "#e2e8f0",
             },
-          ]}>
-          <Text style={[styles.title, { color: isDark ? '#e2e8f0' : '#0f172a' }]}>
-            {t('amapPicker.title')}
+          ]}
+        >
+          <Text
+            style={[styles.title, { color: isDark ? "#e2e8f0" : "#0f172a" }]}
+          >
+            {t("amapPicker.title")}
           </Text>
-          <Text style={[styles.hint, { color: isDark ? '#94a3b8' : '#475569' }]}>
-            {t('amapPicker.subtitle')}
+          <Text
+            style={[styles.hint, { color: isDark ? "#94a3b8" : "#475569" }]}
+          >
+            {t("amapPicker.subtitle")}
           </Text>
 
-          {renderAndroidMap()}
+          {renderMap()}
 
           <View style={styles.placeNameRow}>
             <TextInput
               style={[
                 styles.placeInput,
                 {
-                  backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-                  borderColor: isDark ? '#334155' : '#cbd5e1',
-                  color: isDark ? '#e2e8f0' : '#0f172a',
+                  backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+                  borderColor: isDark ? "#334155" : "#cbd5e1",
+                  color: isDark ? "#e2e8f0" : "#0f172a",
                 },
               ]}
               value={placeName}
               onChangeText={setPlaceName}
-              placeholder={t('amapPicker.placeNamePlaceholder')}
-              placeholderTextColor={isDark ? '#94a3b8' : '#64748b'}
+              placeholder={t("amapPicker.placeNamePlaceholder")}
+              placeholderTextColor={isDark ? "#94a3b8" : "#64748b"}
             />
             {resolving ? <ActivityIndicator size="small" /> : null}
           </View>
 
           {selected ? (
-            <Text style={[styles.coord, { color: isDark ? '#cbd5e1' : '#334155' }]}>
+            <Text
+              style={[styles.coord, { color: isDark ? "#cbd5e1" : "#334155" }]}
+            >
               {selected.latitude.toFixed(6)}, {selected.longitude.toFixed(6)}
             </Text>
           ) : (
-            <Text style={[styles.coord, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-              {t('amapPicker.noneSelected')}
+            <Text
+              style={[styles.coord, { color: isDark ? "#94a3b8" : "#64748b" }]}
+            >
+              {t("amapPicker.noneSelected")}
             </Text>
           )}
 
           <View style={styles.actions}>
             <Pressable style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelText}>{t('amapPicker.cancel')}</Text>
+              <Text style={styles.cancelText}>{t("amapPicker.cancel")}</Text>
             </Pressable>
             <Pressable
               style={styles.confirmButton}
               onPress={() => void confirmSelection()}
-              disabled={confirming}>
+              disabled={confirming}
+            >
               <Text style={styles.confirmText}>
-                {confirming ? t('amapPicker.confirming') : t('amapPicker.confirm')}
+                {confirming
+                  ? t("amapPicker.confirming")
+                  : t("amapPicker.confirm")}
               </Text>
             </Pressable>
           </View>
@@ -359,7 +347,7 @@ export function AMapPlacePicker({
 
 const styles = StyleSheet.create({
   host: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     right: 0,
     bottom: 0,
@@ -374,8 +362,8 @@ const styles = StyleSheet.create({
   },
   mask: {
     flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
     padding: 16,
   },
   card: {
@@ -386,7 +374,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   hint: {
     fontSize: 12,
@@ -394,23 +382,11 @@ const styles = StyleSheet.create({
   map: {
     height: 300,
     borderRadius: 12,
-    overflow: 'hidden',
-  },
-  sdkHintWrap: {
-    height: 300,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 16,
-  },
-  sdkHintText: {
-    color: '#334155',
-    textAlign: 'center',
+    overflow: "hidden",
   },
   placeNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   placeInput: {
@@ -425,30 +401,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   cancelButton: {
     flex: 1,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: "#cbd5e1",
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   confirmButton: {
     flex: 1,
     borderRadius: 10,
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelText: {
-    color: '#334155',
-    fontWeight: '600',
+    color: "#334155",
+    fontWeight: "600",
   },
   confirmText: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
   },
 });
