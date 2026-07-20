@@ -9,6 +9,11 @@ export type TimelineLocation = {
   placeName?: string;
   capturedAt?: string;
   source?: 'manual' | 'tracking';
+  /** Coordinate system of this point.
+   * - `'wgs84'`: GPS raw (expo-location, manual picker saved WGS-84)
+   * - `'gcj02'`: Gaode SDK native (expo-gaode-map)
+   * - `undefined`: legacy data — resolved by migration in normalizeJourneyList */
+  coordSystem?: 'wgs84' | 'gcj02';
 };
 
 export type TimelineMedia = {

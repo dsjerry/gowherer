@@ -246,7 +246,7 @@ export default function LocationPickerScreen() {
               latitude: lastKnown.latitude,
               longitude: lastKnown.longitude,
             },
-            "wgs84",
+            "gcj02",
           );
         },
       });
@@ -260,7 +260,7 @@ export default function LocationPickerScreen() {
             latitude: location.latitude,
             longitude: location.longitude,
           },
-          "wgs84",
+          "gcj02",
         );
       }
     } catch {
@@ -330,6 +330,7 @@ export default function LocationPickerScreen() {
         latitude: selectedWgs.latitude,
         longitude: selectedWgs.longitude,
         placeName: placeName.trim() || undefined,
+        coordSystem: "wgs84",
       });
       // Unmount AMap first, then navigate back, to avoid native crash during concurrent teardown.
       setMapVisible(false);

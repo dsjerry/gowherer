@@ -19,6 +19,7 @@ export function normalizeTrackLocation(
     placeName?: unknown;
     capturedAt?: unknown;
     source?: unknown;
+    coordSystem?: unknown;
   };
   const latitude = Number(raw.latitude);
   const longitude = Number(raw.longitude);
@@ -46,6 +47,11 @@ export function normalizeTrackLocation(
         ? "manual"
         : undefined;
 
+  const coordSystem =
+    raw.coordSystem === "wgs84" || raw.coordSystem === "gcj02"
+      ? raw.coordSystem
+      : undefined;
+
   return {
     latitude,
     longitude,
@@ -53,6 +59,7 @@ export function normalizeTrackLocation(
     placeName: typeof raw.placeName === "string" ? raw.placeName : undefined,
     capturedAt,
     source,
+    coordSystem,
   };
 }
 
@@ -97,6 +104,7 @@ function mergeLocationMeta(
     placeName: base.placeName ?? previous?.placeName ?? next?.placeName,
     capturedAt: base.capturedAt ?? previous?.capturedAt ?? next?.capturedAt,
     source: base.source ?? previous?.source ?? next?.source,
+    coordSystem: base.coordSystem ?? previous?.coordSystem ?? next?.coordSystem,
     latitude: base.latitude,
     longitude: base.longitude,
   };

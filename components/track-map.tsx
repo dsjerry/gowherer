@@ -10,6 +10,13 @@ import {
 } from "@/lib/track-utils";
 import { TimelineLocation } from "@/types/journey";
 
+function toAmapCoordinate(location: TimelineLocation) {
+  if (location.coordSystem === "gcj02") {
+    return { latitude: location.latitude, longitude: location.longitude };
+  }
+  return toGcj02(location.latitude, location.longitude);
+}
+
 const startMarkerIcon = require("../assets/images/marker-start.png");
 const endMarkerIcon = require("../assets/images/marker-end.png");
 const midMarkerIcon = require("../assets/images/marker-mid.png");
@@ -57,14 +64,14 @@ export function TrackMap({
   const amapLocations = useMemo(
     () =>
       displayRouteLocations.map((item) =>
-        toGcj02(item.latitude, item.longitude),
+        toAmapCoordinate(item),
       ),
     [displayRouteLocations],
   );
   const amapMarkerLocations = useMemo(
     () =>
       displayMarkerLocations.map((item) =>
-        toGcj02(item.latitude, item.longitude),
+        toAmapCoordinate(item),
       ),
     [displayMarkerLocations],
   );

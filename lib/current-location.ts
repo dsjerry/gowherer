@@ -23,6 +23,7 @@ export function toTimelineLocation(
     accuracy: location.accuracy ?? undefined,
     capturedAt: new Date(location.timestamp).toISOString(),
     source,
+    coordSystem: "gcj02",
   });
 }
 
