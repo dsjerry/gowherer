@@ -48,3 +48,5 @@ app-example
 # EAS credentials
 credentials.json
 credentials/
+
+.omo

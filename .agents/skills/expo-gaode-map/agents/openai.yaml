@@ -1,0 +1,10 @@
+interface:
+  display_name: "expo-gaode-map"
+  short_description: "Integrate AMap into Expo apps"
+  icon_small: "./assets/icon.svg"
+  icon_large: "./assets/icon.svg"
+  brand_color: "#1677FF"
+  default_prompt: "Use $expo-gaode-map to integrate expo-gaode-map into the current project: update the existing Expo config, add key placeholders if needed, run prebuild, and avoid initSDK unless Web API or missing native key config requires it."
+
+policy:
+  allow_implicit_invocation: true

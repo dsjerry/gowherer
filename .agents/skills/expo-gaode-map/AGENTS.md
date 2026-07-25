@@ -53,7 +53,6 @@ npx expo prebuild
 - Initialization guide: `references/initialization.md`
 - Basic map integration: `references/basic-integration.md`
 - Troubleshooting guide: `references/troubleshooting.md`
-- Migration from react-native-amap3d: `references/migrating-from-react-native-amap3d.md`
 
 ## Useful Script
 

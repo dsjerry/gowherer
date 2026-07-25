@@ -26,7 +26,7 @@ description: Integrate expo-gaode-map, expo-gaode-map-navigation, and expo-gaode
 
 ## 默认目标
 
-如果用户明确说"在当前项目中接入 expo-gaode-map"，默认目标不是只安装依赖，而是把项目推进到下面这个状态：
+如果用户明确说“在当前项目中接入 expo-gaode-map”，默认目标不是只安装依赖，而是把项目推进到下面这个状态：
 
 1. 依赖已安装。
 2. Config Plugin 已配置。
@@ -48,7 +48,7 @@ description: Integrate expo-gaode-map, expo-gaode-map-navigation, and expo-gaode
 
 1. 用项目现有包管理器安装最小必要包。
 2. 在现有 Expo 配置文件中加 Config Plugin；有 `app.json` 就直接改 `app.json`，不要另建 `app.config.*`。
-3. 如用户要"直接可用"，顺手生成一个最小地图页面，并保留现有导航和状态管理结构。
+3. 如用户要“直接可用”，顺手生成一个最小地图页面，并保留现有导航和状态管理结构。
 4. 重新构建原生工程。Expo 项目必须先尝试 `npx expo prebuild`，再按需要 `npx expo run:*` 或 EAS build；bare RN 按原生流程重建。
 5. 运行时先完成隐私同意，再调用地图能力。
 6. 只有在没有通过 Config Plugin 或原生侧配置 Key 时，才手动调用 `ExpoGaodeMapModule.initSDK({ androidKey, iosKey })`。
@@ -61,7 +61,7 @@ description: Integrate expo-gaode-map, expo-gaode-map-navigation, and expo-gaode
 - 如果用户同时要地图和导航，优先推荐导航包，但不要把 `expo-gaode-map` 和 `expo-gaode-map-navigation` 一起装。
 - 新安装首次使用前先做隐私授权，再做 SDK 初始化。
 - 修改 `app.json` / 原生配置后，要提醒用户重新构建，否则改动不会生效。
-- 如果用户要"自动实现基础功能"，优先补一个最小地图页，再按需加定位、Marker、Polyline、搜索。
+- 如果用户要“自动实现基础功能”，优先补一个最小地图页，再按需加定位、Marker、Polyline、搜索。
 
 ## 产出风格
 
