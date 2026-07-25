@@ -3,11 +3,7 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { toGcj02 } from "@/lib/reverse-geocode";
-import {
-    sanitizeTrackLocations,
-    simplifyTrackLocations,
-    smoothTrackLocations,
-} from "@/lib/track-utils";
+import { sanitizeTrackLocations } from "@/lib/track-utils";
 import { TimelineLocation } from "@/types/journey";
 
 function toAmapCoordinate(location: TimelineLocation) {
@@ -53,9 +49,7 @@ export function TrackMap({
   routeLocations,
   markerLocations = routeLocations,
 }: TrackMapProps) {
-  const displayRouteLocations = simplifyTrackLocations(
-    smoothTrackLocations(sanitizeTrackLocations(routeLocations)),
-  );
+  const displayRouteLocations = sanitizeTrackLocations(routeLocations);
   const displayMarkerLocations = sanitizeTrackLocations(markerLocations);
   const allDisplayLocations = sanitizeTrackLocations([
     ...displayRouteLocations,

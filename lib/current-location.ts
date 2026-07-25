@@ -10,7 +10,6 @@ type LocationSource = NonNullable<TimelineLocation["source"]>;
 type CurrentLocationOptions = {
   source?: LocationSource;
   currentTimeoutMs?: number;
-  onLastKnownLocation?: (location: TimelineLocation) => void | Promise<void>;
 };
 
 export function toTimelineLocation(
@@ -38,7 +37,7 @@ async function getCurrentTimelineLocation({
 }: {
   source: LocationSource;
   timeoutMs: number;
-}) {
+}): Promise<TimelineLocation | null> {
   const locationPromise = ExpoGaodeMapModule.getCurrentLocation().then(
     (location) => toTimelineLocation(location, source),
   );

@@ -331,12 +331,15 @@ export async function queryNearbyPlaces(
     Math.min(5000, Math.floor(radius)),
   )}&sortrule=distance&offset=20&page=1&extensions=base&output=JSON`;
 
+  devLog("queryNearbyPlaces request", { url, coordinateType, original: { latitude, longitude }, gcj02 });
+
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`AMap nearby place query failed: ${response.status}`);
   }
 
   const data = (await response.json()) as AmapNearbyResponse;
+  devLog("queryNearbyPlaces response", { status: data.status, info: data.info, infocode: data.infocode, poiCount: data.pois?.length });
   if (data.status !== "1") {
     throw new Error(
       `AMap nearby place invalid status: status=${data.status ?? "N/A"} info=${

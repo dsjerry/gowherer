@@ -28,7 +28,6 @@ import { deleteJourney as deleteJourneyById } from "@/lib/journey-repository";
 import { loadJourneys } from "@/lib/journey-storage";
 import {
   calculateTrackDistanceKm,
-  prepareTrackRouteLocations,
   sanitizeTrackLocations,
 } from "@/lib/track-utils";
 import {
@@ -78,7 +77,7 @@ function formatDuration(durationMs: number, t: TFunction) {
 }
 
 function getJourneyTrackLocations(journey: Journey) {
-  return prepareTrackRouteLocations(journey.trackLocations ?? []);
+  return sanitizeTrackLocations(journey.trackLocations ?? []);
 }
 
 function getJourneyEntryLocations(journey: Journey) {

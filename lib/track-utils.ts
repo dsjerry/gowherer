@@ -2,7 +2,7 @@ import { TimelineLocation } from "@/types/journey";
 
 const MAX_TRACKING_ACCURACY_METERS = 100;
 const MAX_TRACKING_SPEED_KMH = 180;
-const MIN_TRACKING_DISTANCE_METERS = 10;
+const MIN_TRACKING_DISTANCE_METERS = 3;
 const MAX_NEIGHBOR_DISTANCE_METERS = 500;
 
 export function normalizeTrackLocation(
@@ -313,9 +313,13 @@ export function simplifyTrackLocations(
   );
 
   let result = douglasPeucker(safeLocations, epsilonKm);
+  let currentEpsilon = epsilonKm;
   while (result.length > maxPoints) {
-    result = douglasPeucker(safeLocations, epsilonKm * 2);
-    if (result.length === safeLocations.length) break;
+    currentEpsilon *= 2;
+    const simplified = douglasPeucker(result, currentEpsilon);
+    // If simplification didn't reduce points, further iterations won't help
+    if (simplified.length === result.length) break;
+    result = simplified;
   }
 
   return result;

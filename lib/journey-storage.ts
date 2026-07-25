@@ -112,6 +112,8 @@ export function normalizeJourneyList(raw: unknown): Journey[] {
               const loc = normalizeTrackLocation(location);
               if (!loc) return null;
               if (!loc.coordSystem) {
+                // Use the same date-based inference as entries: journeys created after
+                // the Gaode SDK migration are GCJ-02, earlier ones are WGS-84.
                 loc.coordSystem = resolveCoordSystem(
                   (location as any)?.coordSystem,
                   journeyCreatedAt,

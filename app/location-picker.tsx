@@ -1,56 +1,56 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import Constants from "expo-constants";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { MaterialIcons } from "@expo/vector-icons"
+import { useFocusEffect } from "@react-navigation/native"
+import Constants from "expo-constants"
+import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { useCallback, useMemo, useRef, useState } from "react"
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-import { useI18n } from "@/hooks/locale-preference";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useI18n } from "@/hooks/locale-preference"
+import { useColorScheme } from "@/hooks/use-color-scheme"
 import {
-    getBestCurrentTimelineLocation,
-    requestForegroundLocationAccess,
-} from "@/lib/current-location";
-import { setPendingLocation } from "@/lib/pending-location";
+  getBestCurrentTimelineLocation,
+  requestForegroundLocationAccess,
+} from "@/lib/current-location"
+import { setPendingLocation } from "@/lib/pending-location"
 import {
-    NearbyPlace,
-    queryNearbyPlaces,
-    reverseGeocodePlaceName,
-    toGcj02,
-    toWgs84,
-} from "@/lib/reverse-geocode";
-import { TimelineLocation } from "@/types/journey";
-import { MapView, Marker, type MapViewRef } from "expo-gaode-map";
+  NearbyPlace,
+  queryNearbyPlaces,
+  reverseGeocodePlaceName,
+  toGcj02,
+  toWgs84,
+} from "@/lib/reverse-geocode"
+import { TimelineLocation } from "@/types/journey"
+import { MapView, Marker, type MapViewRef } from "expo-gaode-map"
 
 type AMapLatLng = {
-  latitude: number;
-  longitude: number;
-};
+  latitude: number
+  longitude: number
+}
 
 function parseInitialLocation(
   raw: string | string[] | undefined,
 ): TimelineLocation | null {
   if (!raw || Array.isArray(raw)) {
-    return null;
+    return null
   }
 
   try {
     const parsed = JSON.parse(raw) as {
-      latitude?: unknown;
-      longitude?: unknown;
-      placeName?: unknown;
-    };
-    const latitude = Number(parsed.latitude);
-    const longitude = Number(parsed.longitude);
+      latitude?: unknown
+      longitude?: unknown
+      placeName?: unknown
+    }
+    const latitude = Number(parsed.latitude)
+    const longitude = Number(parsed.longitude)
     if (
       !Number.isFinite(latitude) ||
       !Number.isFinite(longitude) ||
@@ -59,48 +59,48 @@ function parseInitialLocation(
       longitude < -180 ||
       longitude > 180
     ) {
-      return null;
+      return null
     }
     return {
       latitude,
       longitude,
       placeName:
         typeof parsed.placeName === "string" ? parsed.placeName : undefined,
-    };
+    }
   } catch {
-    return null;
+    return null
   }
 }
 
 export default function LocationPickerScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const { t } = useI18n();
-  const params = useLocalSearchParams<{ initial?: string }>();
+  const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const colorScheme = useColorScheme()
+  const isDark = colorScheme === "dark"
+  const { t } = useI18n()
+  const params = useLocalSearchParams<{ initial?: string }>()
   const initialLocation = useMemo(
     () => parseInitialLocation(params.initial),
     [params.initial],
-  );
-  const pendingCameraTargetRef = useRef<AMapLatLng | null>(null);
-  const selectionRequestIdRef = useRef(0);
-  const autoLocateTriggeredRef = useRef(false);
-  const screenActiveRef = useRef(false);
-  const mapRef = useRef<MapViewRef | null>(null);
-  const [selected, setSelected] = useState<AMapLatLng | null>(null);
-  const [selectedWgs, setSelectedWgs] = useState<AMapLatLng | null>(null);
-  const [placeName, setPlaceName] = useState("");
-  const [loadingLocation, setLoadingLocation] = useState(false);
-  const [loadingNearby, setLoadingNearby] = useState(false);
-  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
-  const [nearbyHint, setNearbyHint] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [mapVisible, setMapVisible] = useState(true);
+  )
+  const pendingCameraTargetRef = useRef<AMapLatLng | null>(null)
+  const selectionRequestIdRef = useRef(0)
+  const autoLocateTriggeredRef = useRef(false)
+  const screenActiveRef = useRef(false)
+  const mapRef = useRef<MapViewRef | null>(null)
+  const [selected, setSelected] = useState<AMapLatLng | null>(null)
+  const [selectedWgs, setSelectedWgs] = useState<AMapLatLng | null>(null)
+  const [placeName, setPlaceName] = useState("")
+  const [loadingLocation, setLoadingLocation] = useState(false)
+  const [loadingNearby, setLoadingNearby] = useState(false)
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([])
+  const [nearbyHint, setNearbyHint] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [mapVisible, setMapVisible] = useState(true)
 
   const amapWebKey =
     Constants.expoConfig?.extra?.geocoding?.amapWebKey ??
-    process.env.EXPO_PUBLIC_AMAP_WEB_KEY;
+    process.env.EXPO_PUBLIC_AMAP_WEB_KEY
 
   const theme = {
     page: { backgroundColor: isDark ? "#0f172a" : "#f8fafc" },
@@ -117,67 +117,64 @@ export default function LocationPickerScreen() {
     },
     itemTitle: { color: isDark ? "#e2e8f0" : "#0f172a" },
     itemSub: { color: isDark ? "#94a3b8" : "#64748b" },
-  };
+  }
 
   function moveCameraTo(target: AMapLatLng, duration = 250) {
     if (!screenActiveRef.current) {
-      return;
+      return
     }
-    pendingCameraTargetRef.current = target;
-    mapRef.current?.moveCamera({ target, zoom: 16 }, duration);
+    pendingCameraTargetRef.current = target
+    mapRef.current?.moveCamera({ target, zoom: 16 }, duration)
   }
 
   const refreshNearbyPlaces = useCallback(
     async (target: AMapLatLng) => {
       if (!amapWebKey) {
-        setNearbyHint(t("mapPicker.missingWebKey"));
-        setNearbyPlaces([]);
-        return;
+        setNearbyHint(t("mapPicker.missingWebKey"))
+        setNearbyPlaces([])
+        return
       }
-      setLoadingNearby(true);
-      setNearbyHint("");
+      setLoadingNearby(true)
+      setNearbyHint("")
       try {
         const list = await queryNearbyPlaces(
           target.latitude,
           target.longitude,
           1200,
           { coordinateType: "gcj02" },
-        );
-        setNearbyPlaces(list);
+        )
+        setNearbyPlaces(list)
         if (list.length === 0) {
-          setNearbyHint(t("mapPicker.nearbyEmpty"));
+          setNearbyHint(t("mapPicker.nearbyEmpty"))
         }
-      } catch {
-        setNearbyPlaces([]);
-        setNearbyHint(t("mapPicker.nearbyFailed"));
+      } catch (error) {
+        setNearbyPlaces([])
+        const message = error instanceof Error ? error.message : String(error)
+        setNearbyHint(`${t("mapPicker.nearbyFailed")} (${message})`)
       } finally {
-        setLoadingNearby(false);
+        setLoadingNearby(false)
       }
     },
     [amapWebKey, t],
-  );
+  )
 
   const selectPoint = useCallback(
     (target: AMapLatLng, source: "wgs84" | "gcj02", presetName?: string) => {
       if (!screenActiveRef.current) {
-        return;
+        return
       }
       const mapTarget =
-        source === "gcj02"
-          ? target
-          : toGcj02(target.latitude, target.longitude);
+        source === "gcj02" ? target : toGcj02(target.latitude, target.longitude)
       const wgsTarget =
-        source === "wgs84"
-          ? target
-          : toWgs84(target.latitude, target.longitude);
-      const requestId = selectionRequestIdRef.current + 1;
-      selectionRequestIdRef.current = requestId;
+        source === "wgs84" ? target : toWgs84(target.latitude, target.longitude)
+      const requestId = selectionRequestIdRef.current + 1
+      selectionRequestIdRef.current = requestId
 
-      setSelected(mapTarget);
-      setSelectedWgs(wgsTarget);
-      moveCameraTo(mapTarget);
+      setSelected(mapTarget)
+      setSelectedWgs(wgsTarget)
+      moveCameraTo(mapTarget)
       if (presetName) {
-        setPlaceName(presetName);
+        setPlaceName(presetName)
       }
 
       void (async () => {
@@ -187,19 +184,19 @@ export default function LocationPickerScreen() {
               mapTarget.latitude,
               mapTarget.longitude,
               { coordinateType: "gcj02" },
-            );
+            )
             if (
               screenActiveRef.current &&
               selectionRequestIdRef.current === requestId
             ) {
-              setPlaceName(name ?? "");
+              setPlaceName(name ?? "")
             }
           } catch {
             if (
               screenActiveRef.current &&
               selectionRequestIdRef.current === requestId
             ) {
-              setPlaceName("");
+              setPlaceName("")
             }
           }
         }
@@ -208,88 +205,75 @@ export default function LocationPickerScreen() {
           screenActiveRef.current &&
           selectionRequestIdRef.current === requestId
         ) {
-          await refreshNearbyPlaces(mapTarget);
+          await refreshNearbyPlaces(mapTarget)
         }
-      })();
+      })()
     },
     [refreshNearbyPlaces],
-  );
+  )
 
   const locateCurrent = useCallback(async () => {
     if (!screenActiveRef.current) {
-      return;
+      return
     }
-    setLoadingLocation(true);
-    let hasPosition = false;
+    setLoadingLocation(true)
+    let hasPosition = false
     try {
-      const granted = await requestForegroundLocationAccess();
+      const granted = await requestForegroundLocationAccess()
       if (!screenActiveRef.current) {
-        return;
+        return
       }
       if (!granted) {
         Alert.alert(
           t("mapPicker.locationDeniedTitle"),
           t("mapPicker.locationDeniedBody"),
-        );
-        return;
+        )
+        return
       }
 
       const location = await getBestCurrentTimelineLocation({
         source: "manual",
-        onLastKnownLocation: (lastKnown) => {
-          if (!screenActiveRef.current) {
-            return;
-          }
-          hasPosition = true;
-          selectPoint(
-            {
-              latitude: lastKnown.latitude,
-              longitude: lastKnown.longitude,
-            },
-            "gcj02",
-          );
-        },
-      });
+      })
       if (!screenActiveRef.current) {
-        return;
+        return
       }
       if (location) {
-        hasPosition = true;
+        hasPosition = true
         selectPoint(
           {
             latitude: location.latitude,
             longitude: location.longitude,
           },
           "gcj02",
-        );
+        )
       }
     } catch {
       if (screenActiveRef.current && !hasPosition) {
         Alert.alert(
           t("mapPicker.locationFailedTitle"),
           t("mapPicker.locationFailedBody"),
-        );
+        )
       }
     } finally {
       if (screenActiveRef.current) {
-        setLoadingLocation(false);
+        setLoadingLocation(false)
       }
     }
-  }, [selectPoint, t]);
+  }, [selectPoint, t])
 
   useFocusEffect(
     useCallback(() => {
-      screenActiveRef.current = true;
-      setMapVisible(true);
+      screenActiveRef.current = true
+      setMapVisible(true)
 
       if (autoLocateTriggeredRef.current) {
         return () => {
-          screenActiveRef.current = false;
-          mapRef.current = null;
-          selectionRequestIdRef.current += 1;
-        };
+          screenActiveRef.current = false
+          mapRef.current = null
+          selectionRequestIdRef.current += 1
+        }
       }
-      autoLocateTriggeredRef.current = true;
+      autoLocateTriggeredRef.current = true
 
       if (initialLocation) {
         selectPoint(
@@ -299,50 +283,50 @@ export default function LocationPickerScreen() {
           },
           "wgs84",
           initialLocation.placeName,
-        );
+        )
         return () => {
-          screenActiveRef.current = false;
-          mapRef.current = null;
-          selectionRequestIdRef.current += 1;
-        };
+          screenActiveRef.current = false
+          mapRef.current = null
+          selectionRequestIdRef.current += 1
+        }
       }
-      void locateCurrent();
+      void locateCurrent()
 
       return () => {
-        screenActiveRef.current = false;
-        mapRef.current = null;
-        selectionRequestIdRef.current += 1;
-      };
+        screenActiveRef.current = false
+        mapRef.current = null
+        selectionRequestIdRef.current += 1
+      }
     }, [initialLocation, locateCurrent, selectPoint]),
-  );
+  )
 
   async function confirmLocation() {
     if (!selected || !selectedWgs) {
       Alert.alert(
         t("mapPicker.selectFirstTitle"),
         t("mapPicker.selectFirstBody"),
-      );
-      return;
+      )
+      return
     }
-    setSaving(true);
+    setSaving(true)
     try {
       await setPendingLocation({
         latitude: selectedWgs.latitude,
         longitude: selectedWgs.longitude,
         placeName: placeName.trim() || undefined,
         coordSystem: "wgs84",
-      });
+      })
       // Unmount AMap first, then navigate back, to avoid native crash during concurrent teardown.
-      setMapVisible(false);
-      screenActiveRef.current = false;
-      mapRef.current = null;
-      selectionRequestIdRef.current += 1;
+      setMapVisible(false)
+      screenActiveRef.current = false
+      mapRef.current = null
+      selectionRequestIdRef.current += 1
       setTimeout(() => {
-        router.back();
-      }, 120);
+        router.back()
+      }, 120)
     } finally {
       if (screenActiveRef.current) {
-        setSaving(false);
+        setSaving(false)
       }
     }
   }
@@ -355,33 +339,33 @@ export default function LocationPickerScreen() {
             {t("mapPicker.savingBack")}
           </Text>
         </View>
-      );
+      )
     }
 
     return (
       <MapView
-        ref={(ref) => {
-          mapRef.current = ref;
+        ref={ref => {
+          mapRef.current = ref
           if (ref && pendingCameraTargetRef.current) {
             ref.moveCamera(
               { target: pendingCameraTargetRef.current, zoom: 16 },
               250,
-            );
+            )
           }
         }}
         style={styles.map}
         myLocationEnabled={false}
         myLocationButtonEnabled={false}
         onMapPress={({ nativeEvent }) => {
-          void selectPoint(nativeEvent, "gcj02");
+          void selectPoint(nativeEvent, "gcj02")
         }}
         onPressPoi={({ nativeEvent }) => {
-          void selectPoint(nativeEvent.position, "gcj02", nativeEvent.name);
+          void selectPoint(nativeEvent.position, "gcj02", nativeEvent.name)
         }}
       >
         {selected ? <Marker position={selected} /> : null}
       </MapView>
-    );
+    )
   }
 
   return (
@@ -426,7 +410,7 @@ export default function LocationPickerScreen() {
               {nearbyHint || t("mapPicker.emptyNearby")}
             </Text>
           ) : (
-            nearbyPlaces.map((item) => (
+            nearbyPlaces.map(item => (
               <Pressable
                 key={item.id}
                 style={[styles.placeItem, theme.item]}
@@ -462,7 +446,7 @@ export default function LocationPickerScreen() {
         </Pressable>
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -576,4 +560,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14,
   },
-});
+})
