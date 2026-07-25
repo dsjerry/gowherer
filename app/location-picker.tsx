@@ -244,7 +244,7 @@ export default function LocationPickerScreen() {
             latitude: location.latitude,
             longitude: location.longitude,
           },
-          "gcj02",
+          location.coordSystem ?? "gcj02",
         )
       }
     } catch {

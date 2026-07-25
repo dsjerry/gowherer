@@ -125,13 +125,17 @@ function getGeocodingConfig(): GeocodingConfig {
   const extra = (Constants.expoConfig?.extra ?? {}) as {
     geocoding?: { provider?: string; amapWebKey?: string };
   };
-  const rawProvider = extra.geocoding?.provider;
+  const rawProvider =
+    extra.geocoding?.provider ??
+    process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ??
+    "amap";
   const provider: ReverseGeocodeProvider =
     rawProvider === "amap" ? "amap" : "system";
 
   return {
     provider,
-    amapWebKey: extra.geocoding?.amapWebKey,
+    amapWebKey:
+      extra.geocoding?.amapWebKey ?? process.env.EXPO_PUBLIC_AMAP_WEB_KEY,
   };
 }
 
@@ -314,8 +318,15 @@ export async function queryNearbyPlaces(
   options?: { coordinateType?: CoordinateType },
 ): Promise<NearbyPlace[]> {
   const config = getGeocodingConfig();
-  if (!(config.provider === "amap" && config.amapWebKey)) {
-    return [];
+  if (config.provider !== "amap") {
+    throw new Error(
+      `高德附近地点查询未启用：当前 provider 为 ${config.provider}，请在 app.config.ts / .env 中设置 EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER=amap`,
+    );
+  }
+  if (!config.amapWebKey) {
+    throw new Error(
+      `高德附近地点查询缺少 Web Key：请配置 EXPO_PUBLIC_AMAP_WEB_KEY`,
+    );
   }
 
   const coordinateType = options?.coordinateType ?? "wgs84";
@@ -331,7 +342,13 @@ export async function queryNearbyPlaces(
     Math.min(5000, Math.floor(radius)),
   )}&sortrule=distance&offset=20&page=1&extensions=base&output=JSON`;
 
-  devLog("queryNearbyPlaces request", { url, coordinateType, original: { latitude, longitude }, gcj02 });
+  const redactedUrl = url.replace(/key=[^&]+/, "key=***");
+  devLog("queryNearbyPlaces request", {
+    url: redactedUrl,
+    coordinateType,
+    original: { latitude, longitude },
+    gcj02,
+  });
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -339,7 +356,12 @@ export async function queryNearbyPlaces(
   }
 
   const data = (await response.json()) as AmapNearbyResponse;
-  devLog("queryNearbyPlaces response", { status: data.status, info: data.info, infocode: data.infocode, poiCount: data.pois?.length });
+  devLog("queryNearbyPlaces response", {
+    status: data.status,
+    info: data.info,
+    infocode: data.infocode,
+    poiCount: data.pois?.length,
+  });
   if (data.status !== "1") {
     throw new Error(
       `AMap nearby place invalid status: status=${data.status ?? "N/A"} info=${
@@ -350,7 +372,13 @@ export async function queryNearbyPlaces(
 
   const places: NearbyPlace[] = [];
   for (const poi of data.pois ?? []) {
-    if (!poi.id || !poi.name || !poi.location) {
+    if (!poi.id || typeof poi.id !== "string") {
+      continue;
+    }
+    if (!poi.name || typeof poi.name !== "string" || !poi.location) {
+      continue;
+    }
+    if (typeof poi.location !== "string" || !poi.location.includes(",")) {
       continue;
     }
     const [lngText, latText] = poi.location.split(",");
@@ -359,10 +387,12 @@ export async function queryNearbyPlaces(
     if (!Number.isFinite(poiLat) || !Number.isFinite(poiLng)) {
       continue;
     }
+    const trimmedAddress =
+      typeof poi.address === "string" ? poi.address.trim() : undefined;
     places.push({
       id: poi.id,
       name: poi.name.trim(),
-      address: poi.address?.trim() || undefined,
+      address: trimmedAddress || undefined,
       distance: Number.isFinite(Number(poi.distance))
         ? Number(poi.distance)
         : undefined,

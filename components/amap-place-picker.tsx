@@ -159,6 +159,7 @@ export function AMapPlacePicker({
       const maybeName = await reverseGeocodePlaceName(
         target.latitude,
         target.longitude,
+        { coordinateType: "gcj02" },
       );
       setPlaceName(maybeName ?? "");
     } catch (error) {
