@@ -96,7 +96,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
         projectId,
       },
       geocoding: {
-        provider: process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ?? "amap",
+        provider: process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER || "amap",
         amapWebKey,
       },
       amap: {
