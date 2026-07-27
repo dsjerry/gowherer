@@ -1,54 +1,56 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import Constants from 'expo-constants';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MaterialIcons } from "@expo/vector-icons"
+import { useFocusEffect } from "@react-navigation/native"
+import Constants from "expo-constants"
+import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { useCallback, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/locale-preference';
+import { useI18n } from "@/hooks/locale-preference"
+import { useColorScheme } from "@/hooks/use-color-scheme"
 import {
   getBestCurrentTimelineLocation,
   requestForegroundLocationAccess,
-} from '@/lib/current-location';
-import { setPendingLocation } from '@/lib/pending-location';
+} from "@/lib/current-location"
+import { setPendingLocation } from "@/lib/pending-location"
 import {
   NearbyPlace,
   queryNearbyPlaces,
   reverseGeocodePlaceName,
   toGcj02,
   toWgs84,
-} from '@/lib/reverse-geocode';
-import { TimelineLocation } from '@/types/journey';
+} from "@/lib/reverse-geocode"
+import { TimelineLocation } from "@/types/journey"
+import { MapView, Marker, type MapViewRef } from "expo-gaode-map"
 
 type AMapLatLng = {
-  latitude: number;
-  longitude: number;
-};
+  latitude: number
+  longitude: number
+}
 
-function parseInitialLocation(raw: string | string[] | undefined): TimelineLocation | null {
+function parseInitialLocation(
+  raw: string | string[] | undefined,
+): TimelineLocation | null {
   if (!raw || Array.isArray(raw)) {
-    return null;
+    return null
   }
 
   try {
     const parsed = JSON.parse(raw) as {
-      latitude?: unknown;
-      longitude?: unknown;
-      placeName?: unknown;
-    };
-    const latitude = Number(parsed.latitude);
-    const longitude = Number(parsed.longitude);
+      latitude?: unknown
+      longitude?: unknown
+      placeName?: unknown
+    }
+    const latitude = Number(parsed.latitude)
+    const longitude = Number(parsed.longitude)
     if (
       !Number.isFinite(latitude) ||
       !Number.isFinite(longitude) ||
@@ -57,125 +59,122 @@ function parseInitialLocation(raw: string | string[] | undefined): TimelineLocat
       longitude < -180 ||
       longitude > 180
     ) {
-      return null;
+      return null
     }
     return {
       latitude,
       longitude,
-      placeName: typeof parsed.placeName === 'string' ? parsed.placeName : undefined,
-    };
+      placeName:
+        typeof parsed.placeName === "string" ? parsed.placeName : undefined,
+    }
   } catch {
-    return null;
+    return null
   }
 }
 
 export default function LocationPickerScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const { t } = useI18n();
-  const params = useLocalSearchParams<{ initial?: string }>();
+  const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const colorScheme = useColorScheme()
+  const isDark = colorScheme === "dark"
+  const { t } = useI18n()
+  const params = useLocalSearchParams<{ initial?: string }>()
   const initialLocation = useMemo(
     () => parseInitialLocation(params.initial),
-    [params.initial]
-  );
-  const pendingCameraTargetRef = useRef<AMapLatLng | null>(null);
-  const selectionRequestIdRef = useRef(0);
-  const autoLocateTriggeredRef = useRef(false);
-  const screenActiveRef = useRef(false);
-  const mapRef = useRef<{
-    moveCamera?: (cameraPosition: { target: AMapLatLng; zoom?: number }, duration?: number) => void;
-  } | null>(null);
-  const [sdkReady, setSdkReady] = useState(false);
-  const [sdkError, setSdkError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<AMapLatLng | null>(null);
-  const [selectedWgs, setSelectedWgs] = useState<AMapLatLng | null>(null);
-  const [placeName, setPlaceName] = useState('');
-  const [loadingLocation, setLoadingLocation] = useState(false);
-  const [loadingNearby, setLoadingNearby] = useState(false);
-  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
-  const [nearbyHint, setNearbyHint] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [mapVisible, setMapVisible] = useState(true);
+    [params.initial],
+  )
+  const pendingCameraTargetRef = useRef<AMapLatLng | null>(null)
+  const selectionRequestIdRef = useRef(0)
+  const autoLocateTriggeredRef = useRef(false)
+  const screenActiveRef = useRef(false)
+  const mapRef = useRef<MapViewRef | null>(null)
+  const [selected, setSelected] = useState<AMapLatLng | null>(null)
+  const [selectedWgs, setSelectedWgs] = useState<AMapLatLng | null>(null)
+  const [placeName, setPlaceName] = useState("")
+  const [loadingLocation, setLoadingLocation] = useState(false)
+  const [loadingNearby, setLoadingNearby] = useState(false)
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([])
+  const [nearbyHint, setNearbyHint] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [mapVisible, setMapVisible] = useState(true)
 
-  const amapAndroidApiKey =
-    Constants.expoConfig?.extra?.amap?.androidApiKey ??
-    process.env.EXPO_PUBLIC_AMAP_ANDROID_API_KEY;
   const amapWebKey =
     Constants.expoConfig?.extra?.geocoding?.amapWebKey ??
-    process.env.EXPO_PUBLIC_AMAP_WEB_KEY;
+    process.env.EXPO_PUBLIC_AMAP_WEB_KEY
 
   const theme = {
-    page: { backgroundColor: isDark ? '#0f172a' : '#f8fafc' },
+    page: { backgroundColor: isDark ? "#0f172a" : "#f8fafc" },
     card: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? "#1e293b" : "#ffffff",
+      borderColor: isDark ? "#334155" : "#e2e8f0",
     },
-    title: { color: isDark ? '#e2e8f0' : '#0f172a' },
-    muted: { color: isDark ? '#94a3b8' : '#475569' },
-    coord: { color: isDark ? '#cbd5e1' : '#334155' },
+    title: { color: isDark ? "#e2e8f0" : "#0f172a" },
+    muted: { color: isDark ? "#94a3b8" : "#475569" },
+    coord: { color: isDark ? "#cbd5e1" : "#334155" },
     item: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      borderColor: isDark ? "#334155" : "#e2e8f0",
     },
-    itemTitle: { color: isDark ? '#e2e8f0' : '#0f172a' },
-    itemSub: { color: isDark ? '#94a3b8' : '#64748b' },
-  };
+    itemTitle: { color: isDark ? "#e2e8f0" : "#0f172a" },
+    itemSub: { color: isDark ? "#94a3b8" : "#64748b" },
+  }
 
   function moveCameraTo(target: AMapLatLng, duration = 250) {
     if (!screenActiveRef.current) {
-      return;
+      return
     }
-    pendingCameraTargetRef.current = target;
-    mapRef.current?.moveCamera?.({ target, zoom: 16 }, duration);
+    pendingCameraTargetRef.current = target
+    mapRef.current?.moveCamera({ target, zoom: 16 }, duration)
   }
 
   const refreshNearbyPlaces = useCallback(
     async (target: AMapLatLng) => {
       if (!amapWebKey) {
-        setNearbyHint(t('mapPicker.missingWebKey'));
-        setNearbyPlaces([]);
-        return;
+        setNearbyHint(t("mapPicker.missingWebKey"))
+        setNearbyPlaces([])
+        return
       }
-      setLoadingNearby(true);
-      setNearbyHint('');
+      setLoadingNearby(true)
+      setNearbyHint("")
       try {
         const list = await queryNearbyPlaces(
           target.latitude,
           target.longitude,
           1200,
-          { coordinateType: 'gcj02' }
-        );
-        setNearbyPlaces(list);
+          { coordinateType: "gcj02" },
+        )
+        setNearbyPlaces(list)
         if (list.length === 0) {
-          setNearbyHint(t('mapPicker.nearbyEmpty'));
+          setNearbyHint(t("mapPicker.nearbyEmpty"))
         }
-      } catch {
-        setNearbyPlaces([]);
-        setNearbyHint(t('mapPicker.nearbyFailed'));
+      } catch (error) {
+        setNearbyPlaces([])
+        const message = error instanceof Error ? error.message : String(error)
+        setNearbyHint(`${t("mapPicker.nearbyFailed")} (${message})`)
       } finally {
-        setLoadingNearby(false);
+        setLoadingNearby(false)
       }
     },
-    [amapWebKey, t]
-  );
+    [amapWebKey, t],
+  )
 
   const selectPoint = useCallback(
-    (target: AMapLatLng, source: 'wgs84' | 'gcj02', presetName?: string) => {
+    (target: AMapLatLng, source: "wgs84" | "gcj02", presetName?: string) => {
       if (!screenActiveRef.current) {
-        return;
+        return
       }
-      const mapTarget = source === 'gcj02' ? target : toGcj02(target.latitude, target.longitude);
-      const wgsTarget = source === 'wgs84' ? target : toWgs84(target.latitude, target.longitude);
-      const requestId = selectionRequestIdRef.current + 1;
-      selectionRequestIdRef.current = requestId;
+      const mapTarget =
+        source === "gcj02" ? target : toGcj02(target.latitude, target.longitude)
+      const wgsTarget =
+        source === "wgs84" ? target : toWgs84(target.latitude, target.longitude)
+      const requestId = selectionRequestIdRef.current + 1
+      selectionRequestIdRef.current = requestId
 
-      setSelected(mapTarget);
-      setSelectedWgs(wgsTarget);
-      moveCameraTo(mapTarget);
+      setSelected(mapTarget)
+      setSelectedWgs(wgsTarget)
+      moveCameraTo(mapTarget)
       if (presetName) {
-        setPlaceName(presetName);
+        setPlaceName(presetName)
       }
 
       void (async () => {
@@ -184,165 +183,150 @@ export default function LocationPickerScreen() {
             const name = await reverseGeocodePlaceName(
               mapTarget.latitude,
               mapTarget.longitude,
-              { coordinateType: 'gcj02' }
-            );
-            if (screenActiveRef.current && selectionRequestIdRef.current === requestId) {
-              setPlaceName(name ?? '');
+              { coordinateType: "gcj02" },
+            )
+            if (
+              screenActiveRef.current &&
+              selectionRequestIdRef.current === requestId
+            ) {
+              setPlaceName(name ?? "")
             }
           } catch {
-            if (screenActiveRef.current && selectionRequestIdRef.current === requestId) {
-              setPlaceName('');
+            if (
+              screenActiveRef.current &&
+              selectionRequestIdRef.current === requestId
+            ) {
+              setPlaceName("")
             }
           }
         }
 
-        if (screenActiveRef.current && selectionRequestIdRef.current === requestId) {
-          await refreshNearbyPlaces(mapTarget);
+        if (
+          screenActiveRef.current &&
+          selectionRequestIdRef.current === requestId
+        ) {
+          await refreshNearbyPlaces(mapTarget)
         }
-      })();
+      })()
     },
-    [refreshNearbyPlaces]
-  );
+    [refreshNearbyPlaces],
+  )
 
   const locateCurrent = useCallback(async () => {
     if (!screenActiveRef.current) {
-      return;
+      return
     }
-    setLoadingLocation(true);
-    let hasPosition = false;
+    setLoadingLocation(true)
+    let hasPosition = false
     try {
-      const granted = await requestForegroundLocationAccess();
+      const granted = await requestForegroundLocationAccess()
       if (!screenActiveRef.current) {
-        return;
+        return
       }
       if (!granted) {
-        Alert.alert(t('mapPicker.locationDeniedTitle'), t('mapPicker.locationDeniedBody'));
-        return;
+        Alert.alert(
+          t("mapPicker.locationDeniedTitle"),
+          t("mapPicker.locationDeniedBody"),
+        )
+        return
       }
 
       const location = await getBestCurrentTimelineLocation({
-        source: 'manual',
-        onLastKnownLocation: (lastKnown) => {
-          if (!screenActiveRef.current) {
-            return;
-          }
-          hasPosition = true;
-          selectPoint(
-            {
-              latitude: lastKnown.latitude,
-              longitude: lastKnown.longitude,
-            },
-            'wgs84'
-          );
-        },
-      });
+        source: "manual",
+      })
       if (!screenActiveRef.current) {
-        return;
+        return
       }
       if (location) {
-        hasPosition = true;
+        hasPosition = true
         selectPoint(
           {
             latitude: location.latitude,
             longitude: location.longitude,
           },
-          'wgs84'
-        );
+          location.coordSystem ?? "gcj02",
+        )
       }
     } catch {
       if (screenActiveRef.current && !hasPosition) {
-        Alert.alert(t('mapPicker.locationFailedTitle'), t('mapPicker.locationFailedBody'));
+        Alert.alert(
+          t("mapPicker.locationFailedTitle"),
+          t("mapPicker.locationFailedBody"),
+        )
       }
     } finally {
       if (screenActiveRef.current) {
-        setLoadingLocation(false);
+        setLoadingLocation(false)
       }
     }
-  }, [selectPoint, t]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'android') {
-      setSdkReady(false);
-      setSdkError(t('mapPicker.sdkAndroidOnly'));
-      return;
-    }
-    if (!amapAndroidApiKey) {
-      setSdkReady(false);
-      setSdkError(t('mapPicker.sdkMissingKey'));
-      return;
-    }
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { AMapSdk } = require('react-native-amap3d');
-      AMapSdk.init(amapAndroidApiKey);
-      setSdkError(null);
-      setSdkReady(true);
-    } catch {
-      setSdkReady(false);
-      setSdkError(t('mapPicker.sdkUnavailable'));
-    }
-  }, [amapAndroidApiKey, t]);
+  }, [selectPoint, t])
 
   useFocusEffect(
     useCallback(() => {
-      screenActiveRef.current = true;
-      setMapVisible(true);
+      screenActiveRef.current = true
+      setMapVisible(true)
 
       if (autoLocateTriggeredRef.current) {
         return () => {
-          screenActiveRef.current = false;
-          mapRef.current = null;
-          selectionRequestIdRef.current += 1;
-        };
+          screenActiveRef.current = false
+          mapRef.current = null
+          selectionRequestIdRef.current += 1
+        }
       }
-      autoLocateTriggeredRef.current = true;
+      autoLocateTriggeredRef.current = true
 
       if (initialLocation) {
         selectPoint(
-          { latitude: initialLocation.latitude, longitude: initialLocation.longitude },
-          'wgs84',
-          initialLocation.placeName
-        );
+          {
+            latitude: initialLocation.latitude,
+            longitude: initialLocation.longitude,
+          },
+          "wgs84",
+          initialLocation.placeName,
+        )
         return () => {
-          screenActiveRef.current = false;
-          mapRef.current = null;
-          selectionRequestIdRef.current += 1;
-        };
+          screenActiveRef.current = false
+          mapRef.current = null
+          selectionRequestIdRef.current += 1
+        }
       }
-      void locateCurrent();
+      void locateCurrent()
 
       return () => {
-        screenActiveRef.current = false;
-        mapRef.current = null;
-        selectionRequestIdRef.current += 1;
-      };
-    }, [initialLocation, locateCurrent, selectPoint])
-  );
+        screenActiveRef.current = false
+        mapRef.current = null
+        selectionRequestIdRef.current += 1
+      }
+    }, [initialLocation, locateCurrent, selectPoint]),
+  )
 
   async function confirmLocation() {
     if (!selected || !selectedWgs) {
-      Alert.alert(t('mapPicker.selectFirstTitle'), t('mapPicker.selectFirstBody'));
-      return;
+      Alert.alert(
+        t("mapPicker.selectFirstTitle"),
+        t("mapPicker.selectFirstBody"),
+      )
+      return
     }
-    setSaving(true);
+    setSaving(true)
     try {
       await setPendingLocation({
         latitude: selectedWgs.latitude,
         longitude: selectedWgs.longitude,
         placeName: placeName.trim() || undefined,
-      });
+        coordSystem: "wgs84",
+      })
       // Unmount AMap first, then navigate back, to avoid native crash during concurrent teardown.
-      setMapVisible(false);
-      screenActiveRef.current = false;
-      mapRef.current = null;
-      selectionRequestIdRef.current += 1;
+      setMapVisible(false)
+      screenActiveRef.current = false
+      mapRef.current = null
+      selectionRequestIdRef.current += 1
       setTimeout(() => {
-        router.back();
-      }, 120);
+        router.back()
+      }, 120)
     } finally {
       if (screenActiveRef.current) {
-        setSaving(false);
+        setSaving(false)
       }
     }
   }
@@ -351,47 +335,37 @@ export default function LocationPickerScreen() {
     if (!mapVisible) {
       return (
         <View style={styles.mapFallback}>
-          <Text style={[styles.mapFallbackText, theme.muted]}>{t('mapPicker.savingBack')}</Text>
-        </View>
-      );
-    }
-
-    if (!sdkReady) {
-      return (
-        <View style={styles.mapFallback}>
           <Text style={[styles.mapFallbackText, theme.muted]}>
-            {sdkError ?? t('mapPicker.mapInit')}
+            {t("mapPicker.savingBack")}
           </Text>
         </View>
-      );
+      )
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { MapView, Marker } = require('react-native-amap3d');
     return (
       <MapView
-        ref={(ref: typeof mapRef.current) => {
-          mapRef.current = ref;
+        ref={ref => {
+          mapRef.current = ref
           if (ref && pendingCameraTargetRef.current) {
-            ref.moveCamera?.({ target: pendingCameraTargetRef.current, zoom: 16 }, 250);
+            ref.moveCamera(
+              { target: pendingCameraTargetRef.current, zoom: 16 },
+              250,
+            )
           }
         }}
         style={styles.map}
         myLocationEnabled={false}
         myLocationButtonEnabled={false}
-        onPress={({ nativeEvent }: { nativeEvent: AMapLatLng }) => {
-          void selectPoint(nativeEvent, 'gcj02');
+        onMapPress={({ nativeEvent }) => {
+          void selectPoint(nativeEvent, "gcj02")
         }}
-        onPressPoi={({
-          nativeEvent,
-        }: {
-          nativeEvent: { name?: string; position: AMapLatLng };
-        }) => {
-          void selectPoint(nativeEvent.position, 'gcj02', nativeEvent.name);
-        }}>
+        onPressPoi={({ nativeEvent }) => {
+          void selectPoint(nativeEvent.position, "gcj02", nativeEvent.name)
+        }}
+      >
         {selected ? <Marker position={selected} /> : null}
       </MapView>
-    );
+    )
   }
 
   return (
@@ -399,64 +373,80 @@ export default function LocationPickerScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.mapSection, theme.card]}>
         <View style={styles.mapHeader}>
-          <Text style={[styles.sectionTitle, theme.title]}>{t('mapPicker.sectionMap')}</Text>
+          <Text style={[styles.sectionTitle, theme.title]}>
+            {t("mapPicker.sectionMap")}
+          </Text>
           <Pressable
             style={styles.locateButton}
             onPress={() => void locateCurrent()}
-            disabled={loadingLocation}>
+            disabled={loadingLocation}
+          >
             <MaterialIcons name="my-location" size={16} color="#ffffff" />
             <Text style={styles.locateButtonText}>
-              {loadingLocation ? t('mapPicker.locating') : t('mapPicker.locateButton')}
+              {loadingLocation
+                ? t("mapPicker.locating")
+                : t("mapPicker.locateButton")}
             </Text>
           </Pressable>
         </View>
         <Text style={[styles.coordText, theme.coord]}>
           {selected
-            ? `${placeName ? `${placeName} - ` : ''}${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}`
-            : t('mapPicker.pickHint')}
+            ? `${placeName ? `${placeName} - ` : ""}${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}`
+            : t("mapPicker.pickHint")}
         </Text>
         <View style={styles.mapWrap}>{renderMap()}</View>
       </View>
 
       <View style={[styles.listSection, theme.card]}>
         <View style={styles.listHeader}>
-          <Text style={[styles.sectionTitle, theme.title]}>{t('mapPicker.sectionNearby')}</Text>
+          <Text style={[styles.sectionTitle, theme.title]}>
+            {t("mapPicker.sectionNearby")}
+          </Text>
           {loadingNearby ? <ActivityIndicator size="small" /> : null}
         </View>
         <ScrollView contentContainerStyle={styles.listScroll}>
           {nearbyPlaces.length === 0 ? (
             <Text style={[styles.emptyText, theme.muted]}>
-              {nearbyHint || t('mapPicker.emptyNearby')}
+              {nearbyHint || t("mapPicker.emptyNearby")}
             </Text>
           ) : (
-            nearbyPlaces.map((item) => (
+            nearbyPlaces.map(item => (
               <Pressable
                 key={item.id}
                 style={[styles.placeItem, theme.item]}
                 onPress={() =>
                   void selectPoint(
                     { latitude: item.latitude, longitude: item.longitude },
-                    'gcj02',
-                    item.name
+                    "gcj02",
+                    item.name,
                   )
-                }>
-                <Text style={[styles.placeTitle, theme.itemTitle]}>{item.name}</Text>
+                }
+              >
+                <Text style={[styles.placeTitle, theme.itemTitle]}>
+                  {item.name}
+                </Text>
                 <Text style={[styles.placeMeta, theme.itemSub]}>
-                  {item.address ? `${item.address} - ` : ''}
-                  {typeof item.distance === 'number' ? `${Math.round(item.distance)}m` : ''}
+                  {item.address ? `${item.address} - ` : ""}
+                  {typeof item.distance === "number"
+                    ? `${Math.round(item.distance)}m`
+                    : ""}
                 </Text>
               </Pressable>
             ))
           )}
         </ScrollView>
-        <Pressable style={styles.confirmButton} onPress={() => void confirmLocation()} disabled={saving}>
+        <Pressable
+          style={styles.confirmButton}
+          onPress={() => void confirmLocation()}
+          disabled={saving}
+        >
           <Text style={styles.confirmButtonText}>
-            {saving ? t('mapPicker.saving') : t('mapPicker.confirmUse')}
+            {saving ? t("mapPicker.saving") : t("mapPicker.confirmUse")}
           </Text>
         </Pressable>
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -481,39 +471,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   mapHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   listHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   mapWrap: {
     flex: 1,
     borderRadius: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   map: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   mapFallback: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0f172a',
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0f172a",
     borderRadius: 10,
   },
   mapFallbackText: {
     fontSize: 13,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: 12,
   },
   coordText: {
@@ -521,17 +511,17 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   locateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
-    backgroundColor: '#0f766e',
+    backgroundColor: "#0f766e",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   locateButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
     fontSize: 12,
   },
   listScroll: {
@@ -547,7 +537,7 @@ const styles = StyleSheet.create({
   },
   placeTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   placeMeta: {
     fontSize: 12,
@@ -558,16 +548,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   confirmButton: {
-    marginTop: 'auto',
-    backgroundColor: '#0f766e',
+    marginTop: "auto",
+    backgroundColor: "#0f766e",
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 11,
   },
   confirmButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
+    color: "#ffffff",
+    fontWeight: "700",
     fontSize: 14,
   },
-});
+})

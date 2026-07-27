@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
-import * as Location from "expo-location";
+import { ExpoGaodeMapModule } from "expo-gaode-map";
 
 import { useI18n } from "@/hooks/locale-preference";
 import {
@@ -79,8 +79,8 @@ export function useLocationTracking(
         }
 
         const foregroundPermission =
-          await Location.requestForegroundPermissionsAsync();
-        if (foregroundPermission.status !== "granted") {
+          await ExpoGaodeMapModule.requestLocationPermission();
+        if (!foregroundPermission.granted) {
           Alert.alert(
             t("journey.alertTrackingPermissionTitle"),
             t("journey.alertTrackingPermissionBody"),
@@ -89,8 +89,8 @@ export function useLocationTracking(
         }
 
         const backgroundPermission =
-          await Location.requestBackgroundPermissionsAsync();
-        if (backgroundPermission.status !== "granted") {
+          await ExpoGaodeMapModule.requestBackgroundLocationPermission();
+        if (!backgroundPermission.granted) {
           Alert.alert(
             t("journey.alertTrackingPermissionTitle"),
             t("journey.alertTrackingPermissionBody"),

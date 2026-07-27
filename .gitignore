@@ -44,3 +44,9 @@ app-example
 
 # env files
 .env
+
+# EAS credentials
+credentials.json
+credentials/
+
+.omo

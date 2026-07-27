@@ -4,6 +4,10 @@
 
 GoWherer is an Expo React Native app for recording and reviewing journey timelines (travel/commute). It focuses on fast capture, clear recap, and shareable output.
 
+## TODOS
+
+[ ] 1. 地图从`react-native-amap3d`迁移到`expo-gaode-map`，并且定位使用高德SDK而不是`expo-location`。参考[迁移指南](https://tomwq.github.io/expo-gaode-map/guide/migrating-from-react-native-amap3d.html)
+
 ## Features
 
 - Journey start/end flow

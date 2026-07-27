@@ -2,7 +2,7 @@ import { TimelineLocation } from "@/types/journey";
 
 const MAX_TRACKING_ACCURACY_METERS = 100;
 const MAX_TRACKING_SPEED_KMH = 180;
-const MIN_TRACKING_DISTANCE_METERS = 10;
+const MIN_TRACKING_DISTANCE_METERS = 3;
 const MAX_NEIGHBOR_DISTANCE_METERS = 500;
 
 export function normalizeTrackLocation(
@@ -19,6 +19,7 @@ export function normalizeTrackLocation(
     placeName?: unknown;
     capturedAt?: unknown;
     source?: unknown;
+    coordSystem?: unknown;
   };
   const latitude = Number(raw.latitude);
   const longitude = Number(raw.longitude);
@@ -46,6 +47,11 @@ export function normalizeTrackLocation(
         ? "manual"
         : undefined;
 
+  const coordSystem =
+    raw.coordSystem === "wgs84" || raw.coordSystem === "gcj02"
+      ? raw.coordSystem
+      : undefined;
+
   return {
     latitude,
     longitude,
@@ -53,6 +59,7 @@ export function normalizeTrackLocation(
     placeName: typeof raw.placeName === "string" ? raw.placeName : undefined,
     capturedAt,
     source,
+    coordSystem,
   };
 }
 
@@ -97,6 +104,7 @@ function mergeLocationMeta(
     placeName: base.placeName ?? previous?.placeName ?? next?.placeName,
     capturedAt: base.capturedAt ?? previous?.capturedAt ?? next?.capturedAt,
     source: base.source ?? previous?.source ?? next?.source,
+    coordSystem: base.coordSystem ?? previous?.coordSystem ?? next?.coordSystem,
     latitude: base.latitude,
     longitude: base.longitude,
   };
@@ -305,9 +313,13 @@ export function simplifyTrackLocations(
   );
 
   let result = douglasPeucker(safeLocations, epsilonKm);
+  let currentEpsilon = epsilonKm;
   while (result.length > maxPoints) {
-    result = douglasPeucker(safeLocations, epsilonKm * 2);
-    if (result.length === safeLocations.length) break;
+    currentEpsilon *= 2;
+    const simplified = douglasPeucker(result, currentEpsilon);
+    // If simplification didn't reduce points, further iterations won't help
+    if (simplified.length === result.length) break;
+    result = simplified;
   }
 
   return result;

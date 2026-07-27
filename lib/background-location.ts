@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Location from "expo-location";
-import * as TaskManager from "expo-task-manager";
+import { ExpoGaodeMapModule, type Coordinates } from "expo-gaode-map";
 import { Platform } from "react-native";
 
 import { toTimelineLocation } from "@/lib/current-location";
@@ -10,61 +9,33 @@ import { TimelineLocation } from "@/types/journey";
 
 const MAX_COLLECTION_ACCURACY_METERS = 100;
 
-const TRACKING_TASK_NAME = "gowherer-background-location-task";
 const TRACKING_JOURNEY_ID_KEY = "gowherer:tracking:journey-id:v1";
 const TRACKING_BATCH_PREFIX = "gowherer:tracking:batch:v1";
 
-type StartTrackingOptions = {
-  notificationTitle: string;
-  notificationBody: string;
-  journeyKind?: "travel" | "commute";
-};
+let locationListener: { remove: () => void } | null = null;
 
-type BackgroundLocationTaskData = {
-  locations?: Location.LocationObject[];
-};
-
-async function appendTrackLocations(locations: Location.LocationObject[]) {
-  if (locations.length === 0) {
-    return;
-  }
-
+async function appendTrackLocation(location: Coordinates) {
   const trackedJourneyId = await AsyncStorage.getItem(TRACKING_JOURNEY_ID_KEY);
   if (!trackedJourneyId) {
     return;
   }
 
-  const nextLocations = locations
-    .map((item) => toTimelineLocation(item, "tracking"))
-    .filter((item): item is TimelineLocation => Boolean(item))
-    .filter(
-      (item) =>
-        typeof item.accuracy !== "number" ||
-        item.accuracy <= MAX_COLLECTION_ACCURACY_METERS,
-    );
+  const timelineLocation = toTimelineLocation(location, "tracking");
+  if (!timelineLocation) {
+    return;
+  }
 
-  if (nextLocations.length === 0) {
+  if (
+    typeof timelineLocation.accuracy === "number" &&
+    timelineLocation.accuracy > MAX_COLLECTION_ACCURACY_METERS
+  ) {
     return;
   }
 
   const batchKey = `${TRACKING_BATCH_PREFIX}:${trackedJourneyId}:${Date.now()}:${Math.random()
     .toString(36)
     .slice(2, 8)}`;
-  await AsyncStorage.setItem(batchKey, JSON.stringify(nextLocations));
-}
-
-if (!TaskManager.isTaskDefined(TRACKING_TASK_NAME)) {
-  TaskManager.defineTask<BackgroundLocationTaskData>(
-    TRACKING_TASK_NAME,
-    async ({ data, error }) => {
-      if (error) {
-        console.error("Background location task failed", error);
-        return;
-      }
-
-      await appendTrackLocations(data?.locations ?? []);
-    },
-  );
+  await AsyncStorage.setItem(batchKey, JSON.stringify([timelineLocation]));
 }
 
 export async function isBackgroundLocationTrackingAvailable() {
@@ -72,7 +43,7 @@ export async function isBackgroundLocationTrackingAvailable() {
     return false;
   }
 
-  return TaskManager.isAvailableAsync();
+  return true;
 }
 
 export async function isLocationTrackingActive() {
@@ -80,50 +51,47 @@ export async function isLocationTrackingActive() {
     return false;
   }
 
-  return Location.hasStartedLocationUpdatesAsync(TRACKING_TASK_NAME);
+  return ExpoGaodeMapModule.isStarted();
 }
 
 export async function startLocationTracking(
   journeyId: string,
-  options: StartTrackingOptions,
+  _options: {
+    notificationTitle: string;
+    notificationBody: string;
+    journeyKind?: "travel" | "commute";
+  },
 ) {
   if (Platform.OS === "web") {
     return;
   }
 
-  if (await Location.hasStartedLocationUpdatesAsync(TRACKING_TASK_NAME)) {
-    await Location.stopLocationUpdatesAsync(TRACKING_TASK_NAME);
+  if (await ExpoGaodeMapModule.isStarted()) {
+    ExpoGaodeMapModule.stop();
+    if (locationListener) {
+      locationListener.remove();
+      locationListener = null;
+    }
   }
 
   await AsyncStorage.setItem(TRACKING_JOURNEY_ID_KEY, journeyId);
 
-  await Location.startLocationUpdatesAsync(TRACKING_TASK_NAME, {
-    accuracy: Location.Accuracy.High,
-    activityType:
-      options.journeyKind === "travel"
-        ? Location.ActivityType.AutomotiveNavigation
-        : Location.ActivityType.Fitness,
-    timeInterval: 3000,
-    distanceInterval: 10,
-    deferredUpdatesInterval: 5000,
-    deferredUpdatesDistance: 5,
-    pausesUpdatesAutomatically: false,
-    showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: options.notificationTitle,
-      notificationBody: options.notificationBody,
-      notificationColor: "#0f766e",
-      killServiceOnDestroy: false,
-    },
+  ExpoGaodeMapModule.setAllowsBackgroundLocationUpdates(true);
+  ExpoGaodeMapModule.start();
+
+  locationListener = ExpoGaodeMapModule.addLocationListener((location) => {
+    void appendTrackLocation(location);
   });
 }
 
 export async function stopLocationTracking() {
-  if (
-    Platform.OS !== "web" &&
-    (await Location.hasStartedLocationUpdatesAsync(TRACKING_TASK_NAME))
-  ) {
-    await Location.stopLocationUpdatesAsync(TRACKING_TASK_NAME);
+  if (Platform.OS !== "web" && (await ExpoGaodeMapModule.isStarted())) {
+    ExpoGaodeMapModule.stop();
+  }
+
+  if (locationListener) {
+    locationListener.remove();
+    locationListener = null;
   }
 
   await AsyncStorage.removeItem(TRACKING_JOURNEY_ID_KEY);

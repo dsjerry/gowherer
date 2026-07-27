@@ -1,48 +1,48 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import Constants from "expo-constants";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
-import { useRouter } from "expo-router";
-import * as Sharing from "expo-sharing";
-import { useMemo, useState } from "react";
+import { MaterialIcons } from "@expo/vector-icons"
+import Constants from "expo-constants"
+import * as DocumentPicker from "expo-document-picker"
+import * as FileSystem from "expo-file-system/legacy"
+import { useRouter } from "expo-router"
+import * as Sharing from "expo-sharing"
+import { useMemo, useState } from "react"
 import {
-    Alert,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-import { ExternalLink } from "@/components/external-link";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { useI18n } from "@/hooks/locale-preference";
-import { useThemePreference } from "@/hooks/theme-preference";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ExternalLink } from "@/components/external-link"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { useI18n } from "@/hooks/locale-preference"
+import { useThemePreference } from "@/hooks/theme-preference"
+import { useColorScheme } from "@/hooks/use-color-scheme"
 import {
-    buildAppBackup,
-    importBackup,
-    parseBackupString,
-    serializeBackup,
-    writeBackupToFile,
-} from "@/lib/data-backup";
-import { LocalePreference } from "@/lib/i18n";
-import { loadJourneys, saveJourneys } from "@/lib/journey-storage";
-import { cleanupOldMediaCache, migrateMediaFiles } from "@/lib/media-migration";
+  buildAppBackup,
+  importBackup,
+  parseBackupString,
+  serializeBackup,
+  writeBackupToFile,
+} from "@/lib/data-backup"
+import { LocalePreference } from "@/lib/i18n"
+import { loadJourneys, saveJourneys } from "@/lib/journey-storage"
+import { cleanupOldMediaCache, migrateMediaFiles } from "@/lib/media-migration"
 
 export default function SettingsScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const { t, preference, setPreference } = useI18n();
-  const { setPreference: setThemePreference } = useThemePreference();
-  const appVersion = Constants.expoConfig?.version ?? "0.0.0";
-  const [exportingData, setExportingData] = useState(false);
-  const [importingData, setImportingData] = useState(false);
-  const [migratingMedia, setMigratingMedia] = useState(false);
+  const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const colorScheme = useColorScheme()
+  const isDark = colorScheme === "dark"
+  const { t, preference, setPreference } = useI18n()
+  const { setPreference: setThemePreference } = useThemePreference()
+  const appVersion = Constants.expoConfig?.version ?? "0.0.0"
+  const [exportingData, setExportingData] = useState(false)
+  const [importingData, setImportingData] = useState(false)
+  const [migratingMedia, setMigratingMedia] = useState(false)
 
   const theme = useMemo(
     () => ({
@@ -59,56 +59,56 @@ export default function SettingsScreen() {
       accent: { color: "#0f766e" },
     }),
     [isDark],
-  );
+  )
 
   const options: { value: LocalePreference; label: string }[] = [
     { value: "system", label: t("settings.optionSystem") },
     { value: "zh", label: t("settings.optionChinese") },
     { value: "en", label: t("settings.optionEnglish") },
-  ];
+  ]
 
   async function handleExportData() {
-    setExportingData(true);
+    setExportingData(true)
     try {
-      const backup = await buildAppBackup(appVersion);
+      const backup = await buildAppBackup(appVersion)
       if (Platform.OS === "web" && typeof document !== "undefined") {
         const blob = new Blob([serializeBackup(backup)], {
           type: "application/json",
-        });
-        const href = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = href;
-        link.download = `gowherer-backup-${backup.exportedAt.slice(0, 19).replace(/[:T]/g, "-")}.json`;
-        link.click();
-        URL.revokeObjectURL(href);
+        })
+        const href = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = href
+        link.download = `gowherer-backup-${backup.exportedAt.slice(0, 19).replace(/[:T]/g, "-")}.json`
+        link.click()
+        URL.revokeObjectURL(href)
         Alert.alert(
           t("settings.dataExportSuccessTitle"),
           t("settings.dataExportSuccessBodyWeb"),
-        );
-        return;
+        )
+        return
       }
 
-      const file = await writeBackupToFile(backup);
-      const canShare = await Sharing.isAvailableAsync();
+      const file = await writeBackupToFile(backup)
+      const canShare = await Sharing.isAvailableAsync()
       if (canShare) {
         await Sharing.shareAsync(file.uri, {
           mimeType: "application/json",
           dialogTitle: file.fileName,
           UTI: "public.json",
-        });
+        })
       } else {
         Alert.alert(
           t("settings.dataExportSuccessTitle"),
           t("settings.dataExportSuccessBody", { fileName: file.fileName }),
-        );
+        )
       }
     } catch {
       Alert.alert(
         t("settings.dataExportFailedTitle"),
         t("settings.dataExportFailedBody"),
-      );
+      )
     } finally {
-      setExportingData(false);
+      setExportingData(false)
     }
   }
 
@@ -122,82 +122,82 @@ export default function SettingsScreen() {
           text: t("common.confirm"),
           style: "destructive",
           onPress: () => {
-            void confirmImportData();
+            void confirmImportData()
           },
         },
       ],
-    );
+    )
   }
 
   async function confirmImportData() {
-    setImportingData(true);
+    setImportingData(true)
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/json", "text/json", "*/*"],
         copyToCacheDirectory: true,
         multiple: false,
-      });
+      })
       if (result.canceled) {
-        return;
+        return
       }
 
-      const asset = result.assets[0];
+      const asset = result.assets[0]
       const raw = await FileSystem.readAsStringAsync(asset.uri, {
         encoding: FileSystem.EncodingType.UTF8,
-      });
-      const backup = parseBackupString(raw);
-      const imported = await importBackup(backup);
-      setPreference(imported.localePreference);
-      setThemePreference(imported.themePreference);
+      })
+      const backup = parseBackupString(raw)
+      const imported = await importBackup(backup)
+      setPreference(imported.localePreference)
+      setThemePreference(imported.themePreference)
       Alert.alert(
         t("settings.dataImportSuccessTitle"),
         t("settings.dataImportSuccessBody"),
-      );
+      )
     } catch {
       Alert.alert(
         t("settings.dataImportFailedTitle"),
         t("settings.dataImportFailedBody"),
-      );
+      )
     } finally {
-      setImportingData(false);
+      setImportingData(false)
     }
   }
 
   async function handleMigrateMedia() {
-    setMigratingMedia(true);
+    setMigratingMedia(true)
     try {
-      const journeys = await loadJourneys();
-      const result = await migrateMediaFiles(journeys);
+      const journeys = await loadJourneys()
+      const result = await migrateMediaFiles(journeys)
 
       if (!result.success && result.errors.length > 0) {
-        const errorMsg = result.errors.slice(0, 3).join("\n");
+        const errorMsg = result.errors.slice(0, 3).join("\n")
         Alert.alert(
           t("settings.mediaMigrationPartialTitle"),
           `${t("settings.mediaMigrationPartialBody", { count: result.migratedCount })}${result.errors.length > 3 ? "\n..." : ""}\n\n${errorMsg}`,
-        );
+        )
       } else if (result.migratedCount > 0) {
-        await saveJourneys(result.updatedJourneys);
-        await cleanupOldMediaCache();
+        await saveJourneys(result.updatedJourneys)
+        await cleanupOldMediaCache()
         Alert.alert(
           t("settings.mediaMigrationSuccessTitle"),
           t("settings.mediaMigrationSuccessBody", {
             count: result.migratedCount,
           }),
-        );
+        )
       } else {
         Alert.alert(
           t("settings.mediaMigrationEmptyTitle"),
           t("settings.mediaMigrationEmptyBody"),
-        );
+        )
       }
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = err instanceof Error ? err.message : String(err)
       Alert.alert(
         t("settings.mediaMigrationFailedTitle"),
         `${t("settings.mediaMigrationFailedBody")}\n\n${errMsg}`,
-      );
+      )
     } finally {
-      setMigratingMedia(false);
+      setMigratingMedia(false)
     }
   }
 
@@ -233,7 +233,7 @@ export default function SettingsScreen() {
         </Text>
         <View style={[styles.list, theme.divider]}>
           {options.map((option, index) => {
-            const isActive = preference === option.value;
+            const isActive = preference === option.value
             return (
               <Pressable
                 key={option.value}
@@ -255,7 +255,7 @@ export default function SettingsScreen() {
                   />
                 ) : null}
               </Pressable>
-            );
+            )
           })}
         </View>
       </View>
@@ -403,7 +403,7 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
     </ScrollView>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -504,4 +504,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
-});
+})

@@ -23,6 +23,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
 
     android: {
       package: "com.dsjerry.gowherer",
+      versionCode: 1003,
       predictiveBackGestureEnabled: false,
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
@@ -55,15 +56,15 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
         },
       ],
       [
-        "expo-location",
+        "expo-gaode-map",
         {
-          locationWhenInUsePermission: "允许使用定位以记录旅程中的位置节点。",
-          locationAlwaysAndWhenInUsePermission:
+          androidKey: amapAndroidApiKey ?? "your-android-key",
+          iosKey: "your-ios-key",
+          enableLocation: true,
+          enableBackgroundLocation: true,
+          locationDescription: "允许使用定位以记录旅程中的位置节点。",
+          backgroundLocationDescription:
             "允许始终访问定位，以便在后台持续记录跑步、骑行等旅程轨迹。",
-          locationAlwaysPermission:
-            "允许始终访问定位，以便在后台持续记录跑步、骑行等旅程轨迹。",
-          isIosBackgroundLocationEnabled: true,
-          isAndroidBackgroundLocationEnabled: true,
         },
       ],
       "./plugins/with-android-pointer-tagging",
@@ -95,7 +96,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
         projectId,
       },
       geocoding: {
-        provider: process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ?? "amap",
+        provider: process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER || "amap",
         amapWebKey,
       },
       amap: {

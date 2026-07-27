@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/hooks/locale-preference';
-import { sanitizeTrackLocations, smoothTrackLocations } from '@/lib/track-utils';
+import { sanitizeTrackLocations } from '@/lib/track-utils';
 import { TimelineLocation } from '@/types/journey';
 
 type TrackMapProps = {
@@ -14,7 +14,7 @@ export function TrackMap({
   markerLocations = routeLocations,
 }: TrackMapProps) {
   const { t } = useI18n();
-  const displayRouteLocations = smoothTrackLocations(sanitizeTrackLocations(routeLocations));
+  const displayRouteLocations = sanitizeTrackLocations(routeLocations);
   const displayMarkerLocations = sanitizeTrackLocations(markerLocations);
   const summaryLocations =
     displayRouteLocations.length > 0 ? displayRouteLocations : displayMarkerLocations;
