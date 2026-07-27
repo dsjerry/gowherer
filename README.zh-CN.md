@@ -7,14 +7,17 @@ GoWherer 是一个基于 Expo React Native 的旅程时间线应用（旅行/通
 ## 功能概览
 
 - 旅程开始/结束流程
-- 时间线条目（文字、位置、照片、视频）
+- 时间线条目（文字、位置、照片、视频、音频）
 - 相机拍摄与媒体库导入
+- 录音与播放
 - 条目编辑/删除
-- 按类型筛选旅程历史
+- 按类型筛选旅程历史，支持关键字/标签搜索
 - 逆地理编码（经纬度转地点名称）
 - 支持系统/中文/英文语言偏好
 - 设置页管理语言与主题
 - 旅程/条目标签与关键字/标签筛选
+- 旅程模板（出发、到达、休息、打卡），旅行/通勤独立维护
+- 模板管理（添加/编辑/删除自定义模板）
 - 旅程统计卡片：
   - 总距离
   - 总时长
@@ -22,25 +25,32 @@ GoWherer 是一个基于 Expo React Native 的旅程时间线应用（旅行/通
   - 定位点数量
 - 路线可视化（原生地图 + Web 兜底）
 - Android 高德 SDK 地图选点（点击地图/POI 选择地点）
+- 后台 GPS 追踪与轨迹平滑
 - PDF 导出（含路线预览图与统计信息）
 - 手动浅色/深色主题切换（本地持久化）
+- 媒体文件迁移（缓存 → 应用托管目录）
+- 数据备份与导入恢复
+- 触感反馈
+- 本地日志系统
 
 ## 技术栈
 
 - Expo SDK 55
-- React Native 0.83.2
+- React Native 0.83.6
 - React 19.2.0
 - Expo Router
 - AsyncStorage
+- `expo-gaode-map`（高德地图 SDK 封装）
+- `expo-task-manager`（后台任务管理）
+- `react-native-maps`
 - `expo-localization`
 - `expo-image-picker`、`expo-location`、`expo-video`、`expo-print`、`expo-sharing`
-- `react-native-maps`
 
 ## 快速开始
 
 ### 环境要求
 
-- Node.js 18+
+- Node.js 20+
 - npm
 - 可运行 Expo 的 Android/iOS/Web 环境
 
@@ -79,7 +89,13 @@ npm run web
 - `app/(tabs)/explore.tsx` - 历史回顾、总结与 PDF 导出
 - `app/(tabs)/settings.tsx` - 应用设置（主题与语言）
 - `lib/journey-storage.ts` - 本地存储逻辑
+- `lib/background-location.ts` - 后台 GPS 追踪
+- `lib/media-migration.ts` - 媒体文件迁移
+- `lib/media-storage.ts` - 媒体持久化存储
+- `lib/track-utils.ts` - 轨迹处理与平滑
+- `lib/reverse-geocode.ts` - 地理编码与坐标转换
 - `lib/i18n.ts` - i18n 核心逻辑
+- `lib/local-log.ts` - 本地日志系统
 - `types/journey.ts` - 核心数据类型
 - `components/track-map.tsx` - 原生路线地图
 - `components/track-map.web.tsx` - Web 路线地图兜底
@@ -161,8 +177,6 @@ npx eas-cli@latest credentials -p android
 
 - P1：
   - 智能路线分析（停留点/分段总结）
-  - GPS 轨迹去噪与平滑
-  - 时间线模板条目
   - PDF 模板与封面自定义
   - 旅程分享卡片生成
 - P2：

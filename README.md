@@ -4,21 +4,20 @@
 
 GoWherer is an Expo React Native app for recording and reviewing journey timelines (travel/commute). It focuses on fast capture, clear recap, and shareable output.
 
-## TODOS
-
-[x] 1. 地图从`react-native-amap3d`迁移到`expo-gaode-map`，并且定位使用高德SDK而不是`expo-location`。参考[迁移指南](https://tomwq.github.io/expo-gaode-map/guide/migrating-from-react-native-amap3d.html)
-
 ## Features
 
 - Journey start/end flow
-- Timeline entries with text, location, photos, and videos
+- Timeline entries with text, location, photos, videos, and audio
 - Camera capture and media library import
+- Audio recording with playback
 - Entry edit/delete
-- Journey history with type filter
+- Journey history with type filter and keyword/tag search
 - Reverse geocoding (lat/lng to place name)
 - Localization with system/English/Chinese preference
 - Settings screen for language and theme
 - Journey/entry tags and recap keyword/tag filters
+- Journey templates (Departure, Arrival, Rest, Checkpoint) with travel/commute modes
+- Template management (add/edit/delete custom templates)
 - Journey stats card:
   - Distance
   - Duration
@@ -26,25 +25,32 @@ GoWherer is an Expo React Native app for recording and reviewing journey timelin
   - Location point count
 - Route visualization (native map + web fallback)
 - Android AMap SDK place picker (tap map/POI to select location)
+- Background GPS tracking with track smoothing
 - PDF export with route preview image and stats
 - Manual light/dark mode toggle with local persistence
+- Media file migration (cache → app-managed directory)
+- Data backup and import/restore
+- Haptic feedback
+- Local logging system
 
 ## Tech Stack
 
 - Expo SDK 55
-- React Native 0.83.2
+- React Native 0.83.6
 - React 19.2.0
 - Expo Router
 - AsyncStorage
+- `expo-gaode-map` (AMap SDK wrapper)
+- `expo-task-manager` (background tasks)
+- `react-native-maps`
 - `expo-localization`
 - `expo-image-picker`, `expo-location`, `expo-video`, `expo-print`, `expo-sharing`
-- `react-native-maps`
 
 ## Getting Started
 
 ### Requirements
 
-- Node.js 18+
+- Node.js 20+
 - npm
 - Expo environment for Android/iOS/Web
 
@@ -83,7 +89,13 @@ npm run web
 - `app/(tabs)/explore.tsx` - history, recap, and PDF export
 - `app/(tabs)/settings.tsx` - app settings (theme and language)
 - `lib/journey-storage.ts` - local persistence logic
+- `lib/background-location.ts` - background GPS tracking
+- `lib/media-migration.ts` - media file migration
+- `lib/media-storage.ts` - media persistence storage
+- `lib/track-utils.ts` - track processing and smoothing
+- `lib/reverse-geocode.ts` - geocoding and coordinate conversion
 - `lib/i18n.ts` - i18n core logic
+- `lib/local-log.ts` - local logging system
 - `types/journey.ts` - core data types
 - `components/track-map.tsx` - native route map
 - `components/track-map.web.tsx` - web route map fallback
@@ -165,8 +177,6 @@ Then rerun the GitHub Action.
 
 - P1:
   - Smart route analysis (stay points / segment summary)
-  - GPS track denoise/smoothing
-  - Timeline entry templates
   - PDF template and cover customization
   - Journey share card generation
 - P2:
