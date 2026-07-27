@@ -3,5 +3,18 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
+  },
+  "explorer.fileNesting.enabled": true,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/.omo": true,
+    "**/.codegraph": true,
+    "**/node_modules": true,
+    "**/.expo": true,
+    "**/credentials": true,
+    "**/credentials.json": true,
+    "**/.claude": true,
+    "**/.codex": true
   }
 }
