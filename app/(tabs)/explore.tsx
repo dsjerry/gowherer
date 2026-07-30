@@ -8,33 +8,34 @@ import * as Sharing from "expo-sharing";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
-  LayoutAnimation,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    LayoutAnimation,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TrackMap } from "@/components/track-map";
 import { useI18n } from "@/hooks/locale-preference";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
 import { deleteJourney as deleteJourneyById } from "@/lib/journey-repository";
 import { loadJourneys } from "@/lib/journey-storage";
 import {
-  calculateTrackDistanceKm,
-  sanitizeTrackLocations,
+    calculateTrackDistanceKm,
+    sanitizeTrackLocations,
 } from "@/lib/track-utils";
 import {
-  Journey,
-  JourneyKind,
-  TimelineLocation,
-  TimelineMedia,
+    Journey,
+    JourneyKind,
+    TimelineLocation,
+    TimelineMedia,
 } from "@/types/journey";
 
 type JourneyFilter = "all" | JourneyKind;
@@ -442,104 +443,111 @@ export default function JourneyHistoryScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const { t, locale } = useI18n();
+  const { colors: c } = useMaterialTheme();
   const tagSortLocale = locale === "zh" ? "zh-CN" : "en";
   const themed = {
     title: {
-      color: isDark ? "#e2e8f0" : "#0f172a",
+      color: c.fg,
     },
     subTitle: {
-      color: isDark ? "#94a3b8" : "#475569",
+      color: c.textSecondary,
     },
     card: {
-      backgroundColor: isDark ? "#1e293b" : "#ffffff",
-      borderColor: isDark ? "#334155" : "#e2e8f0",
+      backgroundColor: c.surface,
+      borderColor: c.border,
+    },
+    screenBanner: {
+      backgroundColor: c.surface,
+      borderColor: c.border,
     },
     searchInput: {
-      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
-      borderColor: isDark ? "#334155" : "#cbd5e1",
-      color: isDark ? "#e2e8f0" : "#0f172a",
+      backgroundColor: "transparent",
+      borderColor: c.border,
+      color: c.textPrimary,
     },
-    placeholder: isDark ? "#94a3b8" : "#64748b",
+    placeholder: c.textTertiary,
     tagChip: {
-      backgroundColor: isDark ? "#334155" : "#e0f2fe",
+      backgroundColor: isDark
+        ? "rgba(100,66,214,0.12)"
+        : "rgba(100,66,214,0.06)",
     },
     tagChipText: {
-      color: isDark ? "#e2e8f0" : "#0c4a6e",
+      color: c.fg,
     },
     tagFilterChip: {
-      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
-      borderColor: isDark ? "#334155" : "#cbd5e1",
+      backgroundColor: c.surface,
+      borderColor: c.border,
     },
     tagFilterText: {
-      color: isDark ? "#cbd5e1" : "#334155",
+      color: c.textSecondary,
     },
     filterButton: {
-      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
-      borderColor: isDark ? "#334155" : "#cbd5e1",
+      backgroundColor: c.surface,
+      borderColor: c.border,
     },
     filterButtonText: {
-      color: isDark ? "#cbd5e1" : "#0f172a",
+      color: c.textSecondary,
     },
     statsWrap: {
-      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
-      borderColor: isDark ? "#334155" : "#e2e8f0",
+      backgroundColor: c.surface,
+      borderColor: c.border,
     },
     statItem: {
-      backgroundColor: isDark ? "#1e293b" : "#ffffff",
-      borderColor: isDark ? "#334155" : "#e2e8f0",
+      backgroundColor: c.bg,
+      borderColor: c.border,
     },
     statLabel: {
-      color: isDark ? "#94a3b8" : "#64748b",
+      color: c.textTertiary,
     },
     statValue: {
-      color: isDark ? "#e2e8f0" : "#0f172a",
+      color: c.textPrimary,
     },
     journeyTitle: {
-      color: isDark ? "#e2e8f0" : "#0f172a",
+      color: c.textPrimary,
     },
     journeyMeta: {
-      color: isDark ? "#94a3b8" : "#64748b",
+      color: c.textTertiary,
     },
     mapTitle: {
-      color: isDark ? "#cbd5e1" : "#334155",
+      color: c.textSecondary,
     },
     emptyTitle: {
-      color: isDark ? "#e2e8f0" : "#334155",
+      color: c.textPrimary,
     },
     emptyText: {
-      color: isDark ? "#94a3b8" : "#64748b",
+      color: c.textTertiary,
     },
     divider: {
-      backgroundColor: isDark ? "#334155" : "#e2e8f0",
+      backgroundColor: c.border,
     },
     entryItem: {
-      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      backgroundColor: c.bg,
     },
     entryTime: {
-      color: isDark ? "#94a3b8" : "#64748b",
+      color: c.textTertiary,
     },
     entryText: {
-      color: isDark ? "#e2e8f0" : "#0f172a",
+      color: c.textPrimary,
     },
     metaLine: {
-      color: isDark ? "#cbd5e1" : "#334155",
+      color: c.textSecondary,
     },
     mediaSectionTitle: {
-      color: isDark ? "#cbd5e1" : "#334155",
+      color: c.textSecondary,
     },
     mediaPreviewBox: {
-      borderColor: isDark ? "#334155" : "#e2e8f0",
-      backgroundColor: isDark ? "#0f172a" : "#ffffff",
+      borderColor: c.border,
+      backgroundColor: c.bg,
     },
     mediaBadge: {
-      color: isDark ? "#e2e8f0" : "#0f172a",
-      backgroundColor: isDark ? "#1e293b" : "#f8fafc",
+      color: c.textPrimary,
+      backgroundColor: c.surface,
     },
     mediaPlaceholder: {
-      backgroundColor: isDark ? "#334155" : "#0f172a",
+      backgroundColor: c.textPrimary,
     },
     mediaPlaceholderText: {
-      color: "#ffffff",
+      color: c.bg,
     },
   };
   const [journeys, setJourneys] = useState<Journey[]>([]);
@@ -654,6 +662,21 @@ export default function JourneyHistoryScreen() {
     });
   }, [completedJourneys, filter, searchQuery, selectedTag, t]);
 
+  const summaryDistance = filteredJourneys
+    .reduce(
+      (total, journey) => total + computeJourneyStats(journey).distanceKm,
+      0,
+    )
+    .toFixed(1);
+  const summaryEntries = filteredJourneys.reduce(
+    (total, journey) => total + journey.entries.length,
+    0,
+  );
+  const summaryPoints = filteredJourneys.reduce(
+    (total, journey) => total + computeJourneyStats(journey).locationPoints,
+    0,
+  );
+
   async function removeJourney(journeyId: string) {
     const next = await deleteJourneyById(journeyId);
     setJourneys(next);
@@ -711,16 +734,66 @@ export default function JourneyHistoryScreen() {
       <View style={styles.pageHeader}>
         <Text style={[styles.title, themed.title]}>{t("review.title")}</Text>
       </View>
-      <Text style={[styles.subTitle, themed.subTitle]}>
-        {t("review.subtitle")}
-      </Text>
-      <TextInput
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder={t("review.searchPlaceholder")}
-        placeholderTextColor={themed.placeholder}
-        style={[styles.searchInput, themed.searchInput]}
-      />
+      <View style={[styles.screenBanner, themed.screenBanner]}>
+        <View style={styles.bannerCopy}>
+          <Text style={[styles.bannerTitle, themed.title]}>
+            已完成 {filteredJourneys.length} 次旅程
+          </Text>
+          <Text style={[styles.bannerSubtitle, themed.subTitle]}>
+            {t("review.searchPlaceholder")}
+          </Text>
+        </View>
+        <Text style={[styles.bannerMeta, { color: c.fg }]}>
+          {filteredJourneys.length} 条结果
+        </Text>
+      </View>
+      <View style={[styles.summaryCard, themed.card]}>
+        <View style={styles.summaryHeader}>
+          <View>
+            <Text style={[styles.summaryTitle, themed.journeyTitle]}>
+              旅程回顾总览
+            </Text>
+            <Text style={[styles.summarySubtitle, themed.subTitle]}>
+              筛选后自动汇总距离、记录数和定位点。
+            </Text>
+          </View>
+          <Text
+            style={[styles.summaryPill, { color: c.fg, borderColor: c.border }]}
+          >
+            {filteredJourneys.length} 条
+          </Text>
+        </View>
+        <View style={styles.summaryGrid}>
+          <View style={[styles.summaryStat, { borderColor: c.border }]}>
+            <Text style={[styles.summaryValue, themed.journeyTitle]}>
+              {summaryDistance}
+            </Text>
+            <Text style={[styles.summaryLabel, themed.subTitle]}>公里</Text>
+          </View>
+          <View style={[styles.summaryStat, { borderColor: c.border }]}>
+            <Text style={[styles.summaryValue, themed.journeyTitle]}>
+              {summaryEntries}
+            </Text>
+            <Text style={[styles.summaryLabel, themed.subTitle]}>记录</Text>
+          </View>
+          <View style={[styles.summaryStat, { borderColor: c.border }]}>
+            <Text style={[styles.summaryValue, themed.journeyTitle]}>
+              {summaryPoints}
+            </Text>
+            <Text style={[styles.summaryLabel, themed.subTitle]}>定位点</Text>
+          </View>
+        </View>
+      </View>
+      <View style={[styles.searchBar, themed.searchInput]}>
+        <MaterialIcons name="search" size={20} color={c.textTertiary} />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={t("review.searchPlaceholder")}
+          placeholderTextColor={themed.placeholder}
+          style={styles.searchInput}
+        />
+      </View>
 
       <View style={styles.filterRow}>
         <Pressable
@@ -845,12 +918,24 @@ export default function JourneyHistoryScreen() {
           return (
             <View key={journey.id} style={[styles.card, themed.card]}>
               <View style={styles.journeyHeader}>
-                <View>
+                <View style={styles.journeyHeaderMain}>
+                  <Text
+                    style={[
+                      styles.kindChip,
+                      journey.kind === "travel"
+                        ? { color: c.fg, backgroundColor: `${c.fg}10` }
+                        : {
+                            color: c.accentSecondary,
+                            backgroundColor: `${c.accentSecondary}10`,
+                          },
+                    ]}
+                  >
+                    {kindLabel(journey.kind, t)}
+                  </Text>
                   <Text style={[styles.journeyTitle, themed.journeyTitle]}>
                     {journey.title}
                   </Text>
                   <Text style={[styles.journeyMeta, themed.journeyMeta]}>
-                    {kindLabel(journey.kind, t)} ·{" "}
                     {formatDateTime(journey.createdAt)} -{" "}
                     {formatDateTime(journey.endedAt)}
                   </Text>
@@ -1259,9 +1344,9 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#0f172a",
+    fontSize: 22,
+    fontWeight: "600",
+    letterSpacing: -0.02,
   },
   pageHeader: {
     flexDirection: "row",
@@ -1270,17 +1355,92 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   subTitle: {
-    color: "#475569",
     marginBottom: 4,
   },
-  searchInput: {
+  screenBanner: {
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    padding: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  bannerCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  bannerTitle: {
     fontSize: 14,
-    backgroundColor: "#f8fafc",
+    fontWeight: "600",
+  },
+  bannerSubtitle: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  bannerMeta: {
+    fontSize: 11,
+    fontWeight: "600",
+    paddingTop: 1,
+  },
+  summaryCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  summaryTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  summarySubtitle: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  summaryPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    fontSize: 10,
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  summaryStat: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 7,
+    padding: 9,
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  summaryLabel: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  searchBar: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchInput: {
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
   },
   filterRow: {
     flexDirection: "row",
@@ -1288,72 +1448,76 @@ const styles = StyleSheet.create({
   },
   tagFilterRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     paddingRight: 6,
   },
   tagFilterChip: {
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
   },
   tagFilterChipActive: {
-    backgroundColor: "#0f766e",
-    borderColor: "#0f766e",
+    backgroundColor: c.accent,
+    borderColor: c.accent,
   },
   tagFilterText: {
     fontSize: 12,
-    color: "#334155",
-    fontWeight: "600",
+    fontWeight: "500",
   },
   tagFilterTextActive: {
-    color: "#ffffff",
+    color: c.fg,
   },
   filterButton: {
-    backgroundColor: "#f1f5f9",
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
   },
   filterButtonActive: {
-    backgroundColor: "#0f766e",
-    borderColor: "#0f766e",
+    backgroundColor: c.fg,
+    borderColor: c.fg,
   },
   filterButtonText: {
-    color: "#0f172a",
-    fontWeight: "600",
+    fontWeight: "500",
     fontSize: 13,
   },
   filterButtonTextActive: {
-    color: "#ffffff",
+    color: c.fgOn,
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 8,
+    padding: 16,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     gap: 8,
   },
   journeyHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  journeyHeaderMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: 5,
+  },
+  kindChip: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  journeyHeaderActions: {
+    flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
-  journeyHeaderActions: {
-    alignItems: "flex-end",
-    gap: 6,
-  },
   statsWrap: {
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#f8fafc",
     padding: 10,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1361,77 +1525,66 @@ const styles = StyleSheet.create({
   },
   statItem: {
     minWidth: "47%",
-    backgroundColor: "#ffffff",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: "#64748b",
+    fontSize: 11,
+    letterSpacing: 0.06,
+    textTransform: "uppercase",
+    fontWeight: "500",
   },
   statValue: {
-    fontSize: 14,
-    color: "#0f172a",
+    fontSize: 18,
     fontWeight: "600",
+    letterSpacing: -0.02,
   },
   journeyTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#0f172a",
+    letterSpacing: -0.02,
   },
   journeyMeta: {
-    color: "#64748b",
     fontSize: 13,
   },
   mapTitle: {
     fontWeight: "600",
-    color: "#334155",
   },
   exportText: {
-    color: "#0369a1",
     fontWeight: "600",
     fontSize: 12,
   },
   deleteText: {
-    color: "#b91c1c",
     fontWeight: "600",
     fontSize: 12,
   },
   divider: {
     height: 1,
-    backgroundColor: "#e2e8f0",
     marginVertical: 4,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#334155",
   },
   emptyText: {
-    color: "#64748b",
     lineHeight: 20,
   },
   entryItem: {
-    borderRadius: 10,
-    backgroundColor: "#f8fafc",
+    borderRadius: 8,
     padding: 10,
     gap: 4,
   },
   entryTime: {
-    color: "#64748b",
     fontSize: 12,
   },
   entryText: {
-    color: "#0f172a",
     lineHeight: 21,
     fontSize: 15,
   },
   metaLine: {
-    color: "#334155",
     fontSize: 12,
   },
   tagRow: {
@@ -1442,21 +1595,18 @@ const styles = StyleSheet.create({
   },
   tagChip: {
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "#e0f2fe",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
   tagChipText: {
     fontSize: 11,
-    color: "#0c4a6e",
-    fontWeight: "600",
+    fontWeight: "500",
   },
   mediaPreviewBox: {
     marginRight: 10,
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     width: 110,
   },
   mediaPreview: {
@@ -1466,26 +1616,21 @@ const styles = StyleSheet.create({
   mediaPlaceholder: {
     width: 110,
     height: 80,
-    backgroundColor: "#0f172a",
     alignItems: "center",
     justifyContent: "center",
   },
   mediaPlaceholderText: {
-    color: "#ffffff",
     fontSize: 12,
     fontWeight: "700",
   },
   mediaSectionTitle: {
-    color: "#334155",
     fontSize: 12,
     fontWeight: "600",
     marginTop: 2,
   },
   mediaBadge: {
     fontSize: 11,
-    color: "#0f172a",
     padding: 4,
-    backgroundColor: "#f8fafc",
   },
   audioCard: {
     flexDirection: "row",

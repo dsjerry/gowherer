@@ -1,66 +1,68 @@
-import { useFocusEffect } from "@react-navigation/native"
+import { MaterialIcons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import {
-  AudioModule,
-  RecordingPresets,
-  setAudioModeAsync,
-  useAudioRecorder,
-  useAudioRecorderState,
-} from "expo-audio"
-import { ExpoGaodeMapModule } from "expo-gaode-map"
-import * as ImagePicker from "expo-image-picker"
-import { useRouter } from "expo-router"
-import { useCallback, useEffect, useMemo, useState } from "react"
+    AudioModule,
+    RecordingPresets,
+    setAudioModeAsync,
+    useAudioRecorder,
+    useAudioRecorderState,
+} from "expo-audio";
+import { ExpoGaodeMapModule } from "expo-gaode-map";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+    ActivityIndicator,
+    Alert,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ActiveJourneyCard } from "@/components/active-journey-card"
-import { JourneyCreateCard } from "@/components/journey-create-card"
-import { MediaPreviewModal } from "@/components/media-preview-modal"
-import { TemplateModal } from "@/components/template-modal"
-import { TimelineList } from "@/components/timeline-list"
-import { useI18n } from "@/hooks/locale-preference"
-import { useColorScheme } from "@/hooks/use-color-scheme"
-import { useJourneys } from "@/hooks/use-journeys"
-import { useLocationTracking } from "@/hooks/use-location-tracking"
+import { ActiveJourneyCard } from "@/components/active-journey-card";
+import { JourneyCreateCard } from "@/components/journey-create-card";
+import { MediaPreviewModal } from "@/components/media-preview-modal";
+import { TemplateModal } from "@/components/template-modal";
+import { TimelineList } from "@/components/timeline-list";
+import { useI18n } from "@/hooks/locale-preference";
+import { useJourneys } from "@/hooks/use-journeys";
+import { useLocationTracking } from "@/hooks/use-location-tracking";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
 import {
-  stopLocationTracking,
-  syncBufferedTrackLocations,
-} from "@/lib/background-location"
+    stopLocationTracking,
+    syncBufferedTrackLocations,
+} from "@/lib/background-location";
 import {
-  getLocalLogFileUri,
-  logLocalError,
-  logLocalInfo,
-} from "@/lib/local-log"
-import { persistTimelineMedia } from "@/lib/media-storage"
-import { consumePendingLocation } from "@/lib/pending-location"
+    getLocalLogFileUri,
+    logLocalError,
+    logLocalInfo,
+} from "@/lib/local-log";
+import { persistTimelineMedia } from "@/lib/media-storage";
+import { consumePendingLocation } from "@/lib/pending-location";
 import {
-  getDefaultEntryTemplateConfig,
-  loadEntryTemplateConfig,
-  saveEntryTemplateConfig,
-} from "@/lib/template-storage-i18n"
+    getDefaultEntryTemplateConfig,
+    loadEntryTemplateConfig,
+    saveEntryTemplateConfig,
+} from "@/lib/template-storage-i18n";
 import {
-  JourneyKind,
-  MediaType,
-  TimelineEntry,
-  TimelineLocation,
-  TimelineMedia,
-} from "@/types/journey"
-import { EntryTemplate, EntryTemplateConfig } from "@/types/template"
+    JourneyKind,
+    MediaType,
+    TimelineEntry,
+    TimelineLocation,
+    TimelineMedia,
+} from "@/types/journey";
+import { EntryTemplate, EntryTemplateConfig } from "@/types/template";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function createId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function parseTagsInput(raw: string) {
@@ -68,22 +70,22 @@ function parseTagsInput(raw: string) {
     new Set(
       raw
         .split(/[,，、]/)
-        .map(s => s.trim())
+        .map((s) => s.trim())
         .filter(Boolean),
     ),
-  )
+  );
 }
 
 function buildTimelineMedia(
   asset: ImagePicker.ImagePickerAsset,
 ): TimelineMedia {
-  const type: MediaType = asset.type === "video" ? "video" : "photo"
+  const type: MediaType = asset.type === "video" ? "video" : "photo";
   return {
     id: createId("media"),
     uri: asset.uri,
     type,
     thumbnailUri: undefined,
-  }
+  };
 }
 
 function buildManualTimelineLocation(
@@ -91,14 +93,14 @@ function buildManualTimelineLocation(
   capturedAt: string,
 ): TimelineLocation | undefined {
   if (!location) {
-    return undefined
+    return undefined;
   }
 
   return {
     ...location,
     capturedAt: location.capturedAt ?? capturedAt,
     source: "manual",
-  }
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -106,14 +108,17 @@ function buildManualTimelineLocation(
 // ---------------------------------------------------------------------------
 
 export default function JourneyScreen() {
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const colorScheme = useColorScheme()
-  const { t, locale } = useI18n()
-  const isDark = colorScheme === "dark"
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { t, locale } = useI18n();
+  const { colors } = useMaterialTheme();
 
-  const pageTitleColor = { color: isDark ? "#e2e8f0" : "#0f172a" }
-  const pageSubTitleColor = { color: isDark ? "#94a3b8" : "#475569" }
+  const pageTitleColor = { color: colors.fg };
+  const pageSubTitleColor = { color: colors.textTertiary };
+  const headerActionStyle = {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  };
 
   // ---- Journey data -------------------------------------------------------
   const {
@@ -126,175 +131,175 @@ export default function JourneyScreen() {
     updateEntry,
     removeEntry,
     refreshJourneys,
-  } = useJourneys()
+  } = useJourneys();
 
   // ---- Location tracking --------------------------------------------------
   const { locationTracking, trackingBusy, handleTrackingChange } =
-    useLocationTracking(activeJourney, refreshJourneys)
+    useLocationTracking(activeJourney, refreshJourneys);
 
   // ---- Draft entry state --------------------------------------------------
-  const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
-  const [entryText, setEntryText] = useState("")
-  const [entryTagsInput, setEntryTagsInput] = useState("")
-  const [draftLocation, setDraftLocation] = useState<TimelineLocation>()
-  const [draftMedia, setDraftMedia] = useState<TimelineMedia[]>([])
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [entryText, setEntryText] = useState("");
+  const [entryTagsInput, setEntryTagsInput] = useState("");
+  const [draftLocation, setDraftLocation] = useState<TimelineLocation>();
+  const [draftMedia, setDraftMedia] = useState<TimelineMedia[]>([]);
 
   // ---- New-journey form ---------------------------------------------------
-  const [journeyTitle, setJourneyTitle] = useState("")
-  const [journeyTagsInput, setJourneyTagsInput] = useState("")
-  const [journeyKind, setJourneyKind] = useState<JourneyKind>("travel")
-  const [creating, setCreating] = useState(false)
+  const [journeyTitle, setJourneyTitle] = useState("");
+  const [journeyTagsInput, setJourneyTagsInput] = useState("");
+  const [journeyKind, setJourneyKind] = useState<JourneyKind>("travel");
+  const [creating, setCreating] = useState(false);
 
   // ---- Templates ----------------------------------------------------------
   const [templateConfig, setTemplateConfig] = useState<EntryTemplateConfig>(
     getDefaultEntryTemplateConfig(locale),
-  )
-  const [templateModalVisible, setTemplateModalVisible] = useState(false)
+  );
+  const [templateModalVisible, setTemplateModalVisible] = useState(false);
 
   useEffect(() => {
-    let active = true
-    ;(async () => {
-      const stored = await loadEntryTemplateConfig(locale)
-      if (!active) return
-      setTemplateConfig(stored)
-    })()
+    let active = true;
+    (async () => {
+      const stored = await loadEntryTemplateConfig(locale);
+      if (!active) return;
+      setTemplateConfig(stored);
+    })();
     return () => {
-      active = false
-    }
-  }, [locale])
+      active = false;
+    };
+  }, [locale]);
 
-  const templateKind: JourneyKind = activeJourney?.kind ?? journeyKind
+  const templateKind: JourneyKind = activeJourney?.kind ?? journeyKind;
   const entryTemplates = useMemo(
     () => templateConfig[templateKind],
     [templateConfig, templateKind],
-  )
+  );
 
   // ---- Media / audio state ------------------------------------------------
-  const [pickingMedia, setPickingMedia] = useState(false)
-  const [openingLocationPicker, setOpeningLocationPicker] = useState(false)
-  const [savingEntry, setSavingEntry] = useState(false)
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
-  const recorderState = useAudioRecorderState(audioRecorder)
-  const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null)
+  const [pickingMedia, setPickingMedia] = useState(false);
+  const [openingLocationPicker, setOpeningLocationPicker] = useState(false);
+  const [savingEntry, setSavingEntry] = useState(false);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
+  const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
 
   // ---- Pending location from picker page ----------------------------------
   useFocusEffect(
     useCallback(() => {
-      let active = true
-      ;(async () => {
-        const picked = await consumePendingLocation()
+      let active = true;
+      (async () => {
+        const picked = await consumePendingLocation();
         if (active && picked) {
-          setDraftLocation(picked)
+          setDraftLocation(picked);
           void logLocalInfo(
             "JourneyScreen",
             "location selected from picker page",
             picked,
-          )
+          );
         }
-      })()
+      })();
       return () => {
-        active = false
-      }
+        active = false;
+      };
     }, []),
-  )
+  );
 
   // ---- Handlers: journey CRUD --------------------------------------------
 
   async function handleCreateJourney() {
-    const title = journeyTitle.trim()
+    const title = journeyTitle.trim();
     if (!title) {
       Alert.alert(
         t("journey.alertEnterTitleTitle"),
         t("journey.alertEnterTitleBody"),
-      )
-      return
+      );
+      return;
     }
     if (activeJourney) {
       Alert.alert(
         t("journey.alertActiveJourneyTitle"),
         t("journey.alertActiveJourneyBody"),
-      )
-      return
+      );
+      return;
     }
-    setCreating(true)
+    setCreating(true);
     try {
-      const tags = parseTagsInput(journeyTagsInput)
-      await addJourney(title, journeyKind, tags)
-      setJourneyTitle("")
-      setJourneyTagsInput("")
-      setJourneyKind("travel")
+      const tags = parseTagsInput(journeyTagsInput);
+      await addJourney(title, journeyKind, tags);
+      setJourneyTitle("");
+      setJourneyTagsInput("");
+      setJourneyKind("travel");
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
   }
 
   async function handleEndJourney() {
-    if (!activeJourney) return
+    if (!activeJourney) return;
     try {
-      await stopLocationTracking()
-      await syncBufferedTrackLocations(activeJourney.id)
+      await stopLocationTracking();
+      await syncBufferedTrackLocations(activeJourney.id);
     } catch (error) {
       void logLocalError(
         "JourneyScreen",
         "failed to stop location tracking while ending journey",
         error,
-      )
+      );
     }
-    await completeJourney(activeJourney.id)
-    resetDraft()
+    await completeJourney(activeJourney.id);
+    resetDraft();
   }
 
   // ---- Handlers: entry draft ----------------------------------------------
 
   function resetDraft() {
-    setEditingEntryId(null)
-    setEntryText("")
-    setEntryTagsInput("")
-    setDraftLocation(undefined)
-    setDraftMedia([])
+    setEditingEntryId(null);
+    setEntryText("");
+    setEntryTagsInput("");
+    setDraftLocation(undefined);
+    setDraftMedia([]);
     if (recorderState.isRecording) {
-      void audioRecorder.stop()
+      void audioRecorder.stop();
     }
   }
 
   function startEditEntry(entry: TimelineEntry) {
-    setEditingEntryId(entry.id)
-    setEntryText(entry.text)
-    setEntryTagsInput(entry.tags.join(", "))
-    setDraftLocation(entry.location)
-    setDraftMedia(entry.media)
+    setEditingEntryId(entry.id);
+    setEntryText(entry.text);
+    setEntryTagsInput(entry.tags.join(", "));
+    setDraftLocation(entry.location);
+    setDraftMedia(entry.media);
   }
 
   async function handleDeleteEntry(entryId: string) {
-    if (!activeJourney) return
-    await removeEntry(activeJourney.id, entryId)
+    if (!activeJourney) return;
+    await removeEntry(activeJourney.id, entryId);
     if (editingEntryId === entryId) {
-      resetDraft()
+      resetDraft();
     }
   }
 
   async function handleSaveEntry() {
-    if (!activeJourney) return
-    const text = entryText.trim()
-    const tags = parseTagsInput(entryTagsInput)
+    if (!activeJourney) return;
+    const text = entryText.trim();
+    const tags = parseTagsInput(entryTagsInput);
     if (
       !text &&
       draftMedia.length === 0 &&
       !draftLocation &&
       tags.length === 0
     ) {
-      Alert.alert(t("journey.recordEmptyTitle"), t("journey.recordEmptyBody"))
-      return
+      Alert.alert(t("journey.recordEmptyTitle"), t("journey.recordEmptyBody"));
+      return;
     }
 
-    setSavingEntry(true)
+    setSavingEntry(true);
     try {
-      const persistedMedia = await persistTimelineMedia(draftMedia)
+      const persistedMedia = await persistTimelineMedia(draftMedia);
       if (editingEntryId) {
         const original = activeJourney.entries.find(
-          e => e.id === editingEntryId,
-        )
-        const createdAt = original?.createdAt ?? new Date().toISOString()
+          (e) => e.id === editingEntryId,
+        );
+        const createdAt = original?.createdAt ?? new Date().toISOString();
         const entry: TimelineEntry = {
           id: editingEntryId,
           createdAt,
@@ -305,10 +310,10 @@ export default function JourneyScreen() {
             original?.location?.capturedAt ?? createdAt,
           ),
           media: persistedMedia,
-        }
-        await updateEntry(activeJourney.id, entry)
+        };
+        await updateEntry(activeJourney.id, entry);
       } else {
-        const createdAt = new Date().toISOString()
+        const createdAt = new Date().toISOString();
         const entry: TimelineEntry = {
           id: createId("entry"),
           createdAt,
@@ -316,20 +321,20 @@ export default function JourneyScreen() {
           tags,
           location: buildManualTimelineLocation(draftLocation, createdAt),
           media: persistedMedia,
-        }
-        await addEntry(activeJourney.id, entry)
+        };
+        await addEntry(activeJourney.id, entry);
       }
-      resetDraft()
+      resetDraft();
     } finally {
-      setSavingEntry(false)
+      setSavingEntry(false);
     }
   }
 
   // ---- Handlers: template CRUD -------------------------------------------
 
   async function updateTemplateConfig(next: EntryTemplateConfig) {
-    setTemplateConfig(next)
-    await saveEntryTemplateConfig(locale, next)
+    setTemplateConfig(next);
+    await saveEntryTemplateConfig(locale, next);
   }
 
   async function handleSaveTemplate(
@@ -338,74 +343,78 @@ export default function JourneyScreen() {
     tags: string[],
     editingId: string | null,
   ) {
-    const templates = templateConfig[templateKind]
+    const templates = templateConfig[templateKind];
     const nextTemplate: EntryTemplate = {
       id: editingId ?? createId(`template-${templateKind}`),
       label,
       text,
       tags,
-    }
+    };
     const nextTemplates = editingId
-      ? templates.map(t => (t.id === editingId ? nextTemplate : t))
-      : [...templates, nextTemplate]
+      ? templates.map((t) => (t.id === editingId ? nextTemplate : t))
+      : [...templates, nextTemplate];
     await updateTemplateConfig({
       ...templateConfig,
       [templateKind]: nextTemplates,
-    })
+    });
   }
 
   async function handleRemoveTemplate(templateId: string) {
-    const templates = templateConfig[templateKind]
-    const nextTemplates = templates.filter(t => t.id !== templateId)
-    if (nextTemplates.length === 0) return // guarded by modal
+    const templates = templateConfig[templateKind];
+    const nextTemplates = templates.filter((t) => t.id !== templateId);
+    if (nextTemplates.length === 0) return; // guarded by modal
     await updateTemplateConfig({
       ...templateConfig,
       [templateKind]: nextTemplates,
-    })
+    });
   }
 
   async function handleResetTemplates() {
-    const defaults = getDefaultEntryTemplateConfig(locale)
+    const defaults = getDefaultEntryTemplateConfig(locale);
     await updateTemplateConfig({
       ...templateConfig,
       [templateKind]: defaults[templateKind],
-    })
+    });
   }
 
   // ---- Handlers: media / audio / location ---------------------------------
 
   async function pickMediaFromLibrary() {
-    setPickingMedia(true)
+    setPickingMedia(true);
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
           t("journey.alertAlbumDeniedTitle"),
           t("journey.alertAlbumDeniedBody"),
-        )
-        return
+        );
+        return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All,
         quality: 0.8,
-      })
-      if (result.canceled || result.assets.length === 0) return
-      setDraftMedia(prev => [...prev, ...result.assets.map(buildTimelineMedia)])
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      setDraftMedia((prev) => [
+        ...prev,
+        ...result.assets.map(buildTimelineMedia),
+      ]);
     } finally {
-      setPickingMedia(false)
+      setPickingMedia(false);
     }
   }
 
   async function captureMediaWithCamera(type: MediaType) {
-    setPickingMedia(true)
+    setPickingMedia(true);
     try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync()
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
         Alert.alert(
           t("journey.alertCameraDeniedTitle"),
           t("journey.alertCameraDeniedBody"),
-        )
-        return
+        );
+        return;
       }
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes:
@@ -414,38 +423,41 @@ export default function JourneyScreen() {
             : ImagePicker.MediaTypeOptions.Images,
         quality: 0.8,
         videoMaxDuration: 120,
-      })
-      if (result.canceled || result.assets.length === 0) return
-      setDraftMedia(prev => [...prev, ...result.assets.map(buildTimelineMedia)])
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      setDraftMedia((prev) => [
+        ...prev,
+        ...result.assets.map(buildTimelineMedia),
+      ]);
     } finally {
-      setPickingMedia(false)
+      setPickingMedia(false);
     }
   }
 
   async function startRecording() {
-    const perm = await AudioModule.requestRecordingPermissionsAsync()
+    const perm = await AudioModule.requestRecordingPermissionsAsync();
     if (!perm.granted) {
       Alert.alert(
         t("journey.alertMicDeniedTitle"),
         t("journey.alertMicDeniedBody"),
-      )
-      return
+      );
+      return;
     }
-    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
-    await audioRecorder.prepareToRecordAsync()
-    audioRecorder.record()
+    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+    await audioRecorder.prepareToRecordAsync();
+    audioRecorder.record();
   }
 
   async function stopRecording() {
-    if (!recorderState.isRecording) return
-    await audioRecorder.stop()
+    if (!recorderState.isRecording) return;
+    await audioRecorder.stop();
     await setAudioModeAsync({
       allowsRecording: false,
       playsInSilentMode: true,
-    })
-    const uri = audioRecorder.uri
+    });
+    const uri = audioRecorder.uri;
     if (uri) {
-      setDraftMedia(prev => [
+      setDraftMedia((prev) => [
         ...prev,
         {
           id: createId("audio"),
@@ -453,48 +465,48 @@ export default function JourneyScreen() {
           type: "audio" as const,
           thumbnailUri: undefined,
         },
-      ])
+      ]);
     }
   }
 
   async function openAmapPlacePicker() {
-    setOpeningLocationPicker(true)
+    setOpeningLocationPicker(true);
     try {
       if (Platform.OS !== "android") {
         Alert.alert(
           t("journey.alertMapUnsupportedTitle"),
           t("journey.alertMapUnsupportedBody"),
-        )
-        return
+        );
+        return;
       }
-      const perm = await ExpoGaodeMapModule.requestLocationPermission()
+      const perm = await ExpoGaodeMapModule.requestLocationPermission();
       if (!perm.granted) {
         Alert.alert(
           t("journey.alertLocationDeniedTitle"),
           t("journey.alertLocationDeniedBody"),
-        )
-        return
+        );
+        return;
       }
-      void logLocalInfo("JourneyScreen", "open map picker page")
+      void logLocalInfo("JourneyScreen", "open map picker page");
       const initial = draftLocation
         ? JSON.stringify({
             latitude: draftLocation.latitude,
             longitude: draftLocation.longitude,
             placeName: draftLocation.placeName,
           })
-        : undefined
+        : undefined;
       router.push({
         pathname: "/location-picker",
         params: initial ? { initial } : {},
-      })
+      });
     } catch (error) {
-      void logLocalError("JourneyScreen", error, { stage: "open-map-picker" })
+      void logLocalError("JourneyScreen", error, { stage: "open-map-picker" });
       Alert.alert(
         t("journey.alertOpenMapFailedTitle"),
         t("journey.alertOpenMapFailedBody", { uri: getLocalLogFileUri() }),
-      )
+      );
     } finally {
-      setOpeningLocationPicker(false)
+      setOpeningLocationPicker(false);
     }
   }
 
@@ -505,7 +517,7 @@ export default function JourneyScreen() {
       <View style={styles.center}>
         <ActivityIndicator />
       </View>
-    )
+    );
   }
 
   return (
@@ -521,6 +533,13 @@ export default function JourneyScreen() {
           <Text style={[styles.pageTitle, pageTitleColor]}>
             {t("journey.screenTitle")}
           </Text>
+          <Pressable
+            accessibilityLabel={t("tabs.settings")}
+            onPress={() => router.push("/(tabs)/settings")}
+            style={[styles.headerAction, headerActionStyle]}
+          >
+            <MaterialIcons name="tune" size={19} color={colors.textSecondary} />
+          </Pressable>
         </View>
         <Text style={[styles.pageSubTitle, pageSubTitleColor]}>
           {t("journey.screenSummary", {
@@ -559,21 +578,21 @@ export default function JourneyScreen() {
               draftLocation={draftLocation}
               onRemoveDraftLocation={() => setDraftLocation(undefined)}
               draftMedia={draftMedia}
-              onRemoveDraftMedia={id =>
-                setDraftMedia(prev => prev.filter(m => m.id !== id))
+              onRemoveDraftMedia={(id) =>
+                setDraftMedia((prev) => prev.filter((m) => m.id !== id))
               }
               entryTemplates={entryTemplates}
-              onApplyTemplate={template => {
-                const text = entryText.trim()
+              onApplyTemplate={(template) => {
+                const text = entryText.trim();
                 const nextText = text
                   ? `${text}\n${template.text}`
-                  : template.text
-                const currentTags = parseTagsInput(entryTagsInput)
+                  : template.text;
+                const currentTags = parseTagsInput(entryTagsInput);
                 const merged = Array.from(
                   new Set([...currentTags, ...template.tags]),
-                )
-                setEntryText(nextText)
-                setEntryTagsInput(merged.join(", "))
+                );
+                setEntryText(nextText);
+                setEntryTagsInput(merged.join(", "));
               }}
               onOpenTemplateModal={() => setTemplateModalVisible(true)}
               savingEntry={savingEntry}
@@ -620,7 +639,7 @@ export default function JourneyScreen() {
         />
       </ScrollView>
     </View>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -642,9 +661,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pageTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#0f172a",
+    fontSize: 22,
+    fontWeight: "600",
+    letterSpacing: -0.02,
   },
   pageHeader: {
     flexDirection: "row",
@@ -652,8 +671,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   pageSubTitle: {
-    color: "#475569",
     marginBottom: 4,
   },
-})
+});

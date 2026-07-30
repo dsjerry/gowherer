@@ -1,28 +1,31 @@
-import { Pressable, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Pressable, StyleSheet } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemePreference } from '@/hooks/theme-preference';
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import { useThemePreference } from "@/hooks/theme-preference";
 
 export function ThemeToggle() {
   const { resolvedTheme, toggleTheme } = useThemePreference();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
+  const { colors: c } = useMaterialTheme();
 
   return (
     <Pressable
       style={[
         styles.button,
         {
-          borderColor: isDark ? '#475569' : '#94a3b8',
-          backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+          borderColor: c.border,
+          backgroundColor: c.surface,
         },
       ]}
-      onPress={toggleTheme}>
+      onPress={toggleTheme}
+    >
       <MaterialIcons
-        name={resolvedTheme === 'dark' ? 'light-mode' : 'dark-mode'}
+        name={resolvedTheme === "dark" ? "light-mode" : "dark-mode"}
         size={18}
-        color={isDark ? '#e2e8f0' : '#0f172a'}
+        color={c.fg}
       />
     </Pressable>
   );
@@ -34,7 +37,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     width: 34,
     height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -1,5 +1,5 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { MaterialIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import {
   Pressable,
   ScrollView,
@@ -8,14 +8,20 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
+} from "react-native";
 
-import { AudioPlayer } from '@/components/audio-player';
-import { MediaVideoCover } from '@/components/media-viewers';
-import { useI18n } from '@/hooks/locale-preference';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Journey, JourneyKind, TimelineLocation, TimelineMedia } from '@/types/journey';
-import { EntryTemplate } from '@/types/template';
+import { AudioPlayer } from "@/components/audio-player";
+import { MediaVideoCover } from "@/components/media-viewers";
+import { useI18n } from "@/hooks/locale-preference";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import {
+  Journey,
+  JourneyKind,
+  TimelineLocation,
+  TimelineMedia,
+} from "@/types/journey";
+import { EntryTemplate } from "@/types/template";
 
 interface Props {
   activeJourney: Journey;
@@ -64,8 +70,8 @@ interface Props {
 }
 
 function mediaPreviewUri(media: TimelineMedia) {
-  if (media.type === 'video') return media.thumbnailUri;
-  if (media.type === 'audio') return undefined;
+  if (media.type === "video") return media.thumbnailUri;
+  if (media.type === "audio") return undefined;
   return media.uri;
 }
 
@@ -102,369 +108,406 @@ export function ActiveJourneyCard({
 }: Props) {
   const { t } = useI18n();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
+  const { colors: c } = useMaterialTheme();
 
   function kindLabel(kind: JourneyKind) {
-    return t(kind === 'travel' ? 'journey.kind.travel' : 'journey.kind.commute');
+    return t(
+      kind === "travel" ? "journey.kind.travel" : "journey.kind.commute",
+    );
   }
 
   function formatDateTime(iso: string) {
     const date = new Date(iso);
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    const hh = String(date.getHours()).padStart(2, '0');
-    const min = String(date.getMinutes()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
     return `${mm}/${dd} ${hh}:${min}`;
   }
 
   const themedCard = {
-    backgroundColor: isDark ? '#1e293b' : '#ffffff',
-    borderColor: isDark ? '#334155' : '#e2e8f0',
+    backgroundColor: c.surface,
+    borderColor: c.border,
   };
-  const themedSectionTitle = { color: isDark ? '#e2e8f0' : '#0f172a' };
-  const themedMuted = { color: isDark ? '#94a3b8' : '#64748b' };
-  const themedGhostButton = {
-    borderColor: isDark ? '#f59e0b' : '#f59e0b',
-    backgroundColor: isDark ? '#1f2937' : '#ffffff',
+  const themedSectionTitle = { color: c.textPrimary };
+  const heroTitle = { color: c.fgOn };
+  const heroMuted = { color: "rgba(255,255,255,0.76)" };
+  const heroGhost = {
+    borderColor: c.accent,
+    backgroundColor: c.accent,
   };
-  const themedGhostButtonText = {
-    color: isDark ? '#fbbf24' : '#b45309',
-  };
-  const themedLabel = { color: isDark ? '#cbd5e1' : '#334155' };
+  const heroGhostText = { color: c.fg };
+  const themedMuted = { color: c.textTertiary };
   const themedInput = {
-    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-    borderColor: isDark ? '#334155' : '#cbd5e1',
-    color: isDark ? '#e2e8f0' : '#0f172a',
+    backgroundColor: "transparent",
+    borderColor: c.border,
+    color: c.textPrimary,
   };
-  const themedPlaceholder = isDark ? '#94a3b8' : '#64748b';
-  const themedLocationText = { color: isDark ? '#cbd5e1' : '#334155' };
-  const themedSecondaryButton = { backgroundColor: isDark ? '#334155' : '#e2e8f0' };
-  const themedSecondaryButtonText = { color: isDark ? '#e2e8f0' : '#0f172a' };
+  const themedPlaceholder = c.textTertiary;
+  const themedLocationText = { color: c.textSecondary };
+  const themedSecondaryButton = {
+    backgroundColor: c.surface,
+    borderColor: c.border,
+    borderWidth: 1,
+  };
+  const themedSecondaryButtonText = { color: c.textSecondary };
   const themedCancelButton = {
-    borderColor: isDark ? '#334155' : '#cbd5e1',
-    backgroundColor: isDark ? '#0f172a' : '#ffffff',
+    borderColor: c.border,
+    backgroundColor: "transparent",
+    borderWidth: 1,
   };
-  const themedCancelButtonText = { color: isDark ? '#cbd5e1' : '#334155' };
+  const themedCancelButtonText = { color: c.textSecondary };
   const themedTemplateChip = {
-    borderColor: isDark ? '#334155' : '#cbd5e1',
-    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+    borderColor: c.border,
+    backgroundColor: c.surface,
+    borderWidth: 1,
   };
-  const themedTemplateChipText = { color: isDark ? '#cbd5e1' : '#334155' };
+  const themedTemplateChipText = { color: c.textSecondary };
   const themedMediaBox = {
-    borderColor: isDark ? '#334155' : '#e2e8f0',
-    backgroundColor: isDark ? '#0f172a' : '#ffffff',
+    borderColor: c.border,
+    backgroundColor: c.bg,
+    borderWidth: 1,
   };
-  const themedMediaFooter = { backgroundColor: isDark ? '#1e293b' : '#f8fafc' };
-  const themedBadge = { color: isDark ? '#e2e8f0' : '#0f172a' };
+  const themedMediaFooter = { backgroundColor: c.surface };
+  const themedBadge = { color: c.textPrimary };
 
   return (
-    <View style={[styles.card, themedCard]}>
-      {/* Card header */}
-      <View style={styles.cardHeader}>
-        <View style={styles.headerInfo}>
-          <Text style={[styles.sectionTitle, themedSectionTitle]}>
-            {activeJourney.title}
-          </Text>
-          <Text style={[styles.mutedText, themedMuted]}>
-            {t('journey.currentJourneyMeta', {
-              kind: kindLabel(activeJourney.kind),
-              date: formatDateTime(activeJourney.createdAt),
-              count: activeJourney.entries.length,
-            })}
-          </Text>
-        </View>
-        <Pressable
-          style={[styles.ghostButton, themedGhostButton]}
-          onPress={onEndJourney}
-        >
-          <Text style={[styles.ghostButtonText, themedGhostButtonText]}>
-            {t('journey.endJourney')}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Location tracking */}
-      <View style={styles.trackingRow}>
-        <Text style={[styles.trackingLabel, themedSectionTitle]}>
-          {t('journey.locationTracking')}
-        </Text>
-        <Switch
-          value={locationTracking}
-          onValueChange={onLocationTrackingChange}
-          disabled={trackingBusy}
-          trackColor={{ false: '#94a3b8', true: '#0f766e' }}
-          thumbColor="#ffffff"
-        />
-      </View>
-      {locationTracking && activeJourney.trackLocations.length > 0 ? (
-        <Text style={[styles.mutedText, themedMuted]}>
-          {t('journey.trackingPoints', {
-            count: activeJourney.trackLocations.length,
-          })}
-        </Text>
-      ) : null}
-
-      {/* Entry editor */}
-      <Text style={[styles.sectionTitle, themedSectionTitle]}>
-        {t('journey.recordEditorTitle', {
-          mode: editingEntryId
-            ? t('journey.modeEdit')
-            : t('journey.modeCreate'),
-        })}
-      </Text>
-
-      {/* Template shortcuts */}
-      <View style={styles.templateWrap}>
-        <View style={styles.templateHeaderRow}>
-          <Text style={[styles.mutedText, themedMuted]}>
-            {t('journey.templateShortcuts', {
-              kind: kindLabel(activeJourney.kind),
-            })}
-          </Text>
-          <Pressable onPress={onOpenTemplateModal}>
-            <Text style={styles.linkText}>{t('journey.manageTemplates')}</Text>
+    <View style={styles.stack}>
+      <View
+        style={[
+          styles.activeHero,
+          { backgroundColor: c.fg, borderColor: c.fg },
+        ]}
+      >
+        {/* Card header */}
+        <View style={styles.cardHeader}>
+          <View style={styles.headerInfo}>
+            <Text style={[styles.sectionTitle, heroTitle]}>
+              {activeJourney.title}
+            </Text>
+            <Text style={[styles.mutedText, heroMuted]}>
+              {t("journey.currentJourneyMeta", {
+                kind: kindLabel(activeJourney.kind),
+                date: formatDateTime(activeJourney.createdAt),
+                count: activeJourney.entries.length,
+              })}
+            </Text>
+          </View>
+          <Pressable
+            style={[styles.ghostButton, heroGhost]}
+            onPress={onEndJourney}
+          >
+            <Text style={[styles.ghostButtonText, heroGhostText]}>
+              {t("journey.endJourney")}
+            </Text>
           </Pressable>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.templateRow}
-        >
-          {entryTemplates.map((template) => (
-            <Pressable
-              key={template.id}
-              style={[styles.templateChip, themedTemplateChip]}
-              onPress={() => onApplyTemplate(template)}
-            >
-              <Text
-                style={[styles.templateChipText, themedTemplateChipText]}
-              >
-                {template.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+
+        {/* Location tracking */}
+        <View style={styles.trackingRow}>
+          <Text style={[styles.trackingLabel, heroTitle]}>
+            {t("journey.locationTracking")}
+          </Text>
+          <Switch
+            value={locationTracking}
+            onValueChange={onLocationTrackingChange}
+            disabled={trackingBusy}
+            trackColor={{ false: c.muted, true: c.fg }}
+            thumbColor="#ffffff"
+          />
+        </View>
+        {locationTracking && activeJourney.trackLocations.length > 0 ? (
+          <Text style={[styles.mutedText, heroMuted]}>
+            {t("journey.trackingPoints", {
+              count: activeJourney.trackLocations.length,
+            })}
+          </Text>
+        ) : null}
       </View>
 
-      {/* Entry inputs */}
-      <TextInput
-        value={entryText}
-        onChangeText={onEntryTextChange}
-        placeholder={t('journey.entryTextPlaceholder')}
-        placeholderTextColor={themedPlaceholder}
-        style={[styles.input, styles.textArea, themedInput]}
-        multiline
-      />
-      <TextInput
-        value={entryTagsInput}
-        onChangeText={onEntryTagsInputChange}
-        placeholder={t('journey.entryTagsPlaceholder')}
-        placeholderTextColor={themedPlaceholder}
-        style={[styles.input, themedInput]}
-      />
+      <View style={[styles.card, themedCard]}>
+        {/* Entry editor */}
+        <Text style={[styles.sectionTitle, themedSectionTitle]}>
+          {t("journey.recordEditorTitle", {
+            mode: editingEntryId
+              ? t("journey.modeEdit")
+              : t("journey.modeCreate"),
+          })}
+        </Text>
 
-      {/* Location display */}
-      <View style={styles.actionRow}>
-        <View style={styles.locationTextContainer}>
-          <Text style={[styles.locationText, themedLocationText]}>
-            {t('journey.locationLabel')}
-            {draftLocation
-              ? `${draftLocation.placeName ? `${draftLocation.placeName} · ` : ''}${draftLocation.latitude.toFixed(5)}, ${draftLocation.longitude.toFixed(5)}`
-              : '-'}
-          </Text>
-        </View>
-        {draftLocation ? (
-          <Pressable
-            style={styles.inlineAction}
-            onPress={onRemoveDraftLocation}
+        {/* Template shortcuts */}
+        <View style={styles.templateWrap}>
+          <View style={styles.templateHeaderRow}>
+            <Text style={[styles.mutedText, themedMuted]}>
+              {t("journey.templateShortcuts", {
+                kind: kindLabel(activeJourney.kind),
+              })}
+            </Text>
+            <Pressable onPress={onOpenTemplateModal}>
+              <Text style={styles.linkText}>
+                {t("journey.manageTemplates")}
+              </Text>
+            </Pressable>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.templateRow}
           >
-            <Text style={styles.linkText}>
-              {t('journey.removeLocation')}
+            {entryTemplates.map((template) => (
+              <Pressable
+                key={template.id}
+                style={[styles.templateChip, themedTemplateChip]}
+                onPress={() => onApplyTemplate(template)}
+              >
+                <Text style={[styles.templateChipText, themedTemplateChipText]}>
+                  {template.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Entry inputs */}
+        <TextInput
+          value={entryText}
+          onChangeText={onEntryTextChange}
+          placeholder={t("journey.entryTextPlaceholder")}
+          placeholderTextColor={themedPlaceholder}
+          style={[styles.input, styles.textArea, themedInput]}
+          multiline
+        />
+        <TextInput
+          value={entryTagsInput}
+          onChangeText={onEntryTagsInputChange}
+          placeholder={t("journey.entryTagsPlaceholder")}
+          placeholderTextColor={themedPlaceholder}
+          style={[styles.input, themedInput]}
+        />
+
+        {/* Location display */}
+        <View style={styles.actionRow}>
+          <View style={styles.locationTextContainer}>
+            <Text style={[styles.locationText, themedLocationText]}>
+              {t("journey.locationLabel")}
+              {draftLocation
+                ? `${draftLocation.placeName ? `${draftLocation.placeName} · ` : ""}${draftLocation.latitude.toFixed(5)}, ${draftLocation.longitude.toFixed(5)}`
+                : "-"}
+            </Text>
+          </View>
+          {draftLocation ? (
+            <Pressable
+              style={styles.inlineAction}
+              onPress={onRemoveDraftLocation}
+            >
+              <Text style={styles.linkText}>{t("journey.removeLocation")}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Draft media */}
+        {draftMedia.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.mediaRow}
+          >
+            {draftMedia.map((item) =>
+              item.type === "audio" ? (
+                <View
+                  key={item.id}
+                  style={[styles.mediaPreviewBox, themedMediaBox]}
+                >
+                  <AudioPlayer uri={item.uri} label={t("journey.audioBadge")} />
+                  <View style={[styles.mediaFooter, themedMediaFooter]}>
+                    <Text style={[styles.mediaBadge, themedBadge]}>
+                      {t("journey.audioBadge")}
+                    </Text>
+                    <Pressable onPress={() => onRemoveDraftMedia(item.id)}>
+                      <Text style={styles.linkText}>{t("common.delete")}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <View
+                  key={item.id}
+                  style={[styles.mediaPreviewBox, themedMediaBox]}
+                >
+                  {mediaPreviewUri(item) ? (
+                    <Image
+                      source={{ uri: mediaPreviewUri(item) }}
+                      style={styles.mediaPreview}
+                      contentFit="cover"
+                    />
+                  ) : item.type === "video" ? (
+                    <MediaVideoCover uri={item.uri} />
+                  ) : (
+                    <View
+                      style={[
+                        styles.mediaPlaceholder,
+                        { backgroundColor: isDark ? "#334155" : "#0f172a" },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.mediaPlaceholderText,
+                          { color: "#ffffff" },
+                        ]}
+                      >
+                        {t("journey.mediaBadgeVideo")}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={[styles.mediaFooter, themedMediaFooter]}>
+                    <Text style={[styles.mediaBadge, themedBadge]}>
+                      {item.type === "video"
+                        ? t("journey.mediaBadgeVideo")
+                        : t("journey.mediaBadgePhoto")}
+                    </Text>
+                    <Pressable onPress={() => onRemoveDraftMedia(item.id)}>
+                      <Text style={styles.linkText}>{t("common.delete")}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ),
+            )}
+          </ScrollView>
+        ) : null}
+
+        {/* Action buttons */}
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[styles.secondaryButton, themedSecondaryButton]}
+            onPress={onOpenLocationPicker}
+            disabled={openingLocationPicker}
+          >
+            <MaterialIcons name="location-on" size={17} color={c.fg} />
+            <Text
+              style={[styles.secondaryButtonText, themedSecondaryButtonText]}
+            >
+              {openingLocationPicker
+                ? t("journey.openingMap")
+                : t("journey.addLocation")}
+            </Text>
+          </Pressable>
+        </View>
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[styles.secondaryButton, themedSecondaryButton]}
+            onPress={onPickMediaFromLibrary}
+            disabled={pickingMedia}
+          >
+            <MaterialIcons name="photo-library" size={17} color={c.fg} />
+            <Text
+              style={[styles.secondaryButtonText, themedSecondaryButtonText]}
+            >
+              {pickingMedia
+                ? t("journey.readingAlbum")
+                : t("journey.addFromAlbum")}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.secondaryButton, themedSecondaryButton]}
+            onPress={onCapturePhoto}
+            disabled={pickingMedia}
+          >
+            <MaterialIcons name="photo-camera" size={17} color={c.fg} />
+            <Text
+              style={[styles.secondaryButtonText, themedSecondaryButtonText]}
+            >
+              {pickingMedia
+                ? t("journey.processingMedia")
+                : t("journey.takePhoto")}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.secondaryButton, themedSecondaryButton]}
+            onPress={onCaptureVideo}
+            disabled={pickingMedia}
+          >
+            <MaterialIcons name="videocam" size={17} color={c.fg} />
+            <Text
+              style={[styles.secondaryButtonText, themedSecondaryButtonText]}
+            >
+              {pickingMedia
+                ? t("journey.processingMedia")
+                : t("journey.takeVideo")}
+            </Text>
+          </Pressable>
+        </View>
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[styles.secondaryButton, themedSecondaryButton]}
+            onPress={() =>
+              isRecording ? onStopRecording() : onStartRecording()
+            }
+            disabled={pickingMedia}
+          >
+            <MaterialIcons
+              name={isRecording ? "stop" : "mic"}
+              size={17}
+              color={c.fg}
+            />
+            <Text
+              style={[styles.secondaryButtonText, themedSecondaryButtonText]}
+            >
+              {isRecording
+                ? t("journey.stopRecording")
+                : t("journey.recordAudio")}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Save / Cancel */}
+        <Pressable
+          style={[styles.primaryButton, { backgroundColor: c.accentSecondary }]}
+          onPress={onSaveEntry}
+          disabled={savingEntry}
+        >
+          <Text style={styles.primaryButtonText}>
+            {savingEntry
+              ? t("journey.savingEntry")
+              : editingEntryId
+                ? t("journey.updateEntry")
+                : t("journey.saveEntry")}
+          </Text>
+        </Pressable>
+        {editingEntryId ? (
+          <Pressable
+            style={[styles.cancelButton, themedCancelButton]}
+            onPress={onResetDraft}
+          >
+            <Text style={[styles.cancelButtonText, themedCancelButtonText]}>
+              {t("journey.cancelEdit")}
             </Text>
           </Pressable>
         ) : null}
       </View>
-
-      {/* Draft media */}
-      {draftMedia.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.mediaRow}
-        >
-          {draftMedia.map((item) =>
-            item.type === 'audio' ? (
-              <View key={item.id} style={[styles.mediaPreviewBox, themedMediaBox]}>
-                <AudioPlayer
-                  uri={item.uri}
-                  label={t('journey.audioBadge')}
-                />
-                <View style={[styles.mediaFooter, themedMediaFooter]}>
-                  <Text style={[styles.mediaBadge, themedBadge]}>
-                    {t('journey.audioBadge')}
-                  </Text>
-                  <Pressable
-                    onPress={() => onRemoveDraftMedia(item.id)}
-                  >
-                    <Text style={styles.linkText}>
-                      {t('common.delete')}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <View key={item.id} style={[styles.mediaPreviewBox, themedMediaBox]}>
-                {mediaPreviewUri(item) ? (
-                  <Image
-                    source={{ uri: mediaPreviewUri(item) }}
-                    style={styles.mediaPreview}
-                    contentFit="cover"
-                  />
-                ) : item.type === 'video' ? (
-                  <MediaVideoCover uri={item.uri} />
-                ) : (
-                  <View
-                    style={[
-                      styles.mediaPlaceholder,
-                      { backgroundColor: isDark ? '#334155' : '#0f172a' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.mediaPlaceholderText,
-                        { color: '#ffffff' },
-                      ]}
-                    >
-                      {t('journey.mediaBadgeVideo')}
-                    </Text>
-                  </View>
-                )}
-                <View style={[styles.mediaFooter, themedMediaFooter]}>
-                  <Text style={[styles.mediaBadge, themedBadge]}>
-                    {item.type === 'video'
-                      ? t('journey.mediaBadgeVideo')
-                      : t('journey.mediaBadgePhoto')}
-                  </Text>
-                  <Pressable
-                    onPress={() => onRemoveDraftMedia(item.id)}
-                  >
-                    <Text style={styles.linkText}>
-                      {t('common.delete')}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            )
-          )}
-        </ScrollView>
-      ) : null}
-
-      {/* Action buttons */}
-      <View style={styles.actionRow}>
-        <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
-          onPress={onOpenLocationPicker}
-          disabled={openingLocationPicker}
-        >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {openingLocationPicker
-              ? t('journey.openingMap')
-              : `📍 ${t('journey.addLocation')}`}
-          </Text>
-        </Pressable>
-      </View>
-      <View style={styles.actionRow}>
-        <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
-          onPress={onPickMediaFromLibrary}
-          disabled={pickingMedia}
-        >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {pickingMedia
-              ? t('journey.readingAlbum')
-              : `🖼️ ${t('journey.addFromAlbum')}`}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
-          onPress={onCapturePhoto}
-          disabled={pickingMedia}
-        >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {pickingMedia
-              ? t('journey.processingMedia')
-              : `📷 ${t('journey.takePhoto')}`}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
-          onPress={onCaptureVideo}
-          disabled={pickingMedia}
-        >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {pickingMedia
-              ? t('journey.processingMedia')
-              : `🎥 ${t('journey.takeVideo')}`}
-          </Text>
-        </Pressable>
-      </View>
-      <View style={styles.actionRow}>
-        <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
-          onPress={() =>
-            isRecording ? onStopRecording() : onStartRecording()
-          }
-          disabled={pickingMedia}
-        >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {isRecording
-              ? `⏹️ ${t('journey.stopRecording')}`
-              : `🎙️ ${t('journey.recordAudio')}`}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Save / Cancel */}
-      <Pressable
-        style={styles.primaryButton}
-        onPress={onSaveEntry}
-        disabled={savingEntry}
-      >
-        <Text style={styles.primaryButtonText}>
-          {savingEntry
-            ? t('journey.savingEntry')
-            : editingEntryId
-              ? t('journey.updateEntry')
-              : t('journey.saveEntry')}
-        </Text>
-      </Pressable>
-      {editingEntryId ? (
-        <Pressable
-          style={[styles.cancelButton, themedCancelButton]}
-          onPress={onResetDraft}
-        >
-          <Text style={[styles.cancelButtonText, themedCancelButtonText]}>
-            {t('journey.cancelEdit')}
-          </Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
+  stack: {
+    gap: 12,
+  },
+  activeHero: {
+    borderRadius: 8,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 10,
+    gap: 12,
+  },
+  card: {
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    gap: 12,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     gap: 12,
   },
   headerInfo: {
@@ -473,77 +516,68 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: "600",
   },
   mutedText: {
-    color: '#64748b',
     fontSize: 12,
   },
   ghostButton: {
-    borderRadius: 10,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#f59e0b',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   ghostButtonText: {
-    color: '#b45309',
-    fontWeight: '600',
-    fontSize: 12,
+    fontWeight: "600",
+    fontSize: 13,
   },
   trackingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 6,
   },
   trackingLabel: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   templateWrap: {
     gap: 6,
   },
   templateHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     gap: 8,
   },
   templateRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     paddingRight: 6,
   },
   templateChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
   },
   templateChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#334155',
+    fontSize: 13,
+    fontWeight: "500",
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 15,
-    backgroundColor: '#f8fafc',
   },
   textArea: {
     minHeight: 84,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   actionRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   locationTextContainer: {
@@ -551,7 +585,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   locationText: {
-    color: '#334155',
     fontSize: 13,
     flexShrink: 1,
   },
@@ -560,19 +593,17 @@ const styles = StyleSheet.create({
     paddingTop: 1,
   },
   linkText: {
-    color: '#0369a1',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   mediaRow: {
     maxHeight: 110,
   },
   mediaPreviewBox: {
     marginRight: 10,
-    borderRadius: 10,
-    overflow: 'hidden',
+    borderRadius: 8,
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     width: 110,
   },
   mediaPreview: {
@@ -582,58 +613,50 @@ const styles = StyleSheet.create({
   mediaPlaceholder: {
     width: 110,
     height: 80,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   mediaPlaceholderText: {
-    color: '#ffffff',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   mediaFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 6,
     paddingVertical: 4,
-    backgroundColor: '#f8fafc',
   },
   mediaBadge: {
     fontSize: 11,
-    color: '#0f172a',
     padding: 4,
   },
   secondaryButton: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    paddingHorizontal: 12,
     paddingVertical: 8,
+    borderWidth: 1,
   },
   secondaryButtonText: {
-    color: '#0f172a',
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: "500",
   },
   primaryButton: {
-    backgroundColor: '#0f766e',
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: 'center',
+    borderRadius: 999,
+    paddingVertical: 12,
+    alignItems: "center",
   },
   primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: "600",
   },
   cancelButton: {
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButtonText: {
-    color: '#334155',
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
