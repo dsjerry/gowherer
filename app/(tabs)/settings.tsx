@@ -20,7 +20,6 @@ import { ExternalLink } from "@/components/external-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useI18n } from "@/hooks/locale-preference";
 import { useThemePreference } from "@/hooks/theme-preference";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useMaterialTheme } from "@/hooks/use-material-theme";
 import {
     buildAppBackup,
@@ -36,8 +35,6 @@ import { cleanupOldMediaCache, migrateMediaFiles } from "@/lib/media-migration";
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const { t, preference, setPreference } = useI18n();
   const { setPreference: setThemePreference } = useThemePreference();
   const appVersion = Constants.expoConfig?.version ?? "0.0.0";
@@ -51,16 +48,16 @@ export default function SettingsScreen() {
       page: { backgroundColor: c.bg },
       card: {
         backgroundColor: c.surface,
-        borderColor: c.border,
+        borderColor: c.borderSoft,
       },
       title: { color: c.textPrimary },
       muted: { color: c.textTertiary },
       rowText: { color: c.textPrimary },
       rowHint: { color: c.textTertiary },
-      divider: { borderColor: c.border },
-      accent: { color: c.fg },
+      divider: { borderColor: c.borderSoft },
+      accent: { color: c.accent },
     }),
-    [isDark, c],
+    [c],
   );
 
   const options: { value: LocalePreference; label: string }[] = [
@@ -250,11 +247,7 @@ export default function SettingsScreen() {
                   {option.label}
                 </Text>
                 {isActive ? (
-                  <MaterialIcons
-                    name="check"
-                    size={20}
-                    color={theme.accent.color}
-                  />
+                  <MaterialIcons name="check" size={20} color={c.fg} />
                 ) : null}
               </Pressable>
             );
@@ -280,8 +273,12 @@ export default function SettingsScreen() {
             onPress={() => void handleExportData()}
             disabled={exportingData || importingData}
           >
-            <View style={[styles.dataIcon, { backgroundColor: `${c.fg}14` }]}>
-              <MaterialIcons name="ios-share" size={18} color={c.fg} />
+            <View style={[styles.dataIcon, { backgroundColor: c.surfaceWarm }]}>
+              <MaterialIcons
+                name="ios-share"
+                size={18}
+                color={c.textSecondary}
+              />
             </View>
             <View style={styles.rowTextWrap}>
               <Text style={[styles.listItemText, theme.rowText]}>
@@ -309,16 +306,11 @@ export default function SettingsScreen() {
             onPress={handleImportData}
             disabled={exportingData || importingData}
           >
-            <View
-              style={[
-                styles.dataIcon,
-                { backgroundColor: `${c.accentSecondary}14` },
-              ]}
-            >
+            <View style={[styles.dataIcon, { backgroundColor: c.surfaceWarm }]}>
               <MaterialIcons
                 name="file-upload"
                 size={18}
-                color={c.accentSecondary}
+                color={c.textSecondary}
               />
             </View>
             <View style={styles.rowTextWrap}>
@@ -342,8 +334,8 @@ export default function SettingsScreen() {
             onPress={() => void handleMigrateMedia()}
             disabled={exportingData || importingData || migratingMedia}
           >
-            <View style={[styles.dataIcon, { backgroundColor: `${c.warn}18` }]}>
-              <MaterialIcons name="storage" size={18} color={c.warn} />
+            <View style={[styles.dataIcon, { backgroundColor: c.surfaceWarm }]}>
+              <MaterialIcons name="storage" size={18} color={c.textSecondary} />
             </View>
             <View style={styles.rowTextWrap}>
               <Text style={[styles.listItemText, theme.rowText]}>
@@ -441,7 +433,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.02,
   },
   card: {
-    borderRadius: 8,
+    borderRadius: 18,
     borderWidth: 1,
     padding: 16,
     gap: 10,
@@ -487,9 +479,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   dataIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },

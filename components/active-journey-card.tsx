@@ -1,13 +1,13 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 
 import { AudioPlayer } from "@/components/audio-player";
@@ -16,10 +16,10 @@ import { useI18n } from "@/hooks/locale-preference";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useMaterialTheme } from "@/hooks/use-material-theme";
 import {
-  Journey,
-  JourneyKind,
-  TimelineLocation,
-  TimelineMedia,
+    Journey,
+    JourneyKind,
+    TimelineLocation,
+    TimelineMedia,
 } from "@/types/journey";
 import { EntryTemplate } from "@/types/template";
 
@@ -128,27 +128,27 @@ export function ActiveJourneyCard({
 
   const themedCard = {
     backgroundColor: c.surface,
-    borderColor: c.border,
+    borderColor: c.borderSoft,
   };
   const themedSectionTitle = { color: c.textPrimary };
-  const heroTitle = { color: c.fgOn };
-  const heroMuted = { color: "rgba(255,255,255,0.76)" };
+  const heroTitle = { color: isDark ? c.textPrimary : c.bg };
+  const heroMuted = { color: "rgba(255,255,255,0.72)" };
   const heroGhost = {
-    borderColor: c.accent,
-    backgroundColor: c.accent,
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.14)",
   };
-  const heroGhostText = { color: c.fg };
+  const heroGhostText = { color: c.fgOn };
   const themedMuted = { color: c.textTertiary };
   const themedInput = {
-    backgroundColor: "transparent",
+    backgroundColor: c.bg,
     borderColor: c.border,
     color: c.textPrimary,
   };
   const themedPlaceholder = c.textTertiary;
   const themedLocationText = { color: c.textSecondary };
   const themedSecondaryButton = {
-    backgroundColor: c.surface,
-    borderColor: c.border,
+    backgroundColor: c.bg,
+    borderColor: c.borderSoft,
     borderWidth: 1,
   };
   const themedSecondaryButtonText = { color: c.textSecondary };
@@ -159,13 +159,13 @@ export function ActiveJourneyCard({
   };
   const themedCancelButtonText = { color: c.textSecondary };
   const themedTemplateChip = {
-    borderColor: c.border,
-    backgroundColor: c.surface,
+    borderColor: c.borderSoft,
+    backgroundColor: c.bg,
     borderWidth: 1,
   };
   const themedTemplateChipText = { color: c.textSecondary };
   const themedMediaBox = {
-    borderColor: c.border,
+    borderColor: c.borderSoft,
     backgroundColor: c.bg,
     borderWidth: 1,
   };
@@ -177,7 +177,9 @@ export function ActiveJourneyCard({
       <View
         style={[
           styles.activeHero,
-          { backgroundColor: c.fg, borderColor: c.fg },
+          {
+            backgroundColor: isDark ? c.surfaceWarm : c.fg,
+          },
         ]}
       >
         {/* Card header */}
@@ -213,7 +215,10 @@ export function ActiveJourneyCard({
             value={locationTracking}
             onValueChange={onLocationTrackingChange}
             disabled={trackingBusy}
-            trackColor={{ false: c.muted, true: c.fg }}
+            trackColor={{
+              false: isDark ? c.border : c.muted,
+              true: isDark ? c.accent : c.accentSecondary,
+            }}
             thumbColor="#ffffff"
           />
         </View>
@@ -245,7 +250,7 @@ export function ActiveJourneyCard({
               })}
             </Text>
             <Pressable onPress={onOpenTemplateModal}>
-              <Text style={styles.linkText}>
+              <Text style={[styles.linkText, { color: c.accent }]}>
                 {t("journey.manageTemplates")}
               </Text>
             </Pressable>
@@ -301,7 +306,9 @@ export function ActiveJourneyCard({
               style={styles.inlineAction}
               onPress={onRemoveDraftLocation}
             >
-              <Text style={styles.linkText}>{t("journey.removeLocation")}</Text>
+              <Text style={[styles.linkText, { color: c.accent }]}>
+                {t("journey.removeLocation")}
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -325,7 +332,9 @@ export function ActiveJourneyCard({
                       {t("journey.audioBadge")}
                     </Text>
                     <Pressable onPress={() => onRemoveDraftMedia(item.id)}>
-                      <Text style={styles.linkText}>{t("common.delete")}</Text>
+                      <Text style={[styles.linkText, { color: c.danger }]}>
+                        {t("common.delete")}
+                      </Text>
                     </Pressable>
                   </View>
                 </View>
@@ -346,13 +355,13 @@ export function ActiveJourneyCard({
                     <View
                       style={[
                         styles.mediaPlaceholder,
-                        { backgroundColor: isDark ? "#334155" : "#0f172a" },
+                        { backgroundColor: c.borderSoft },
                       ]}
                     >
                       <Text
                         style={[
                           styles.mediaPlaceholderText,
-                          { color: "#ffffff" },
+                          { color: c.textTertiary },
                         ]}
                       >
                         {t("journey.mediaBadgeVideo")}
@@ -366,7 +375,9 @@ export function ActiveJourneyCard({
                         : t("journey.mediaBadgePhoto")}
                     </Text>
                     <Pressable onPress={() => onRemoveDraftMedia(item.id)}>
-                      <Text style={styles.linkText}>{t("common.delete")}</Text>
+                      <Text style={[styles.linkText, { color: c.danger }]}>
+                        {t("common.delete")}
+                      </Text>
                     </Pressable>
                   </View>
                 </View>
@@ -382,7 +393,11 @@ export function ActiveJourneyCard({
             onPress={onOpenLocationPicker}
             disabled={openingLocationPicker}
           >
-            <MaterialIcons name="location-on" size={17} color={c.fg} />
+            <MaterialIcons
+              name="location-on"
+              size={17}
+              color={c.textSecondary}
+            />
             <Text
               style={[styles.secondaryButtonText, themedSecondaryButtonText]}
             >
@@ -398,7 +413,11 @@ export function ActiveJourneyCard({
             onPress={onPickMediaFromLibrary}
             disabled={pickingMedia}
           >
-            <MaterialIcons name="photo-library" size={17} color={c.fg} />
+            <MaterialIcons
+              name="photo-library"
+              size={17}
+              color={c.textSecondary}
+            />
             <Text
               style={[styles.secondaryButtonText, themedSecondaryButtonText]}
             >
@@ -412,7 +431,11 @@ export function ActiveJourneyCard({
             onPress={onCapturePhoto}
             disabled={pickingMedia}
           >
-            <MaterialIcons name="photo-camera" size={17} color={c.fg} />
+            <MaterialIcons
+              name="photo-camera"
+              size={17}
+              color={c.textSecondary}
+            />
             <Text
               style={[styles.secondaryButtonText, themedSecondaryButtonText]}
             >
@@ -426,7 +449,7 @@ export function ActiveJourneyCard({
             onPress={onCaptureVideo}
             disabled={pickingMedia}
           >
-            <MaterialIcons name="videocam" size={17} color={c.fg} />
+            <MaterialIcons name="videocam" size={17} color={c.textSecondary} />
             <Text
               style={[styles.secondaryButtonText, themedSecondaryButtonText]}
             >
@@ -447,7 +470,7 @@ export function ActiveJourneyCard({
             <MaterialIcons
               name={isRecording ? "stop" : "mic"}
               size={17}
-              color={c.fg}
+              color={c.textSecondary}
             />
             <Text
               style={[styles.secondaryButtonText, themedSecondaryButtonText]}
@@ -461,7 +484,7 @@ export function ActiveJourneyCard({
 
         {/* Save / Cancel */}
         <Pressable
-          style={[styles.primaryButton, { backgroundColor: c.accentSecondary }]}
+          style={[styles.primaryButton, { backgroundColor: c.accent }]}
           onPress={onSaveEntry}
           disabled={savingEntry}
         >
@@ -493,13 +516,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   activeHero: {
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    gap: 12,
+    borderRadius: 18,
+    padding: 20,
+    gap: 14,
   },
   card: {
-    borderRadius: 8,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
     gap: 12,
@@ -517,9 +539,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
+    letterSpacing: -0.3,
   },
   mutedText: {
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 18,
   },
   ghostButton: {
     borderRadius: 999,
@@ -566,8 +590,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   input: {
-    borderWidth: 1.5,
-    borderRadius: 8,
+    borderWidth: 1,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
@@ -632,10 +656,13 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   secondaryButton: {
-    borderRadius: 999,
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   secondaryButtonText: {
     fontSize: 13,
@@ -643,12 +670,13 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     borderRadius: 999,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: "center",
   },
   primaryButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
+    color: "#ffffff",
   },
   cancelButton: {
     borderRadius: 999,

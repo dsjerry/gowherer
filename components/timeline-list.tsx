@@ -1,12 +1,12 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import { AudioPlayer } from "@/components/audio-player";
@@ -23,7 +23,8 @@ interface Props {
   onPreviewMedia: (media: TimelineMedia) => void;
 }
 
-const TONE_COLORS = ["#6442d6", "#16a34a", "#f9ab00", "#0f766e"];
+const TONE_COLORS_LIGHT = ["#0071e3", "#16a34a", "#eab308", "#424245"];
+const TONE_COLORS_DARK = ["#2997ff", "#2fbf5f", "#f0c02e", "#d2d2d7"];
 
 function formatDateTime(iso: string) {
   const date = new Date(iso);
@@ -53,19 +54,13 @@ export function TimelineList({
 
   const themedCard = {
     backgroundColor: c.surface,
-    borderColor: c.border,
+    borderColor: c.borderSoft,
   };
-  const themedSectionTitle = { color: c.textPrimary };
-  const themedMuted = { color: c.textTertiary };
+  const themedSectionTitle = { color: c.textTertiary };
   const themedTime = { color: c.textTertiary };
   const themedText = { color: c.textPrimary };
-  const themedTagChip = {
-    backgroundColor: isDark ? "rgba(100,66,214,0.12)" : "rgba(100,66,214,0.06)",
-    borderColor: isDark ? "rgba(100,66,214,0.24)" : "rgba(100,66,214,0.14)",
-  };
-  const themedTagChipText = { color: c.fg };
   const themedMediaBox = {
-    borderColor: c.border,
+    borderColor: c.borderSoft,
     backgroundColor: c.bg,
   };
   const themedBadge = { color: c.textPrimary };
@@ -76,13 +71,14 @@ export function TimelineList({
         {t("journey.timelineTitle")} · {entries.length} 条记录
       </Text>
       {entries.map((entry, index) => {
-        const toneColor = TONE_COLORS[index % TONE_COLORS.length];
+        const tones = isDark ? TONE_COLORS_DARK : TONE_COLORS_LIGHT;
+        const toneColor = tones[index % tones.length];
         return (
           <View key={entry.id} style={styles.timelineItem}>
             <View
               style={[
                 styles.timelineDot,
-                { backgroundColor: toneColor, borderColor: c.surface },
+                { backgroundColor: toneColor, borderColor: c.bg },
               ]}
             />
             <View style={styles.timelineContent}>
@@ -96,9 +92,7 @@ export function TimelineList({
                     backgroundColor: isDark
                       ? `rgba(${hexToRgb(toneColor)},0.06)`
                       : `rgba(${hexToRgb(toneColor)},0.04)`,
-                    borderColor: isDark
-                      ? `rgba(${hexToRgb(toneColor)},0.12)`
-                      : `rgba(${hexToRgb(toneColor)},0.12)`,
+                    borderColor: c.borderSoft,
                   },
                 ]}
               >
@@ -115,17 +109,16 @@ export function TimelineList({
                         style={[
                           styles.tagChip,
                           {
-                            backgroundColor: isDark
-                              ? `rgba(${hexToRgb(toneColor)},0.12)`
-                              : `rgba(${hexToRgb(toneColor)},0.08)`,
-                            borderColor: isDark
-                              ? `rgba(${hexToRgb(toneColor)},0.2)`
-                              : `rgba(${hexToRgb(toneColor)},0.16)`,
+                            backgroundColor: c.bg,
+                            borderColor: c.borderSoft,
                           },
                         ]}
                       >
                         <Text
-                          style={[styles.tagChipText, { color: toneColor }]}
+                          style={[
+                            styles.tagChipText,
+                            { color: c.textSecondary },
+                          ]}
                         >
                           #{tag}
                         </Text>
@@ -138,7 +131,7 @@ export function TimelineList({
                     <MaterialIcons
                       name="location-on"
                       size={15}
-                      color={c.teal}
+                      color={c.textTertiary}
                     />
                     <Text
                       style={[styles.locationText, { color: c.textTertiary }]}
@@ -158,11 +151,15 @@ export function TimelineList({
                 <Pressable
                   style={[
                     styles.entryActionBtn,
-                    { borderColor: c.border, backgroundColor: c.surface },
+                    { borderColor: c.borderSoft, backgroundColor: c.bg },
                   ]}
                   onPress={() => onEditEntry(entry)}
                 >
-                  <MaterialIcons name="edit" size={15} color={c.fg} />
+                  <MaterialIcons
+                    name="edit"
+                    size={15}
+                    color={c.textSecondary}
+                  />
                   <Text
                     style={[styles.entryActionText, { color: c.textSecondary }]}
                   >
@@ -172,7 +169,7 @@ export function TimelineList({
                 <Pressable
                   style={[
                     styles.entryActionBtn,
-                    { borderColor: c.border, backgroundColor: c.surface },
+                    { borderColor: c.borderSoft, backgroundColor: c.bg },
                   ]}
                   onPress={() =>
                     Alert.alert(
@@ -235,13 +232,13 @@ export function TimelineList({
                           <View
                             style={[
                               styles.mediaPlaceholder,
-                              { backgroundColor: c.textPrimary },
+                              { backgroundColor: c.borderSoft },
                             ]}
                           >
                             <Text
                               style={[
                                 styles.mediaPlaceholderText,
-                                { color: c.bg },
+                                { color: c.textTertiary },
                               ]}
                             >
                               {t("journey.mediaBadgeVideo")}
@@ -261,7 +258,7 @@ export function TimelineList({
             </View>
             {index < entries.length - 1 ? (
               <View
-                style={[styles.timelineLine, { backgroundColor: c.border }]}
+                style={[styles.timelineLine, { backgroundColor: c.borderSoft }]}
               />
             ) : null}
           </View>
@@ -282,15 +279,16 @@ function hexToRgb(hex: string): string {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 8,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
     gap: 12,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: "500",
-    letterSpacing: 0.02,
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.06,
+    textTransform: "uppercase",
   },
   timelineItem: {
     position: "relative",
@@ -321,14 +319,14 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   timelineCard: {
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     padding: 12,
-    gap: 6,
+    gap: 8,
   },
   timelineText: {
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 24,
   },
   tagRow: {
     flexDirection: "row",
@@ -361,14 +359,14 @@ const styles = StyleSheet.create({
   entryActionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
     borderRadius: 8,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   entryActionText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "500",
   },
   mutedText: {
@@ -376,7 +374,7 @@ const styles = StyleSheet.create({
   },
   mediaPreviewBox: {
     marginRight: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: "hidden",
     borderWidth: 1,
     width: 110,

@@ -23,7 +23,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TrackMap } from "@/components/track-map";
 import { useI18n } from "@/hooks/locale-preference";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useMaterialTheme } from "@/hooks/use-material-theme";
 import { deleteJourney as deleteJourneyById } from "@/lib/journey-repository";
 import { loadJourneys } from "@/lib/journey-storage";
@@ -412,6 +411,7 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
   const isPlaying = status?.playing ?? false;
+  const { colors } = useMaterialTheme();
 
   const togglePlayback = async () => {
     if (isPlaying) {
@@ -429,7 +429,7 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
       <MaterialIcons
         name={isPlaying ? "pause-circle-filled" : "play-circle-filled"}
         size={20}
-        color="#0f766e"
+        color={colors.textSecondary}
       />
       <Text style={styles.audioLabel} numberOfLines={1} ellipsizeMode="tail">
         {label}
@@ -440,61 +440,50 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
 
 export default function JourneyHistoryScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const { t, locale } = useI18n();
-  const { colors: c } = useMaterialTheme();
+  const { colors: c, isDark: isDarkTheme } = useMaterialTheme();
   const tagSortLocale = locale === "zh" ? "zh-CN" : "en";
   const themed = {
     title: {
-      color: c.fg,
+      color: c.textPrimary,
     },
     subTitle: {
       color: c.textSecondary,
     },
     card: {
       backgroundColor: c.surface,
-      borderColor: c.border,
+      borderColor: c.borderSoft,
+      shadowColor: "#000000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 2,
+      elevation: 1,
     },
     screenBanner: {
       backgroundColor: c.surface,
-      borderColor: c.border,
+      borderColor: c.borderSoft,
     },
     searchInput: {
-      backgroundColor: "transparent",
-      borderColor: c.border,
+      backgroundColor: c.surface,
+      borderColor: "transparent",
       color: c.textPrimary,
     },
     placeholder: c.textTertiary,
     tagChip: {
-      backgroundColor: isDark
-        ? "rgba(100,66,214,0.12)"
-        : "rgba(100,66,214,0.06)",
+      backgroundColor: c.bg,
+      borderColor: c.borderSoft,
+      borderWidth: 1,
     },
     tagChipText: {
-      color: c.fg,
-    },
-    tagFilterChip: {
-      backgroundColor: c.surface,
-      borderColor: c.border,
-    },
-    tagFilterText: {
-      color: c.textSecondary,
-    },
-    filterButton: {
-      backgroundColor: c.surface,
-      borderColor: c.border,
-    },
-    filterButtonText: {
       color: c.textSecondary,
     },
     statsWrap: {
-      backgroundColor: c.surface,
-      borderColor: c.border,
+      backgroundColor: "transparent",
+      borderColor: "transparent",
     },
     statItem: {
       backgroundColor: c.bg,
-      borderColor: c.border,
+      borderColor: c.borderSoft,
     },
     statLabel: {
       color: c.textTertiary,
@@ -518,10 +507,11 @@ export default function JourneyHistoryScreen() {
       color: c.textTertiary,
     },
     divider: {
-      backgroundColor: c.border,
+      backgroundColor: c.borderSoft,
     },
     entryItem: {
       backgroundColor: c.bg,
+      borderColor: c.borderSoft,
     },
     entryTime: {
       color: c.textTertiary,
@@ -536,7 +526,7 @@ export default function JourneyHistoryScreen() {
       color: c.textSecondary,
     },
     mediaPreviewBox: {
-      borderColor: c.border,
+      borderColor: c.borderSoft,
       backgroundColor: c.bg,
     },
     mediaBadge: {
@@ -544,10 +534,10 @@ export default function JourneyHistoryScreen() {
       backgroundColor: c.surface,
     },
     mediaPlaceholder: {
-      backgroundColor: c.textPrimary,
+      backgroundColor: c.borderSoft,
     },
     mediaPlaceholderText: {
-      color: c.bg,
+      color: c.textTertiary,
     },
   };
   const [journeys, setJourneys] = useState<Journey[]>([]);
@@ -743,7 +733,7 @@ export default function JourneyHistoryScreen() {
             {t("review.searchPlaceholder")}
           </Text>
         </View>
-        <Text style={[styles.bannerMeta, { color: c.fg }]}>
+        <Text style={[styles.bannerMeta, { color: c.textTertiary }]}>
           {filteredJourneys.length} 条结果
         </Text>
       </View>
@@ -758,147 +748,145 @@ export default function JourneyHistoryScreen() {
             </Text>
           </View>
           <Text
-            style={[styles.summaryPill, { color: c.fg, borderColor: c.border }]}
+            style={[
+              styles.summaryPill,
+              {
+                color: c.textSecondary,
+                borderColor: c.borderSoft,
+                backgroundColor: c.bg,
+              },
+            ]}
           >
             {filteredJourneys.length} 条
           </Text>
         </View>
         <View style={styles.summaryGrid}>
-          <View style={[styles.summaryStat, { borderColor: c.border }]}>
+          <View style={[styles.summaryStat, { borderColor: c.borderSoft }]}>
             <Text style={[styles.summaryValue, themed.journeyTitle]}>
               {summaryDistance}
             </Text>
-            <Text style={[styles.summaryLabel, themed.subTitle]}>公里</Text>
+            <Text style={[styles.summaryLabel, themed.statLabel]}>公里</Text>
           </View>
-          <View style={[styles.summaryStat, { borderColor: c.border }]}>
+          <View style={[styles.summaryStat, { borderColor: c.borderSoft }]}>
             <Text style={[styles.summaryValue, themed.journeyTitle]}>
               {summaryEntries}
             </Text>
-            <Text style={[styles.summaryLabel, themed.subTitle]}>记录</Text>
+            <Text style={[styles.summaryLabel, themed.statLabel]}>记录</Text>
           </View>
-          <View style={[styles.summaryStat, { borderColor: c.border }]}>
+          <View style={[styles.summaryStat, { borderColor: c.borderSoft }]}>
             <Text style={[styles.summaryValue, themed.journeyTitle]}>
               {summaryPoints}
             </Text>
-            <Text style={[styles.summaryLabel, themed.subTitle]}>定位点</Text>
+            <Text style={[styles.summaryLabel, themed.statLabel]}>定位点</Text>
           </View>
         </View>
       </View>
-      <View style={[styles.searchBar, themed.searchInput]}>
-        <MaterialIcons name="search" size={20} color={c.textTertiary} />
+      <View style={[styles.searchBar, { backgroundColor: c.surface }]}>
+        <MaterialIcons name="search" size={18} color={c.meta} />
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder={t("review.searchPlaceholder")}
           placeholderTextColor={themed.placeholder}
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: c.textPrimary }]}
+          returnKeyType="search"
         />
+        {searchQuery.length > 0 ? (
+          <Pressable
+            accessibilityLabel={t("common.cancel")}
+            onPress={() => setSearchQuery("")}
+            hitSlop={8}
+          >
+            <MaterialIcons name="cancel" size={16} color={c.meta} />
+          </Pressable>
+        ) : null}
       </View>
 
-      <View style={styles.filterRow}>
-        <Pressable
-          style={[
-            styles.filterButton,
-            themed.filterButton,
-            filter === "all" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilter("all")}
-        >
-          <Text
-            style={[
-              styles.filterButtonText,
-              themed.filterButtonText,
-              filter === "all" && styles.filterButtonTextActive,
-            ]}
-          >
-            {t("review.filterAll")}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.filterButton,
-            themed.filterButton,
-            filter === "travel" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilter("travel")}
-        >
-          <Text
-            style={[
-              styles.filterButtonText,
-              themed.filterButtonText,
-              filter === "travel" && styles.filterButtonTextActive,
-            ]}
-          >
-            {t("review.filterTravel")}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.filterButton,
-            themed.filterButton,
-            filter === "commute" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilter("commute")}
-        >
-          <Text
-            style={[
-              styles.filterButtonText,
-              themed.filterButtonText,
-              filter === "commute" && styles.filterButtonTextActive,
-            ]}
-          >
-            {t("review.filterCommute")}
-          </Text>
-        </Pressable>
-      </View>
-      {availableTags.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.tagFilterRow}>
+      <View style={[styles.segmented, { backgroundColor: c.surface }]}>
+        {(
+          [
+            ["all", t("review.filterAll")],
+            ["travel", t("review.filterTravel")],
+            ["commute", t("review.filterCommute")],
+          ] as const
+        ).map(([value, label]) => {
+          const isActive = filter === value;
+          return (
             <Pressable
+              key={value}
               style={[
-                styles.tagFilterChip,
-                themed.tagFilterChip,
-                !selectedTag && styles.tagFilterChipActive,
+                styles.segment,
+                isActive && [
+                  styles.segmentActive,
+                  {
+                    backgroundColor: isDarkTheme ? c.surfaceWarm : c.bg,
+                    shadowColor: "#000000",
+                  },
+                ],
               ]}
-              onPress={() => setSelectedTag(null)}
+              onPress={() => setFilter(value)}
+              accessibilityState={{ selected: isActive }}
             >
               <Text
                 style={[
-                  styles.tagFilterText,
-                  themed.tagFilterText,
-                  !selectedTag && styles.tagFilterTextActive,
+                  styles.segmentText,
+                  { color: c.textSecondary },
+                  isActive && { color: c.textPrimary, fontWeight: "600" },
                 ]}
               >
-                {t("review.filterAllTags")}
+                {label}
               </Text>
             </Pressable>
-            {availableTags.map((tag) => (
-              <Pressable
-                key={tag}
-                style={[
-                  styles.tagFilterChip,
-                  themed.tagFilterChip,
-                  selectedTag === tag && styles.tagFilterChipActive,
-                ]}
-                onPress={() => setSelectedTag(tag)}
-              >
-                <Text
+          );
+        })}
+      </View>
+
+      {availableTags.length > 0 ? (
+        <View style={styles.tagFilterBlock}>
+          <Text style={[styles.tagFilterLabel, { color: c.textTertiary }]}>
+            {t("review.tagFilterTitle")}
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tagFilterRow}
+          >
+            {availableTags.map((tag) => {
+              const isActive = selectedTag === tag;
+              return (
+                <Pressable
+                  key={tag}
                   style={[
-                    styles.tagFilterText,
-                    themed.tagFilterText,
-                    selectedTag === tag && styles.tagFilterTextActive,
+                    styles.tagFilterChip,
+                    {
+                      backgroundColor: isActive ? c.fg : c.bg,
+                      borderColor: isActive ? c.fg : c.borderSoft,
+                    },
                   ]}
+                  onPress={() => setSelectedTag(isActive ? null : tag)}
+                  accessibilityState={{ selected: isActive }}
                 >
-                  #{tag}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </ScrollView>
+                  <Text
+                    style={[
+                      styles.tagFilterText,
+                      { color: c.textSecondary },
+                      isActive && { color: c.bg },
+                    ]}
+                  >
+                    #{tag}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
       ) : null}
 
       {filteredJourneys.length === 0 ? (
-        <View style={[styles.card, themed.card]}>
+        <View style={[styles.card, themed.card, styles.emptyState]}>
+          <View style={[styles.emptyIcon, { backgroundColor: c.surfaceWarm }]}>
+            <MaterialIcons name="search" size={28} color={c.meta} />
+          </View>
           <Text style={[styles.emptyTitle, themed.emptyTitle]}>
             {t("review.emptyTitle")}
           </Text>
@@ -923,27 +911,43 @@ export default function JourneyHistoryScreen() {
                     style={[
                       styles.kindChip,
                       journey.kind === "travel"
-                        ? { color: c.fg, backgroundColor: `${c.fg}10` }
+                        ? {
+                            color: c.accent,
+                            backgroundColor: `${c.accent}12`,
+                            borderColor: `${c.accent}33`,
+                          }
                         : {
                             color: c.accentSecondary,
-                            backgroundColor: `${c.accentSecondary}10`,
+                            backgroundColor: `${c.accentSecondary}12`,
+                            borderColor: `${c.accentSecondary}38`,
                           },
                     ]}
                   >
                     {kindLabel(journey.kind, t)}
                   </Text>
-                  <Text style={[styles.journeyTitle, themed.journeyTitle]}>
-                    {journey.title}
-                  </Text>
-                  <Text style={[styles.journeyMeta, themed.journeyMeta]}>
-                    {formatDateTime(journey.createdAt)} -{" "}
-                    {formatDateTime(journey.endedAt)}
-                  </Text>
-                  <Text style={[styles.journeyMeta, themed.journeyMeta]}>
-                    {t("review.journeyCount", {
-                      count: journey.entries.length,
-                    })}
-                  </Text>
+                  <View style={styles.journeyTitleRow}>
+                    <Text
+                      style={[styles.journeyTitle, themed.journeyTitle]}
+                      numberOfLines={2}
+                    >
+                      {journey.title}
+                    </Text>
+                    <Text style={[styles.journeyDate, themed.journeyMeta]}>
+                      {formatDateTime(journey.createdAt)}
+                    </Text>
+                  </View>
+                  <View style={styles.journeyMetaRow}>
+                    <Text style={[styles.journeyMeta, themed.journeyMeta]}>
+                      {formatDateTime(journey.endedAt)}
+                    </Text>
+                    <Text
+                      style={[styles.journeyCount, { color: c.textSecondary }]}
+                    >
+                      {t("review.journeyCount", {
+                        count: journey.entries.length,
+                      })}
+                    </Text>
+                  </View>
                   {journey.tags.length > 0 ? (
                     <View style={styles.tagRow}>
                       {journey.tags.map((tag) => (
@@ -962,24 +966,40 @@ export default function JourneyHistoryScreen() {
                   ) : null}
                 </View>
                 <View style={styles.journeyHeaderActions}>
-                  <Pressable onPress={() => toggleJourneyCollapsed(journey.id)}>
+                  <Pressable
+                    style={[
+                      styles.headerActionButton,
+                      { backgroundColor: c.surfaceWarm },
+                    ]}
+                    onPress={() => toggleJourneyCollapsed(journey.id)}
+                  >
                     <MaterialIcons
                       name={isCollapsed ? "expand-more" : "expand-less"}
-                      size={22}
-                      color={isDark ? "#cbd5e1" : "#334155"}
+                      size={20}
+                      color={c.muted}
                     />
                   </Pressable>
                   {!isCollapsed ? (
-                    <Pressable onPress={() => void exportJourneyPdf(journey)}>
+                    <Pressable
+                      style={[
+                        styles.headerActionButton,
+                        { backgroundColor: c.surfaceWarm },
+                      ]}
+                      onPress={() => void exportJourneyPdf(journey)}
+                    >
                       <MaterialIcons
                         name="picture-as-pdf"
-                        size={20}
-                        color={isDark ? "#7dd3fc" : "#0369a1"}
+                        size={18}
+                        color={c.muted}
                       />
                     </Pressable>
                   ) : null}
                   {!isCollapsed ? (
                     <Pressable
+                      style={[
+                        styles.headerActionButton,
+                        { backgroundColor: `${c.danger}1F` },
+                      ]}
                       onPress={() =>
                         Alert.alert(
                           t("review.deleteJourneyTitle"),
@@ -1000,7 +1020,7 @@ export default function JourneyHistoryScreen() {
                       <MaterialIcons
                         name="delete-outline"
                         size={20}
-                        color={isDark ? "#fca5a5" : "#b91c1c"}
+                        color={c.danger}
                       />
                     </Pressable>
                   ) : null}
@@ -1045,10 +1065,48 @@ export default function JourneyHistoryScreen() {
 
                   {hasTrackMap ? (
                     <View>
-                      <Text style={[styles.mapTitle, themed.mapTitle]}>
-                        {t("review.trackMapTitle")}
-                      </Text>
                       <View
+                        style={[
+                          styles.routeCard,
+                          { backgroundColor: c.bg, borderColor: c.borderSoft },
+                        ]}
+                      >
+                        <View style={styles.routePreviewLeft}>
+                          <View
+                            style={[
+                              styles.routePreviewIcon,
+                              { backgroundColor: `${c.accentSecondary}14` },
+                            ]}
+                          >
+                            <MaterialIcons
+                              name="route"
+                              size={18}
+                              color={c.accentSecondary}
+                            />
+                          </View>
+                          <View style={styles.routeCopy}>
+                            <Text
+                              style={[
+                                styles.routeTitle,
+                                { color: c.textPrimary },
+                              ]}
+                            >
+                              {t("review.trackMapTitle")}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.routeSubtitle,
+                                { color: c.textTertiary },
+                              ]}
+                            >
+                              {stats.locationPoints} 个定位点 ·{" "}
+                              {stats.distanceKm.toFixed(1)} 公里
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View
+                        style={[styles.mapFrame, { borderColor: c.borderSoft }]}
                         onTouchStart={() => setMapInteracting(true)}
                         onTouchEnd={() => setMapInteracting(false)}
                         onTouchCancel={() => setMapInteracting(false)}
@@ -1060,9 +1118,24 @@ export default function JourneyHistoryScreen() {
                       </View>
                     </View>
                   ) : (
-                    <Text style={[styles.emptyText, themed.emptyText]}>
-                      {t("review.trackMapEmpty")}
-                    </Text>
+                    <View
+                      style={[
+                        styles.routeCard,
+                        { backgroundColor: c.bg, borderColor: c.borderSoft },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.routePreviewIcon,
+                          { backgroundColor: c.surfaceWarm },
+                        ]}
+                      >
+                        <MaterialIcons name="map" size={18} color={c.muted} />
+                      </View>
+                      <Text style={[styles.emptyText, themed.emptyText]}>
+                        {t("review.trackMapEmpty")}
+                      </Text>
+                    </View>
                   )}
 
                   <View style={[styles.divider, themed.divider]} />
@@ -1344,9 +1417,9 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
   title: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: "600",
-    letterSpacing: -0.02,
+    letterSpacing: -0.01,
   },
   pageHeader: {
     flexDirection: "row",
@@ -1358,7 +1431,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   screenBanner: {
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     padding: 14,
     flexDirection: "row",
@@ -1383,7 +1456,7 @@ const styles = StyleSheet.create({
     paddingTop: 1,
   },
   summaryCard: {
-    borderRadius: 8,
+    borderRadius: 18,
     borderWidth: 1,
     padding: 14,
     gap: 12,
@@ -1394,19 +1467,22 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   summaryTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "600",
+    letterSpacing: -0.01,
   },
   summarySubtitle: {
-    fontSize: 11,
-    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 3,
   },
   summaryPill: {
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    fontSize: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    fontSize: 12,
+    fontWeight: "600",
   },
   summaryGrid: {
     flexDirection: "row",
@@ -1415,78 +1491,87 @@ const styles = StyleSheet.create({
   summaryStat: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 7,
-    padding: 9,
+    borderRadius: 12,
+    padding: 10,
+    alignItems: "center",
   },
   summaryValue: {
     fontSize: 18,
     fontWeight: "600",
+    letterSpacing: -0.01,
+    fontVariant: ["tabular-nums"],
   },
   summaryLabel: {
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
+    letterSpacing: 0.06,
+    textTransform: "uppercase",
+    fontWeight: "500",
   },
   searchBar: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderRadius: 8,
+    minHeight: 40,
+    borderRadius: 12,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
   searchInput: {
-    borderWidth: 1.5,
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    flex: 1,
     fontSize: 15,
+    paddingVertical: 0,
   },
-  filterRow: {
+  segmented: {
     flexDirection: "row",
+    borderRadius: 10,
+    padding: 2,
+    gap: 2,
+  },
+  segment: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentActive: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  tagFilterBlock: {
     gap: 8,
+  },
+  tagFilterLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.06,
+    textTransform: "uppercase",
   },
   tagFilterRow: {
     flexDirection: "row",
     gap: 6,
     paddingRight: 6,
+    paddingVertical: 1,
   },
   tagFilterChip: {
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
     borderWidth: 1,
-  },
-  tagFilterChipActive: {
-    backgroundColor: c.accent,
-    borderColor: c.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   tagFilterText: {
     fontSize: 12,
     fontWeight: "500",
   },
-  tagFilterTextActive: {
-    color: c.fg,
-  },
-  filterButton: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  filterButtonActive: {
-    backgroundColor: c.fg,
-    borderColor: c.fg,
-  },
-  filterButtonText: {
-    fontWeight: "500",
-    fontSize: 13,
-  },
-  filterButtonTextActive: {
-    color: c.fgOn,
-  },
   card: {
-    borderRadius: 8,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
     gap: 8,
@@ -1505,31 +1590,49 @@ const styles = StyleSheet.create({
   kindChip: {
     alignSelf: "flex-start",
     borderRadius: 999,
+    borderWidth: 1,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    fontSize: 10,
+    paddingVertical: 4,
+    fontSize: 11,
     fontWeight: "600",
   },
   journeyHeaderActions: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+  },
+  headerActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  journeyTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 2,
+  },
+  journeyMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   statsWrap: {
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 10,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
   statItem: {
-    minWidth: "47%",
-    borderRadius: 8,
+    width: "48.5%",
+    flexGrow: 1,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     gap: 4,
+    alignItems: "center",
   },
   statLabel: {
     fontSize: 11,
@@ -1538,43 +1641,98 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: "600",
-    letterSpacing: -0.02,
+    letterSpacing: -0.01,
+    fontVariant: ["tabular-nums"],
   },
   journeyTitle: {
-    fontSize: 18,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 17,
     fontWeight: "600",
-    letterSpacing: -0.02,
+    letterSpacing: -0.01,
+  },
+  journeyDate: {
+    fontSize: 12,
   },
   journeyMeta: {
+    fontSize: 12,
+  },
+  journeyCount: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  routeCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  routePreviewLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  routePreviewIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  routeCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  routeTitle: {
     fontSize: 13,
-  },
-  mapTitle: {
     fontWeight: "600",
   },
-  exportText: {
-    fontWeight: "600",
+  routeSubtitle: {
+    marginTop: 1,
     fontSize: 12,
   },
-  deleteText: {
-    fontWeight: "600",
-    fontSize: 12,
+  mapFrame: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
   },
-  divider: {
-    height: 1,
-    marginVertical: 4,
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: "600",
   },
+  divider: {
+    height: 1,
+    marginVertical: 4,
+  },
   emptyText: {
     lineHeight: 20,
+    textAlign: "center",
+    fontSize: 13,
   },
   entryItem: {
-    borderRadius: 8,
-    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
     gap: 4,
   },
   entryTime: {
@@ -1660,9 +1818,9 @@ const styles = StyleSheet.create({
     top: 48,
     right: 20,
     zIndex: 2,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    backgroundColor: "rgba(29,29,31,0.85)",
+    borderRadius: 999,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
   previewCloseText: {

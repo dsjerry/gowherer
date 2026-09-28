@@ -1,6 +1,5 @@
 import { Tabs } from "expo-router";
 import React from "react";
-import { View } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -16,24 +15,25 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.fg,
-        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
-          height: 80,
-          paddingBottom: 12,
+          height: 78,
+          paddingBottom: 14,
           paddingTop: 8,
           backgroundColor: colors.tabBg,
-          borderTopColor: colors.border,
+          borderTopColor: colors.borderSoft,
           borderTopWidth: 1,
           elevation: 0,
           shadowOpacity: 0,
         },
         tabBarItemStyle: {
-          gap: 2,
+          gap: 3,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "500",
+          letterSpacing: 0.01,
         },
         headerShown: false,
         tabBarButton: HapticTab,
@@ -43,23 +43,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: t("tabs.journey"),
-          tabBarIcon: ({ color, focused }) => (
-            <View
-              style={{
-                width: 64,
-                height: 30,
-                borderRadius: 999,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: focused ? colors.fg : "transparent",
-              }}
-            >
-              <IconSymbol
-                size={20}
-                name="map.fill"
-                color={focused ? colors.fgOn : color}
-              />
-            </View>
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={22} name="map.fill" color={color} />
           ),
         }}
       />
@@ -67,23 +52,8 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: t("tabs.explore"),
-          tabBarIcon: ({ color, focused }) => (
-            <View
-              style={{
-                width: 64,
-                height: 30,
-                borderRadius: 999,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: focused ? colors.fg : "transparent",
-              }}
-            >
-              <IconSymbol
-                size={20}
-                name="paperplane.fill"
-                color={focused ? colors.fgOn : color}
-              />
-            </View>
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={22} name="clock" color={color} />
           ),
         }}
       />
@@ -91,23 +61,8 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: t("tabs.settings"),
-          tabBarIcon: ({ color, focused }) => (
-            <View
-              style={{
-                width: 64,
-                height: 30,
-                borderRadius: 999,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: focused ? colors.fg : "transparent",
-              }}
-            >
-              <IconSymbol
-                size={20}
-                name="gearshape.fill"
-                color={focused ? colors.fgOn : color}
-              />
-            </View>
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={22} name="gearshape" color={color} />
           ),
         }}
       />

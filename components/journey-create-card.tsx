@@ -34,16 +34,15 @@ export function JourneyCreateCard({
 
   const themedCard = {
     backgroundColor: c.surface,
-    borderColor: c.border,
+    borderColor: c.borderSoft,
   };
-  const themedSectionTitle = { color: c.textPrimary };
   const themedKindButton = {
     backgroundColor: c.bg,
     borderColor: c.border,
   };
-  const themedKindButtonText = { color: c.textSecondary };
+  const themedKindButtonText = { color: c.textPrimary };
   const themedInput = {
-    backgroundColor: "transparent",
+    backgroundColor: c.bg,
     borderColor: c.border,
     color: c.textPrimary,
   };
@@ -52,16 +51,26 @@ export function JourneyCreateCard({
   return (
     <View style={[styles.card, themedCard]}>
       {/* Hero section */}
-      <View style={[styles.hero, { backgroundColor: c.surface }]}>
-        <Text style={[styles.eyebrow, { color: c.fg }]}>
+      <View
+        style={[
+          styles.hero,
+          {
+            backgroundColor: c.surface,
+            borderBottomColor: c.borderSoft,
+          },
+        ]}
+      >
+        <Text
+          style={[styles.eyebrow, { color: isDark ? "#2997ff" : c.accent }]}
+        >
           {t("journey.startNew")}
         </Text>
-        <Text style={[styles.heroTitle, { color: c.textSecondary }]}>
+        <Text style={[styles.heroTitle, { color: c.textPrimary }]}>
           {journeyKind === "travel"
             ? "把下一段路程整理成清晰时间线"
             : "记录每一次通勤的路线与耗时"}
         </Text>
-        <Text style={[styles.heroSub, { color: c.textTertiary }]}>
+        <Text style={[styles.heroSub, { color: c.textSecondary }]}>
           GoWherer 会把照片、位置和文字记录收进同一条旅程。
         </Text>
       </View>
@@ -73,8 +82,8 @@ export function JourneyCreateCard({
             styles.kindButton,
             themedKindButton,
             journeyKind === "travel" && {
-              backgroundColor: c.fg,
-              borderColor: c.fg,
+              borderColor: c.accent,
+              backgroundColor: `${c.accent}0F`,
             },
           ]}
           onPress={() => onChangeKind("travel")}
@@ -82,19 +91,19 @@ export function JourneyCreateCard({
           <MaterialIcons
             name="map"
             size={18}
-            color={journeyKind === "travel" ? c.fgOn : c.fg}
+            color={journeyKind === "travel" ? c.accent : c.textSecondary}
           />
           <Text
             style={[
               styles.kindButtonText,
               themedKindButtonText,
-              journeyKind === "travel" && { color: c.fgOn },
+              journeyKind === "travel" && { color: c.textPrimary },
             ]}
           >
             {t("journey.kind.travel")}
           </Text>
           {journeyKind === "travel" && (
-            <MaterialIcons name="check" size={14} color={c.fgOn} />
+            <MaterialIcons name="check-circle" size={16} color={c.accent} />
           )}
         </Pressable>
         <Pressable
@@ -102,8 +111,8 @@ export function JourneyCreateCard({
             styles.kindButton,
             themedKindButton,
             journeyKind === "commute" && {
-              backgroundColor: c.accentSecondary,
-              borderColor: c.accentSecondary,
+              borderColor: c.accent,
+              backgroundColor: `${c.accent}0F`,
             },
           ]}
           onPress={() => onChangeKind("commute")}
@@ -111,19 +120,25 @@ export function JourneyCreateCard({
           <MaterialIcons
             name="alt-route"
             size={18}
-            color={journeyKind === "commute" ? c.fgOn : c.accentSecondary}
+            color={
+              journeyKind === "commute" ? c.accentSecondary : c.textSecondary
+            }
           />
           <Text
             style={[
               styles.kindButtonText,
               themedKindButtonText,
-              journeyKind === "commute" && { color: c.fgOn },
+              journeyKind === "commute" && { color: c.textPrimary },
             ]}
           >
             {t("journey.kind.commute")}
           </Text>
           {journeyKind === "commute" && (
-            <MaterialIcons name="check" size={14} color={c.fgOn} />
+            <MaterialIcons
+              name="check-circle"
+              size={16}
+              color={c.accentSecondary}
+            />
           )}
         </Pressable>
       </View>
@@ -200,7 +215,9 @@ export function JourneyCreateCard({
         <Pressable
           style={[
             styles.primaryButton,
-            { backgroundColor: journeyTitle.trim() ? c.fg : c.border },
+            {
+              backgroundColor: journeyTitle.trim() ? c.accent : c.borderSoft,
+            },
           ]}
           onPress={onCreateJourney}
           disabled={creating || !journeyTitle.trim()}
@@ -222,8 +239,17 @@ export function JourneyCreateCard({
           </Text>
         </Pressable>
 
-        <View style={[styles.hint, { borderColor: c.border, backgroundColor: c.bg }]}>
-          <MaterialIcons name="check-circle" size={16} color={c.accentSecondary} />
+        <View
+          style={[
+            styles.hint,
+            { borderColor: c.border, backgroundColor: c.bg },
+          ]}
+        >
+          <MaterialIcons
+            name="check-circle"
+            size={16}
+            color={c.accentSecondary}
+          />
           <Text style={[styles.hintText, { color: c.textTertiary }]}>
             开始后会自动建立空时间线，你可以继续添加文字、照片、位置和标签。
           </Text>
@@ -235,7 +261,7 @@ export function JourneyCreateCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 8,
+    borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
     gap: 0,
@@ -273,10 +299,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   kindButtonText: {
     flex: 1,
@@ -291,13 +317,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   inputLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "500",
     marginBottom: 2,
   },
   input: {
-    borderWidth: 1.5,
-    borderRadius: 8,
+    borderWidth: 1,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
@@ -333,16 +359,15 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   primaryButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
-    letterSpacing: 0.02,
   },
   hint: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
   },
   hintText: {

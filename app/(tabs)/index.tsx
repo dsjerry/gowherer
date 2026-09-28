@@ -113,11 +113,11 @@ export default function JourneyScreen() {
   const { t, locale } = useI18n();
   const { colors } = useMaterialTheme();
 
-  const pageTitleColor = { color: colors.fg };
+  const pageTitleColor = { color: colors.textPrimary };
   const pageSubTitleColor = { color: colors.textTertiary };
   const headerActionStyle = {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: "transparent",
+    borderColor: "transparent",
   };
 
   // ---- Journey data -------------------------------------------------------
@@ -661,9 +661,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pageTitle: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: "600",
-    letterSpacing: -0.02,
+    letterSpacing: -0.01,
   },
   pageHeader: {
     flexDirection: "row",
@@ -672,10 +672,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headerAction: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 0,
     alignItems: "center",
     justifyContent: "center",
   },

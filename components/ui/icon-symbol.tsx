@@ -20,6 +20,8 @@ const MAPPING = {
   "house.fill": "home",
   "map.fill": "map",
   "paperplane.fill": "history",
+  clock: "history",
+  gearshape: "settings",
   "gearshape.fill": "settings",
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",

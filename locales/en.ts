@@ -208,6 +208,7 @@ const en = {
     filterTravel: "Travel",
     filterCommute: "Commute",
     filterAllTags: "All tags",
+    tagFilterTitle: "Tags",
     emptyTitle: "No completed journeys match",
     emptyBody: "Try another filter, or add a record in the Journey tab first.",
     journeyCount: "Records: {count}",

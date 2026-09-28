@@ -1,14 +1,11 @@
-import { Pressable, StyleSheet } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { Pressable, StyleSheet } from "react-native";
 
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useMaterialTheme } from "@/hooks/use-material-theme";
 import { useThemePreference } from "@/hooks/theme-preference";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
 
 export function ThemeToggle() {
   const { resolvedTheme, toggleTheme } = useThemePreference();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const { colors: c } = useMaterialTheme();
 
   return (
@@ -25,7 +22,7 @@ export function ThemeToggle() {
       <MaterialIcons
         name={resolvedTheme === "dark" ? "light-mode" : "dark-mode"}
         size={18}
-        color={c.fg}
+        color={c.textSecondary}
       />
     </Pressable>
   );

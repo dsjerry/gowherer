@@ -34,9 +34,9 @@ function buildStyles(c: ThemeColors, _isDark: boolean) {
     // Cards
     card: {
       backgroundColor: c.surface,
-      borderRadius: 8,
+      borderRadius: 18,
       borderWidth: 1,
-      borderColor: c.border,
+      borderColor: c.borderSoft,
       padding: 16,
     },
 
@@ -57,46 +57,46 @@ function buildStyles(c: ThemeColors, _isDark: boolean) {
 
     // Section header
     sectionHeader: {
-      fontSize: 14,
-      fontWeight: "500",
+      fontSize: 13,
+      fontWeight: "600",
       color: c.textTertiary,
-      letterSpacing: 0.02,
+      letterSpacing: 0.06,
+      textTransform: "uppercase",
       marginBottom: 10,
     },
 
     // Input
     input: {
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderColor: c.border,
-      borderRadius: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
       fontSize: 15,
       color: c.textPrimary,
-      backgroundColor: "transparent",
+      backgroundColor: c.bg,
     },
 
     // Primary button
     btnPrimary: {
-      backgroundColor: c.fg,
+      backgroundColor: c.accent,
       borderRadius: 999,
       paddingVertical: 12,
-      paddingHorizontal: 24,
+      paddingHorizontal: 22,
       alignItems: "center",
       justifyContent: "center",
     },
     btnPrimaryText: {
       color: c.fgOn,
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: "600",
-      letterSpacing: 0.02,
     },
 
     // Secondary button
     btnSecondary: {
-      backgroundColor: c.surface,
+      backgroundColor: c.bg,
       borderRadius: 999,
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderColor: c.border,
       paddingVertical: 10,
       paddingHorizontal: 16,
@@ -104,19 +104,19 @@ function buildStyles(c: ThemeColors, _isDark: boolean) {
       justifyContent: "center",
     },
     btnSecondaryText: {
-      color: c.fg,
+      color: c.textSecondary,
       fontSize: 13,
-      fontWeight: "600",
+      fontWeight: "500",
     },
 
     // Chip
     chip: {
       borderRadius: 999,
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderColor: c.border,
       paddingHorizontal: 14,
       paddingVertical: 6,
-      backgroundColor: "transparent",
+      backgroundColor: c.bg,
     },
     chipText: {
       fontSize: 13,
@@ -128,13 +128,13 @@ function buildStyles(c: ThemeColors, _isDark: boolean) {
       borderColor: c.fg,
     },
     chipActiveText: {
-      color: c.fgOn,
+      color: c.bg,
     },
 
     // Divider
     divider: {
       height: 1,
-      backgroundColor: c.border,
+      backgroundColor: c.borderSoft,
       marginVertical: 12,
     },
 
@@ -145,7 +145,7 @@ function buildStyles(c: ThemeColors, _isDark: boolean) {
       justifyContent: "space-between",
       paddingVertical: 12,
       borderBottomWidth: 1,
-      borderBottomColor: c.border,
+      borderBottomColor: c.borderSoft,
     },
   });
 }

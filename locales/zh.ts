@@ -192,6 +192,7 @@ const zh = {
     filterTravel: "旅行",
     filterCommute: "通勤",
     filterAllTags: "全部标签",
+    tagFilterTitle: "标签",
     emptyTitle: "没有匹配的已完成旅程",
     emptyBody: "换个筛选条件，或先在「旅程」页完成一次记录。",
     journeyCount: "记录数：{count}",

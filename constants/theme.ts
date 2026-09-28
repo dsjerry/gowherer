@@ -1,8 +1,9 @@
 /**
- * GoWherer Material Design Theme Tokens
+ * GoWherer Apple-style Theme Tokens
  *
- * Color system inspired by Material Design with a purple/violet accent palette.
- * Based on the Open Design prototype (gowherer-material-ui.html).
+ * Color system based on the Open Design prototype (gowherer-apple-ui.html):
+ * Apple graphite neutrals with a bright link-blue accent, ink-inverted chips,
+ * and a single black hero card for the active journey.
  */
 
 import { Platform } from "react-native";
@@ -16,17 +17,25 @@ export interface ThemeColors {
   bg: string;
   /** Card / elevated surface fill */
   surface: string;
-  /** Primary accent, interactive elements */
+  /** Elevated fill used by inset elements in dark mode */
+  surfaceWarm: string;
+  /** Primary ink; also the black hero-card fill in light mode */
   fg: string;
+  /** Secondary ink */
+  fg2: string;
   /** Secondary text, disabled states */
   muted: string;
+  /** Tertiary meta text */
+  meta: string;
   /** Dividers, card borders */
   border: string;
-  /** Secondary accent, highlight fills */
+  /** Soft dividers, quiet card borders */
+  borderSoft: string;
+  /** Primary accent, interactive elements */
   accent: string;
   /** Success / positive actions */
   accentSecondary: string;
-  /** Text on foreground-colored surfaces */
+  /** Text on accent-colored surfaces */
   fgOn: string;
   /** Headings, primary body text */
   textPrimary: string;
@@ -49,21 +58,25 @@ export interface ThemeColors {
 
 const light: ThemeColors = {
   bg: "#ffffff",
-  surface: "#f9f7fd",
-  fg: "#6442d6",
-  muted: "#b9aaed",
-  border: "#e9e5f9",
-  accent: "#c8b3fd",
+  surface: "#f5f5f7",
+  surfaceWarm: "#fbfbfd",
+  fg: "#1d1d1f",
+  fg2: "#424245",
+  muted: "#6e6e73",
+  meta: "#86868b",
+  border: "#d2d2d7",
+  borderSoft: "#e8e8ed",
+  accent: "#0071e3",
   accentSecondary: "#16a34a",
   fgOn: "#ffffff",
-  textPrimary: "#1a1625",
-  textSecondary: "#5a4f73",
-  textTertiary: "#8a7fa3",
+  textPrimary: "#1d1d1f",
+  textSecondary: "#424245",
+  textTertiary: "#6e6e73",
   success: "#16a34a",
-  warn: "#f9ab00",
-  danger: "#d93025",
+  warn: "#eab308",
+  danger: "#dc2626",
   teal: "#0f766e",
-  tabBg: "#f9f7fd",
+  tabBg: "#ffffff",
 };
 
 // ---------------------------------------------------------------------------
@@ -71,22 +84,26 @@ const light: ThemeColors = {
 // ---------------------------------------------------------------------------
 
 const dark: ThemeColors = {
-  bg: "#1a1625",
-  surface: "#252031",
-  fg: "#c8b3fd",
-  muted: "#7c6db5",
-  border: "#3d3555",
-  accent: "#c8b3fd",
+  bg: "#000000",
+  surface: "#1d1d1f",
+  surfaceWarm: "#272729",
+  fg: "#f5f5f7",
+  fg2: "#d2d2d7",
+  muted: "#86868b",
+  meta: "#86868b",
+  border: "rgba(255,255,255,0.14)",
+  borderSoft: "rgba(255,255,255,0.08)",
+  accent: "#0071e3",
   accentSecondary: "#16a34a",
   fgOn: "#ffffff",
-  textPrimary: "#e8e0f5",
-  textSecondary: "#b8a8d8",
-  textTertiary: "#7c6db5",
+  textPrimary: "#f5f5f7",
+  textSecondary: "#d2d2d7",
+  textTertiary: "#86868b",
   success: "#16a34a",
-  warn: "#f9ab00",
-  danger: "#d93025",
+  warn: "#eab308",
+  danger: "#dc2626",
   teal: "#0f766e",
-  tabBg: "#252031",
+  tabBg: "#000000",
 };
 
 // ---------------------------------------------------------------------------
