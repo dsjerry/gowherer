@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons"
 import { useFocusEffect } from "@react-navigation/native"
 import Constants from "expo-constants"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -25,6 +26,7 @@ import {
   NearbyPlace,
   queryNearbyPlaces,
   reverseGeocodePlaceName,
+  searchPlaces,
   toGcj02,
   toWgs84,
 } from "@/lib/reverse-geocode"
@@ -87,6 +89,8 @@ export default function LocationPickerScreen() {
   const selectionRequestIdRef = useRef(0)
   const autoLocateTriggeredRef = useRef(false)
   const screenActiveRef = useRef(false)
+  const searchActiveRef = useRef(false)
+  const searchBiasRef = useRef<AMapLatLng | null>(null)
   const mapRef = useRef<MapViewRef | null>(null)
   const [selected, setSelected] = useState<AMapLatLng | null>(null)
   const [selectedWgs, setSelectedWgs] = useState<AMapLatLng | null>(null)
@@ -95,6 +99,9 @@ export default function LocationPickerScreen() {
   const [loadingNearby, setLoadingNearby] = useState(false)
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([])
   const [nearbyHint, setNearbyHint] = useState("")
+  const [searchText, setSearchText] = useState("")
+  const [searchResults, setSearchResults] = useState<NearbyPlace[] | null>(null)
+  const [searching, setSearching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [mapVisible, setMapVisible] = useState(true)
 
@@ -205,7 +212,12 @@ export default function LocationPickerScreen() {
           screenActiveRef.current &&
           selectionRequestIdRef.current === requestId
         ) {
-          await refreshNearbyPlaces(mapTarget)
+          searchBiasRef.current = mapTarget
+          // While a keyword search is active, keep the search results on
+          // screen instead of replacing them with nearby places.
+          if (!searchActiveRef.current) {
+            await refreshNearbyPlaces(mapTarget)
+          }
         }
       })()
     },
@@ -259,7 +271,49 @@ export default function LocationPickerScreen() {
         setLoadingLocation(false)
       }
     }
-  }, [selectPoint, t])
+    }, [selectPoint, t])
+
+  // Keyword search: debounced; results replace the nearby list until the
+  // query is cleared. Distance-sorted from the latest picked/mapped point.
+  useEffect(() => {
+    const trimmed = searchText.trim()
+    if (!trimmed) {
+      searchActiveRef.current = false
+      setSearchResults(null)
+      setSearching(false)
+      return
+    }
+    searchActiveRef.current = true
+    setSearching(true)
+    let active = true
+    const timer = setTimeout(() => {
+      searchPlaces(trimmed, {
+        near: searchBiasRef.current
+          ? {
+              latitude: searchBiasRef.current.latitude,
+              longitude: searchBiasRef.current.longitude,
+            }
+          : undefined,
+        coordinateType: "gcj02",
+      })
+        .then(list => {
+          if (!active) return
+          setSearchResults(list)
+          setSearching(false)
+        })
+        .catch(error => {
+          if (!active) return
+          setSearchResults([])
+          setSearching(false)
+          const message = error instanceof Error ? error.message : String(error)
+          setNearbyHint(`${t("mapPicker.searchFailed")} (${message})`)
+        })
+    }, 500)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [searchText, t])
 
   useFocusEffect(
     useCallback(() => {
@@ -368,6 +422,8 @@ export default function LocationPickerScreen() {
     )
   }
 
+  const displayPlaces = searchResults ?? nearbyPlaces
+
   return (
     <View style={[styles.page, theme.page, { paddingTop: insets.top + 6 }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -400,17 +456,39 @@ export default function LocationPickerScreen() {
       <View style={[styles.listSection, theme.card]}>
         <View style={styles.listHeader}>
           <Text style={[styles.sectionTitle, theme.title]}>
-            {t("mapPicker.sectionNearby")}
+            {searchResults
+              ? t("mapPicker.sectionSearch")
+              : t("mapPicker.sectionNearby")}
           </Text>
-          {loadingNearby ? <ActivityIndicator size="small" /> : null}
+          {loadingNearby || searching ? (
+            <ActivityIndicator size="small" />
+          ) : null}
         </View>
+        <TextInput
+          style={[
+            styles.searchInput,
+            {
+              backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+              borderColor: isDark ? "#334155" : "#cbd5e1",
+              color: isDark ? "#e2e8f0" : "#0f172a",
+            },
+          ]}
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder={t("mapPicker.searchPlaceholder")}
+          placeholderTextColor={isDark ? "#94a3b8" : "#64748b"}
+          returnKeyType="search"
+        />
         <ScrollView contentContainerStyle={styles.listScroll}>
-          {nearbyPlaces.length === 0 ? (
+          {displayPlaces.length === 0 ? (
             <Text style={[styles.emptyText, theme.muted]}>
-              {nearbyHint || t("mapPicker.emptyNearby")}
+              {nearbyHint ||
+                (searchResults
+                  ? t("mapPicker.searchEmpty")
+                  : t("mapPicker.emptyNearby"))}
             </Text>
           ) : (
-            nearbyPlaces.map(item => (
+            displayPlaces.map(item => (
               <Pressable
                 key={item.id}
                 style={[styles.placeItem, theme.item]}
@@ -479,6 +557,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
   },
   sectionTitle: {
     fontSize: 17,

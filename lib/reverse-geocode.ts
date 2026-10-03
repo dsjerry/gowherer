@@ -311,6 +311,40 @@ export async function reverseGeocodePlaceName(
   return placeName;
 }
 
+function parseAmapPois(data: AmapNearbyResponse): NearbyPlace[] {
+  const places: NearbyPlace[] = [];
+  for (const poi of data.pois ?? []) {
+    if (!poi.id || typeof poi.id !== "string") {
+      continue;
+    }
+    if (!poi.name || typeof poi.name !== "string" || !poi.location) {
+      continue;
+    }
+    if (typeof poi.location !== "string" || !poi.location.includes(",")) {
+      continue;
+    }
+    const [lngText, latText] = poi.location.split(",");
+    const poiLat = Number(latText);
+    const poiLng = Number(lngText);
+    if (!Number.isFinite(poiLat) || !Number.isFinite(poiLng)) {
+      continue;
+    }
+    const trimmedAddress =
+      typeof poi.address === "string" ? poi.address.trim() : undefined;
+    places.push({
+      id: poi.id,
+      name: poi.name.trim(),
+      address: trimmedAddress || undefined,
+      distance: Number.isFinite(Number(poi.distance))
+        ? Number(poi.distance)
+        : undefined,
+      latitude: poiLat,
+      longitude: poiLng,
+    });
+  }
+  return places;
+}
+
 export async function queryNearbyPlaces(
   latitude: number,
   longitude: number,
@@ -370,35 +404,101 @@ export async function queryNearbyPlaces(
     );
   }
 
-  const places: NearbyPlace[] = [];
-  for (const poi of data.pois ?? []) {
-    if (!poi.id || typeof poi.id !== "string") {
-      continue;
-    }
-    if (!poi.name || typeof poi.name !== "string" || !poi.location) {
-      continue;
-    }
-    if (typeof poi.location !== "string" || !poi.location.includes(",")) {
-      continue;
-    }
-    const [lngText, latText] = poi.location.split(",");
-    const poiLat = Number(latText);
-    const poiLng = Number(lngText);
-    if (!Number.isFinite(poiLat) || !Number.isFinite(poiLng)) {
-      continue;
-    }
-    const trimmedAddress =
-      typeof poi.address === "string" ? poi.address.trim() : undefined;
-    places.push({
-      id: poi.id,
-      name: poi.name.trim(),
-      address: trimmedAddress || undefined,
-      distance: Number.isFinite(Number(poi.distance))
-        ? Number(poi.distance)
-        : undefined,
-      latitude: poiLat,
-      longitude: poiLng,
-    });
+  return parseAmapPois(data);
+}
+
+export async function searchPlaces(
+  keyword: string,
+  options?: {
+    /** Center of the search range (gcj02 or wgs84 per coordinateType). */
+    near?: { latitude: number; longitude: number };
+    /** Search radius in meters around `near` (default 5000, clamped 200-50000). */
+    radius?: number;
+    coordinateType?: CoordinateType;
+  },
+): Promise<NearbyPlace[]> {
+  const trimmed = keyword.trim();
+  if (!trimmed) {
+    return [];
   }
-  return places;
+
+  const config = getGeocodingConfig();
+  if (config.provider !== "amap") {
+    throw new Error(
+      `高德地点搜索未启用：当前 provider 为 ${config.provider}，请在 app.config.ts / .env 中设置 EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER=amap`,
+    );
+  }
+  if (!config.amapWebKey) {
+    throw new Error(
+      `高德地点搜索缺少 Web Key：请配置 EXPO_PUBLIC_AMAP_WEB_KEY`,
+    );
+  }
+
+  const near = options?.near;
+  const radius = Math.max(
+    200,
+    Math.min(50000, Math.floor(options?.radius ?? 5000)),
+  );
+
+  if (!near) {
+    // No center to search around: fall back to a nationwide keyword search.
+    const url = `https://restapi.amap.com/v3/place/text?key=${encodeURIComponent(
+      config.amapWebKey,
+    )}&keywords=${encodeURIComponent(trimmed)}&offset=20&page=1&extensions=base&output=JSON`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`AMap place search failed: ${response.status}`);
+    }
+    const data = (await response.json()) as AmapNearbyResponse;
+    if (data.status !== "1") {
+      throw new Error(
+        `AMap place search invalid status: status=${data.status ?? "N/A"} info=${
+          data.info ?? "N/A"
+        } infocode=${data.infocode ?? "N/A"}`,
+      );
+    }
+    return parseAmapPois(data);
+  }
+
+  const coordinateType = options?.coordinateType ?? "wgs84";
+  const gcj02 =
+    coordinateType === "gcj02"
+      ? { latitude: near.latitude, longitude: near.longitude }
+      : wgs84ToGcj02(near.latitude, near.longitude);
+  const location = `${gcj02.longitude},${gcj02.latitude}`;
+  const url = `https://restapi.amap.com/v3/place/around?key=${encodeURIComponent(
+    config.amapWebKey,
+  )}&location=${encodeURIComponent(location)}&radius=${radius}&keywords=${encodeURIComponent(
+    trimmed,
+  )}&sortrule=distance&offset=20&page=1&extensions=base&output=JSON`;
+
+  const redactedUrl = url.replace(/key=[^&]+/, "key=***");
+  devLog("searchPlaces request", {
+    url: redactedUrl,
+    keyword: trimmed,
+    radius,
+    gcj02,
+  });
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`AMap place search failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as AmapNearbyResponse;
+  devLog("searchPlaces response", {
+    status: data.status,
+    info: data.info,
+    infocode: data.infocode,
+    poiCount: data.pois?.length,
+  });
+  if (data.status !== "1") {
+    throw new Error(
+      `AMap place search invalid status: status=${data.status ?? "N/A"} info=${
+        data.info ?? "N/A"
+      } infocode=${data.infocode ?? "N/A"}`,
+    );
+  }
+
+  return parseAmapPois(data);
 }
