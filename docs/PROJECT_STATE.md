@@ -346,3 +346,55 @@ Latest updates (2026-03-08):
 ### TODO / Follow-ups
 - Wire `Journey.trackLocations` into the recap map (`components/track-map.tsx`) so the continuous track replaces or supplements manual location entries when drawing the route.
 - Consider adding a "tracking is active" indicator (e.g., subtle badge or pulsing dot) so users know background tracking is running.
+
+## Work Log (2026-10-03)
+
+### Completed
+- Made local debug builds install alongside the release app on the same device:
+  - New config plugin `plugins/with-android-debug-identity.js` adds `applicationIdSuffix ".debug"` and `versionNameSuffix "-debug"` to the `debug` buildType only (release keeps `com.dsjerry.gowherer`, so CI/EAS release artifacts are unaffected).
+  - Debug launcher label becomes "gowherer Dev" via manifest placeholder `${appLabel}`.
+  - AMap key moved to a manifest placeholder `${amapApiKey}`: `defaultConfig` uses `AMAP_ANDROID_API_KEY`, debug buildType uses `AMAP_ANDROID_DEBUG_KEY` (falls back to the release key when unset). Patch applied via `withFinalizedMod` because dangerous mods run FIRST and expo-gaode-map's manifest mod overwrites the key literal afterwards.
+  - Registered the plugin in `app.config.ts` after `with-android-abi-splits`; documented `AMAP_ANDROID_DEBUG_KEY` in both READMEs.
+- Earlier attempt (2026-03-15) failed because the suffix was hand-edited into the generated `android/app/build.gradle` and committed; with CNG (`/android` gitignored, CI runs `expo prebuild --clean`) generated native files must only be customized through config plugins.
+- Fixed runtime crash `Cannot set prop 'icon' on MarkerView (Value for icon cannot be cast from Double to String)`:
+  - expo-gaode-map's native MarkerView accepts `icon` only as a string (http URL / `file://` / drawable resource name), but `components/track-map.tsx` passed `require(...)` ids (numbers) — a leftover from the react-native-maps API.
+  - New config plugin `plugins/with-android-map-marker-icons.js` copies `assets/images/marker-{start,end,mid}.png` into `android/app/src/main/res/drawable-nodpi/` on every prebuild; `track-map.tsx` now passes resource names plus explicit `iconWidth`/`iconHeight` (28dp endpoints, 20dp mid via `PixelRatio`).
+  - Requires a native rebuild (`npm run android`) — Metro reload alone won't pick up new resources.
+- Fixed the track-map drawer collapsing to title-only height when opened:
+  - Root cause: expo-gaode-map's MapView wrapper always applies `flex: 1` (flexBasis 0%) to its container. Inside the RN Modal's definite-height measure pass, flexBasis 0% resolves to 0 instead of falling back to the style height (which is what happens in the ScrollView's undefined-height measure pass), so the map container measured 0 and the auto-height drawer sheet collapsed to just the header.
+  - Fix: give the whole chain definite heights — drawer sheet is now `0.8 * windowHeight`, and `TrackMap` applies its `height` prop to the outer `mapWrap` as well as the MapView (map height in drawer = `0.6 * windowHeight`). JS-only change; Metro reload is enough.
+- Fixed the drawer map rendering solid black:
+  - Root cause: the AMap GL-rendered view does not composite inside RN `Modal`'s separate dialog window (`hardwareAccelerated` alone was NOT sufficient — tried and ruled out). Maps on the regular screen render fine.
+  - Fix: replaced the drawer `Modal` with an absolutely-positioned overlay inside the review screen itself (`screenWrap` > ScrollView + overlay siblings), so the drawer map renders in the same window/path as the card map. Android back closes it via `BackHandler`; backdrop tap and × button unchanged. Trade-off: the backdrop does not dim the tab bar (overlay is scoped to the screen area). JS-only change.
+- Fixed oversized map markers and still-black drawer map (screenshot-verified):
+  - Markers rendered at `iconWidth × screen density`: the SDK density-scales `iconWidth`/`iconHeight`, so pass dp directly (28 endpoints / 20 mid) instead of pre-multiplying with `PixelRatio`.
+  - Drawer map stayed black even in-window; the only structural difference vs the working card map was a second live AMap instance (the card map behind the overlay). The AMap SDK shares one GL render thread and a freshly created surface renders black while another instance is alive.
+  - Fix: card maps unmount while the drawer is open (`hasTrackMap && !isMapDrawerOpen`), making the drawer map the only live instance; the drawer TrackMap also mounts one frame after the overlay lays out (`mapDrawerReady` + rAF) with a fixed-height placeholder holding the space.
+  - If the drawer map is still black after this, capture `adb logcat` filtered on `amap|ExpoGaode` while opening the drawer for the next diagnosis.
+- Root cause found via on-device adb experiment (logcat + screenshots); drawer replaced by expand-in-place:
+  - Evidence: the review page keeps ~7 card AMap instances alive; opening the drawer created an 8th instance whose GL engine died mid the multi-instance churn (NPE in `GLMapEngine.destroyAMapEngine`/`changeSurface.setMapZoomer`, 9× `libEGL call to OpenGL ES API with no current context`); the surface stayed black even after background/foreground (activity resume) — the engine was dead, not paused.
+  - Conclusion: the SDK cannot reliably initialize a NEW map instance while others are alive on the page; only instances created cleanly at page mount render.
+  - Final fix: removed the drawer entirely. The expand button now grows the card's OWN map to `0.7 * windowHeight` (LayoutAnimation) and auto-scrolls it into view (`measureInWindow` + `scrollTo`); the same button collapses it (`close-fullscreen` icon, new `review.mapCollapse` locale key). No new AMap instance is ever created, so tiles always render. Markers now pass dp directly (`iconWidth` is density-scaled by the SDK).
+  - Verified on device via adb: expanded map renders tiles with correct marker sizes.
+  - Latent smell (not fixed): every journey card mounts an AMap instance even off-screen (~7 on this page). If other multi-map issues appear, consider lazy-mounting card maps near the viewport.
+- Added segment stats between two record points (verified on device via adb):
+  - New "分段统计" section in each journey card (after total stats): one row of record-point chips (`#n · MM/dd HH:mm`); first tap picks the start, second tap the end, tapping another chip starts a new range (one-tap switching); tapping the start chip alone clears.
+  - Stats shown for the range: 段里程 (GPS track distance summed over `capturedAt` between the two entries, falling back to straight-line haversine between entry locations), 段耗时 (entry time difference), 段均速. Inverted picks are normalized.
+  - Map: `TrackMap` gained an optional `highlightLocations` prop rendering an orange polyline (stroke #ea580c, width 6) over the teal route for the selected range.
+  - State: single `segmentRange {journeyId, start, end}` in `explore.tsx` (one active card at a time); i18n keys `review.segmentTitle/segmentHint/segmentDistance/segmentDuration/segmentAvgSpeed` (zh/en).
+- Segment pickers reworked to dropdown form (per user preference), verified on device:
+  - Two triggers (`起点：…` / `终点：…`) open an inline dropdown panel (maxHeight 220 ScrollView) listing record points with index, time and place name; picking closes the panel; inverted start/end picks are normalized in the stats.
+  - `segmentRange.start/end` are now nullable independently; stats render only when both are set.
+  - The panel's ScrollView requires `nestedScrollEnabled` — without it the outer page ScrollView intercepts the gesture and the panel never scrolls (Android nesting).
+- Dropdown list items now show a leading outline icon (MaterialCommunityIcons, added alongside MaterialIcons): entries with an address use `map-marker-outline`, entries without one (falling back to their `text` as the title) use `text-box-outline`; icon color follows the selected state. `segmentPanelItem` is now a row layout with the text `flex: 1`.
+- Segment selection now defaults to first→last record point (user request):
+  - No "未选择" state: `segmentStart`/`segmentEnd` fall back to 0 / `entries.length - 1` when `segmentRange` has no explicit value; triggers always show `#n · time`.
+  - The full-range default renders the plain teal route; the orange highlight polyline only appears for a proper subrange (`isFullSegment` check).
+  - Stats are always shown for the effective range; dropdown panels highlight the effective selection; `segmentNotSet` locale key removed; hint reworded to "默认统计全程，可切换起止记录点". Verified on device (default green full route; end switched to #12 → orange subrange 广州→江门 with updated stats).
+- Converted the two top filter rows (kind 全部/旅行/通勤 and tag chips) to the same dropdown pattern (`filterPicker` state, `segmentTrigger`/`segmentPanel` styles shared); active filters show teal trigger text/border; removed the old chip styles. Verified on device: type and tag selection, active styling, reset to defaults.
+- Fixed ~500ms delay on dropdown open/close:
+  - Root cause: every screen re-render (including dropdown toggles) re-ran heavy per-card work — `sanitizeTrackLocations` + `toGcj02` conversion over 6158 track points × ~7 mounted TrackMaps, plus haversine loops for stats.
+  - Fix: `journeyDerivedById` useMemo precomputes sanitized track / marker locations / journey stats once per journey (keyed on `completedJourneys`); `computeJourneyStats` / `getJourneyTrackMapMarkerLocations` / `computeSegmentStats` accept precomputed track arrays; segment stats cached per `journeyId:start:end` (`segmentStatsCache`) so the highlight polyline keeps a stable array identity and `TrackMap`'s internal memos hold across renders.
+
+### TODO / Follow-ups
+- ~~Register a dedicated AMap Android key for package `com.dsjerry.gowherer.debug`~~ Done (2026-10-03): key set via `AMAP_ANDROID_DEBUG_KEY` in local `.env`; plugin now refreshes the gradle block on every prebuild (marker-based replace instead of skip) so prop changes take effect.
