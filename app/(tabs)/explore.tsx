@@ -1,4 +1,4 @@
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as ExpoFileSystem from "expo-file-system";
@@ -6,7 +6,7 @@ import { Image } from "expo-image";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { VideoView, useVideoPlayer } from "expo-video";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   LayoutAnimation,
@@ -18,6 +18,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -28,6 +29,7 @@ import { deleteJourney as deleteJourneyById } from "@/lib/journey-repository";
 import { loadJourneys } from "@/lib/journey-storage";
 import {
   calculateTrackDistanceKm,
+  haversineKm,
   sanitizeTrackLocations,
 } from "@/lib/track-utils";
 import {
@@ -62,6 +64,16 @@ function kindLabel(kind: JourneyKind, t: TFunction) {
     : t("journey.kind.commute");
 }
 
+function journeyFilterLabel(filter: JourneyFilter, t: TFunction) {
+  if (filter === "travel") {
+    return t("review.filterTravel");
+  }
+  if (filter === "commute") {
+    return t("review.filterCommute");
+  }
+  return t("review.filterAll");
+}
+
 function formatDuration(durationMs: number, t: TFunction) {
   const totalMinutes = Math.max(0, Math.floor(durationMs / 60000));
   const hours = Math.floor(totalMinutes / 60);
@@ -84,8 +96,11 @@ function getJourneyEntryLocations(journey: Journey) {
   return sanitizeTrackLocations(journey.entries.map((entry) => entry.location));
 }
 
-function getJourneyTrackMapMarkerLocations(journey: Journey) {
-  const routeLocations = getJourneyTrackLocations(journey);
+function getJourneyTrackMapMarkerLocations(
+  journey: Journey,
+  trackLocations?: TimelineLocation[],
+) {
+  const routeLocations = trackLocations ?? getJourneyTrackLocations(journey);
   const entryLocations = getJourneyEntryLocations(journey);
 
   if (routeLocations.length === 0) {
@@ -112,11 +127,95 @@ function getJourneyTrackMapMarkerLocations(journey: Journey) {
   return markers;
 }
 
-function computeJourneyStats(journey: Journey) {
-  const trackLocations = getJourneyTrackLocations(journey);
+type SegmentStats = {
+  durationMs: number;
+  distanceKm: number | null;
+  avgSpeedKmh: number | null;
+  segmentTrack: TimelineLocation[];
+};
+
+type JourneyDerived = {
+  track: TimelineLocation[];
+  markerLocations: TimelineLocation[];
+  stats: ReturnType<typeof computeJourneyStats>;
+};
+
+function computeSegmentStats(
+  journey: Journey,
+  trackLocations: TimelineLocation[],
+  startIndex: number,
+  endIndex: number,
+): SegmentStats {
+  const from = journey.entries[Math.min(startIndex, endIndex)];
+  const to = journey.entries[Math.max(startIndex, endIndex)];
+  const startMs = Date.parse(from.createdAt);
+  const endMs = Date.parse(to.createdAt);
+  const durationMs =
+    Number.isFinite(startMs) && Number.isFinite(endMs)
+      ? Math.max(0, endMs - startMs)
+      : 0;
+
+  // Prefer GPS track points captured between the two record points; fall back
+  // to the straight line between their own locations.
+  const segmentTrack = trackLocations.filter((point) => {
+    if (!point.capturedAt) {
+      return false;
+    }
+    const at = Date.parse(point.capturedAt);
+    return at >= startMs && at <= endMs;
+  });
+
+  let distanceKm: number | null = null;
+  if (segmentTrack.length >= 2) {
+    distanceKm = calculateTrackDistanceKm(segmentTrack);
+  } else if (from.location && to.location) {
+    distanceKm = haversineKm(from.location, to.location);
+  }
+
+  const avgSpeedKmh =
+    distanceKm != null && durationMs > 0
+      ? distanceKm / (durationMs / 3600000)
+      : null;
+
+  return { durationMs, distanceKm, avgSpeedKmh, segmentTrack };
+}
+
+// Cached per journey/selection so toggling the dropdowns does not re-filter
+// and re-measure thousands of track points on every render.
+const segmentStatsCache = new Map<string, SegmentStats>();
+
+function getSegmentStats(
+  journey: Journey,
+  trackLocations: TimelineLocation[],
+  journeyId: string,
+  startIndex: number,
+  endIndex: number,
+) {
+  const cacheKey = `${journeyId}:${startIndex}:${endIndex}`;
+  const cached = segmentStatsCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  if (segmentStatsCache.size > 100) {
+    segmentStatsCache.clear();
+  }
+  const stats = computeSegmentStats(
+    journey,
+    trackLocations,
+    startIndex,
+    endIndex,
+  );
+  segmentStatsCache.set(cacheKey, stats);
+  return stats;
+}
+
+function computeJourneyStats(
+  journey: Journey,
+  trackLocations?: TimelineLocation[],
+) {
+  const track = trackLocations ?? getJourneyTrackLocations(journey);
   const entryLocations = getJourneyEntryLocations(journey);
-  const distanceSource =
-    trackLocations.length >= 2 ? trackLocations : entryLocations;
+  const distanceSource = track.length >= 2 ? track : entryLocations;
   const distanceKm = calculateTrackDistanceKm(distanceSource);
 
   const endMs = journey.endedAt
@@ -133,7 +232,7 @@ function computeJourneyStats(journey: Journey) {
   const avgSpeedKmh = durationMs > 0 ? distanceKm / (durationMs / 3600000) : 0;
 
   return {
-    locationPoints: trackLocations.length + entryLocations.length,
+    locationPoints: track.length + entryLocations.length,
     distanceKm,
     durationMs,
     avgSpeedKmh,
@@ -439,6 +538,7 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
 
 export default function JourneyHistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const { t, locale } = useI18n();
@@ -465,20 +565,6 @@ export default function JourneyHistoryScreen() {
     },
     tagChipText: {
       color: isDark ? "#e2e8f0" : "#0c4a6e",
-    },
-    tagFilterChip: {
-      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
-      borderColor: isDark ? "#334155" : "#cbd5e1",
-    },
-    tagFilterText: {
-      color: isDark ? "#cbd5e1" : "#334155",
-    },
-    filterButton: {
-      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
-      borderColor: isDark ? "#334155" : "#cbd5e1",
-    },
-    filterButtonText: {
-      color: isDark ? "#cbd5e1" : "#0f172a",
     },
     statsWrap: {
       backgroundColor: isDark ? "#0f172a" : "#f8fafc",
@@ -549,6 +635,23 @@ export default function JourneyHistoryScreen() {
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
   const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<string[]>([]);
   const [mapInteracting, setMapInteracting] = useState(false);
+  const [expandedMapId, setExpandedMapId] = useState<string | null>(null);
+  const [segmentRange, setSegmentRange] = useState<{
+    journeyId: string;
+    start: number | null;
+    end: number | null;
+  } | null>(null);
+  const [segmentPicker, setSegmentPicker] = useState<{
+    journeyId: string;
+    kind: "start" | "end";
+  } | null>(null);
+  const [filterPicker, setFilterPicker] = useState<"kind" | "tag" | null>(
+    null,
+  );
+  const canExpandMap = Platform.OS !== "web";
+  const scrollViewRef = useRef<ScrollView>(null);
+  const mapWrapRefs = useRef<Record<string, View | null>>({});
+  const scrollYRef = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -570,6 +673,22 @@ export default function JourneyHistoryScreen() {
     () => journeys.filter((item) => item.status === "completed"),
     [journeys],
   );
+
+  // Heavy per-journey derivation (sanitizing thousands of track points,
+  // haversine sums, coordinate conversion) is computed once per journey —
+  // re-running it on every render made dropdown toggles take ~500ms.
+  const journeyDerivedById = useMemo(() => {
+    const map = new Map<string, JourneyDerived>();
+    for (const journey of completedJourneys) {
+      const track = getJourneyTrackLocations(journey);
+      map.set(journey.id, {
+        track,
+        markerLocations: getJourneyTrackMapMarkerLocations(journey, track),
+        stats: computeJourneyStats(journey, track),
+      });
+    }
+    return map;
+  }, [completedJourneys]);
 
   const availableTags = useMemo(
     () =>
@@ -662,11 +781,57 @@ export default function JourneyHistoryScreen() {
 
   function toggleJourneyCollapsed(journeyId: string) {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedMapId(null);
     setCollapsedJourneyIds((prev) =>
       prev.includes(journeyId)
         ? prev.filter((id) => id !== journeyId)
         : [...prev, journeyId],
     );
+  }
+
+  // The AMap SDK fails to initialize the GL engine of a NEW map instance while
+  // other instances are alive (surface renders black, see logcat NPEs in
+  // GLMapEngine). Enlarging reuses the card's already-rendering map instead of
+  // mounting a second one.
+  function toggleMapExpanded(journeyId: string) {
+    const expanding = expandedMapId !== journeyId;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedMapId(expanding ? journeyId : null);
+
+    if (!expanding) {
+      return;
+    }
+
+    const scrollView = scrollViewRef.current;
+    const mapWrap = mapWrapRefs.current[journeyId];
+    if (!scrollView || !mapWrap) {
+      return;
+    }
+    (scrollView as unknown as View).measureInWindow((_x, scrollViewY) => {
+      mapWrap.measureInWindow((_mapX, mapY) => {
+        const contentY = mapY - scrollViewY + scrollYRef.current;
+        scrollView.scrollTo({ y: Math.max(0, contentY - 60), animated: true });
+      });
+    });
+  }
+
+  // Start/end default to the first/last record point; picking one side just
+  // overrides that side (the other keeps its previous or default value).
+  function handleSegmentPick(
+    journeyId: string,
+    kind: "start" | "end",
+    index: number,
+  ) {
+    setSegmentRange((prev) => {
+      const base =
+        prev && prev.journeyId === journeyId
+          ? prev
+          : { journeyId, start: null, end: null };
+      return kind === "start"
+        ? { journeyId, start: index, end: base.end }
+        : { journeyId, start: base.start, end: index };
+    });
+    setSegmentPicker(null);
   }
 
   async function exportJourneyPdf(journey: Journey) {
@@ -702,11 +867,16 @@ export default function JourneyHistoryScreen() {
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       contentContainerStyle={[
         styles.container,
         { paddingTop: insets.top + 12 },
       ]}
       scrollEnabled={!mapInteracting}
+      scrollEventThrottle={100}
+      onScroll={(event) => {
+        scrollYRef.current = event.nativeEvent.contentOffset.y;
+      }}
     >
       <View style={styles.pageHeader}>
         <Text style={[styles.title, themed.title]}>{t("review.title")}</Text>
@@ -722,78 +892,133 @@ export default function JourneyHistoryScreen() {
         style={[styles.searchInput, themed.searchInput]}
       />
 
-      <View style={styles.filterRow}>
+      <View style={styles.segmentTriggerRow}>
         <Pressable
           style={[
-            styles.filterButton,
-            themed.filterButton,
-            filter === "all" && styles.filterButtonActive,
+            styles.segmentTrigger,
+            isDark ? styles.segmentTriggerDark : styles.segmentTriggerLight,
+            filter !== "all" && styles.segmentTriggerActive,
           ]}
-          onPress={() => setFilter("all")}
+          onPress={() =>
+            setFilterPicker(filterPicker === "kind" ? null : "kind")
+          }
         >
           <Text
             style={[
-              styles.filterButtonText,
-              themed.filterButtonText,
-              filter === "all" && styles.filterButtonTextActive,
+              styles.segmentTriggerText,
+              {
+                color:
+                  filter !== "all"
+                    ? "#0f766e"
+                    : isDark
+                      ? "#e2e8f0"
+                      : "#0f172a",
+              },
             ]}
+            numberOfLines={1}
           >
-            {t("review.filterAll")}
+            {`${t("review.filterKind")}${locale === "zh" ? "：" : ": "}${journeyFilterLabel(filter, t)}`}
           </Text>
+          <MaterialIcons
+            name={filterPicker === "kind" ? "expand-less" : "expand-more"}
+            size={18}
+            color={isDark ? "#94a3b8" : "#64748b"}
+          />
         </Pressable>
-        <Pressable
-          style={[
-            styles.filterButton,
-            themed.filterButton,
-            filter === "travel" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilter("travel")}
-        >
-          <Text
+        {availableTags.length > 0 ? (
+          <Pressable
             style={[
-              styles.filterButtonText,
-              themed.filterButtonText,
-              filter === "travel" && styles.filterButtonTextActive,
+              styles.segmentTrigger,
+              isDark ? styles.segmentTriggerDark : styles.segmentTriggerLight,
+              selectedTag != null && styles.segmentTriggerActive,
             ]}
+            onPress={() =>
+              setFilterPicker(filterPicker === "tag" ? null : "tag")
+            }
           >
-            {t("review.filterTravel")}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.filterButton,
-            themed.filterButton,
-            filter === "commute" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilter("commute")}
-        >
-          <Text
-            style={[
-              styles.filterButtonText,
-              themed.filterButtonText,
-              filter === "commute" && styles.filterButtonTextActive,
-            ]}
-          >
-            {t("review.filterCommute")}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.segmentTriggerText,
+                {
+                  color:
+                    selectedTag != null
+                      ? "#0f766e"
+                      : isDark
+                        ? "#e2e8f0"
+                        : "#0f172a",
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {`${t("review.filterTag")}${locale === "zh" ? "：" : ": "}${selectedTag ? `#${selectedTag}` : t("review.filterAllTags")}`}
+            </Text>
+            <MaterialIcons
+              name={filterPicker === "tag" ? "expand-less" : "expand-more"}
+              size={18}
+              color={isDark ? "#94a3b8" : "#64748b"}
+            />
+          </Pressable>
+        ) : null}
       </View>
-      {availableTags.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.tagFilterRow}>
+      {filterPicker === "kind" ? (
+        <View
+          style={[
+            styles.segmentPanel,
+            isDark ? styles.segmentPanelDark : styles.segmentPanelLight,
+          ]}
+        >
+          <ScrollView style={styles.segmentPanelScroll} nestedScrollEnabled>
+            {(["all", "travel", "commute"] as const).map((value) => (
+              <Pressable
+                key={value}
+                style={[
+                  styles.segmentPanelItem,
+                  filter === value && styles.segmentPanelItemSelected,
+                ]}
+                onPress={() => {
+                  setFilter(value);
+                  setFilterPicker(null);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.segmentPanelItemText,
+                    filter === value
+                      ? styles.segmentChipTextSelected
+                      : themed.statLabel,
+                  ]}
+                >
+                  {journeyFilterLabel(value, t)}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+      {filterPicker === "tag" && availableTags.length > 0 ? (
+        <View
+          style={[
+            styles.segmentPanel,
+            isDark ? styles.segmentPanelDark : styles.segmentPanelLight,
+          ]}
+        >
+          <ScrollView style={styles.segmentPanelScroll} nestedScrollEnabled>
             <Pressable
               style={[
-                styles.tagFilterChip,
-                themed.tagFilterChip,
-                !selectedTag && styles.tagFilterChipActive,
+                styles.segmentPanelItem,
+                selectedTag === null && styles.segmentPanelItemSelected,
               ]}
-              onPress={() => setSelectedTag(null)}
+              onPress={() => {
+                setSelectedTag(null);
+                setFilterPicker(null);
+              }}
             >
               <Text
                 style={[
-                  styles.tagFilterText,
-                  themed.tagFilterText,
-                  !selectedTag && styles.tagFilterTextActive,
+                  styles.segmentPanelItemText,
+                  selectedTag === null
+                    ? styles.segmentChipTextSelected
+                    : themed.statLabel,
                 ]}
               >
                 {t("review.filterAllTags")}
@@ -803,25 +1028,28 @@ export default function JourneyHistoryScreen() {
               <Pressable
                 key={tag}
                 style={[
-                  styles.tagFilterChip,
-                  themed.tagFilterChip,
-                  selectedTag === tag && styles.tagFilterChipActive,
+                  styles.segmentPanelItem,
+                  selectedTag === tag && styles.segmentPanelItemSelected,
                 ]}
-                onPress={() => setSelectedTag(tag)}
+                onPress={() => {
+                  setSelectedTag(tag);
+                  setFilterPicker(null);
+                }}
               >
                 <Text
                   style={[
-                    styles.tagFilterText,
-                    themed.tagFilterText,
-                    selectedTag === tag && styles.tagFilterTextActive,
+                    styles.segmentPanelItemText,
+                    selectedTag === tag
+                      ? styles.segmentChipTextSelected
+                      : themed.statLabel,
                   ]}
                 >
                   #{tag}
                 </Text>
               </Pressable>
             ))}
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </View>
       ) : null}
 
       {filteredJourneys.length === 0 ? (
@@ -836,11 +1064,33 @@ export default function JourneyHistoryScreen() {
       ) : (
         filteredJourneys.map((journey) => {
           const isCollapsed = collapsedJourneyIds.includes(journey.id);
-          const stats = computeJourneyStats(journey);
-          const routeLocations = getJourneyTrackLocations(journey);
-          const markerLocations = getJourneyTrackMapMarkerLocations(journey);
+          const derived = journeyDerivedById.get(journey.id);
+          const stats = derived?.stats ?? computeJourneyStats(journey);
+          const routeLocations =
+            derived?.track ?? getJourneyTrackLocations(journey);
+          const markerLocations =
+            derived?.markerLocations ??
+            getJourneyTrackMapMarkerLocations(journey);
           const hasTrackMap =
             routeLocations.length > 0 || markerLocations.length > 0;
+          const activeSegment =
+            segmentRange?.journeyId === journey.id ? segmentRange : null;
+          const openPicker =
+            segmentPicker?.journeyId === journey.id ? segmentPicker : null;
+          const lastEntryIndex = journey.entries.length - 1;
+          const segmentStart = activeSegment?.start ?? 0;
+          const segmentEnd = activeSegment?.end ?? lastEntryIndex;
+          const isFullSegment =
+            segmentStart === 0 && segmentEnd === lastEntryIndex;
+          const segmentStats = derived
+            ? getSegmentStats(
+                journey,
+                derived.track,
+                journey.id,
+                segmentStart,
+                segmentEnd,
+              )
+            : null;
 
           return (
             <View key={journey.id} style={[styles.card, themed.card]}>
@@ -958,12 +1208,193 @@ export default function JourneyHistoryScreen() {
                     </View>
                   </View>
 
+                  {journey.entries.length >= 2 ? (
+                    <View
+                      style={[
+                        styles.segmentSection,
+                        {
+                          borderColor: isDark ? "#334155" : "#e2e8f0",
+                          backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.mapTitle, themed.mapTitle]}>
+                        {t("review.segmentTitle")}
+                      </Text>
+                      <Text style={[styles.statLabel, themed.statLabel]}>
+                        {t("review.segmentHint")}
+                      </Text>
+                      <View style={styles.segmentTriggerRow}>
+                        {(["start", "end"] as const).map((kind) => {
+                          const isOpen =
+                            openPicker?.kind === kind;
+                          const picked =
+                            kind === "start"
+                              ? segmentStart
+                              : segmentEnd;
+                          const prefix =
+                            kind === "start"
+                              ? t("review.html.start")
+                              : t("review.html.end");
+                          return (
+                            <Pressable
+                              key={kind}
+                              style={[
+                                styles.segmentTrigger,
+                                isDark
+                                  ? styles.segmentTriggerDark
+                                  : styles.segmentTriggerLight,
+                              ]}
+                              onPress={() =>
+                                setSegmentPicker(
+                                  isOpen
+                                    ? null
+                                    : { journeyId: journey.id, kind },
+                                )
+                              }
+                            >
+                              <Text
+                                style={[
+                                  styles.segmentTriggerText,
+                                  { color: isDark ? "#e2e8f0" : "#0f172a" },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {prefix}
+                                {locale === "zh" ? "：" : ": "}
+                                {`#${picked + 1} · ${formatDateTime(
+                                  journey.entries[picked].createdAt,
+                                )}`}
+                              </Text>
+                              <MaterialIcons
+                                name={isOpen ? "expand-less" : "expand-more"}
+                                size={18}
+                                color={isDark ? "#94a3b8" : "#64748b"}
+                              />
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      {openPicker ? (
+                        <View
+                          style={[
+                            styles.segmentPanel,
+                            isDark
+                              ? styles.segmentPanelDark
+                              : styles.segmentPanelLight,
+                          ]}
+                        >
+                          <ScrollView
+                            style={styles.segmentPanelScroll}
+                            nestedScrollEnabled
+                          >
+                              {journey.entries.map((entry, index) => {
+                                const isSelected =
+                                  (openPicker.kind === "start"
+                                    ? segmentStart
+                                    : segmentEnd) === index;
+                                // Prefer the address; fall back to the
+                                // record's own text when it has none.
+                                const hasAddress = Boolean(
+                                  entry.location?.placeName,
+                                );
+                                const detail = hasAddress
+                                  ? entry.location?.placeName
+                                  : entry.text;
+                                return (
+                                  <Pressable
+                                    key={entry.id}
+                                    style={[
+                                      styles.segmentPanelItem,
+                                      isSelected &&
+                                        styles.segmentPanelItemSelected,
+                                    ]}
+                                    onPress={() =>
+                                      handleSegmentPick(
+                                        journey.id,
+                                        openPicker.kind,
+                                        index,
+                                      )
+                                    }
+                                  >
+                                    <MaterialCommunityIcons
+                                      name={
+                                        hasAddress
+                                          ? "map-marker-outline"
+                                          : "text-box-outline"
+                                      }
+                                      size={16}
+                                      color={
+                                        isSelected
+                                          ? "#ffffff"
+                                          : isDark
+                                            ? "#94a3b8"
+                                            : "#64748b"
+                                      }
+                                    />
+                                    <Text
+                                      style={[
+                                        styles.segmentPanelItemText,
+                                        isSelected
+                                          ? styles.segmentChipTextSelected
+                                          : themed.statLabel,
+                                      ]}
+                                      numberOfLines={1}
+                                    >
+                                      #{index + 1} ·{" "}
+                                      {formatDateTime(entry.createdAt)}
+                                      {detail ? ` · ${detail}` : ""}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                          </ScrollView>
+                        </View>
+                      ) : null}
+                      {segmentStats ? (
+                        <View style={styles.segmentStatsRow}>
+                          <View style={[styles.statItem, themed.statItem]}>
+                            <Text style={[styles.statLabel, themed.statLabel]}>
+                              {t("review.segmentDistance")}
+                            </Text>
+                            <Text style={[styles.statValue, themed.statValue]}>
+                              {segmentStats.distanceKm != null
+                                ? `${segmentStats.distanceKm.toFixed(2)} km`
+                                : "-"}
+                            </Text>
+                          </View>
+                          <View style={[styles.statItem, themed.statItem]}>
+                            <Text style={[styles.statLabel, themed.statLabel]}>
+                              {t("review.segmentDuration")}
+                            </Text>
+                            <Text style={[styles.statValue, themed.statValue]}>
+                              {formatDuration(segmentStats.durationMs, t)}
+                            </Text>
+                          </View>
+                          <View style={[styles.statItem, themed.statItem]}>
+                            <Text style={[styles.statLabel, themed.statLabel]}>
+                              {t("review.segmentAvgSpeed")}
+                            </Text>
+                            <Text style={[styles.statValue, themed.statValue]}>
+                              {segmentStats.avgSpeedKmh != null
+                                ? `${segmentStats.avgSpeedKmh.toFixed(2)} km/h`
+                                : "-"}
+                            </Text>
+                          </View>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+
                   {hasTrackMap ? (
                     <View>
                       <Text style={[styles.mapTitle, themed.mapTitle]}>
                         {t("review.trackMapTitle")}
                       </Text>
                       <View
+                        ref={(el) => {
+                          mapWrapRefs.current[journey.id] = el;
+                        }}
                         onTouchStart={() => setMapInteracting(true)}
                         onTouchEnd={() => setMapInteracting(false)}
                         onTouchCancel={() => setMapInteracting(false)}
@@ -971,7 +1402,42 @@ export default function JourneyHistoryScreen() {
                         <TrackMap
                           routeLocations={routeLocations}
                           markerLocations={markerLocations}
+                          highlightLocations={
+                            isFullSegment ? undefined : segmentStats?.segmentTrack
+                          }
+                          height={
+                            expandedMapId === journey.id
+                              ? Math.round(windowHeight * 0.7)
+                              : undefined
+                          }
                         />
+                        {canExpandMap ? (
+                          <Pressable
+                            style={[
+                              styles.mapExpandOverlay,
+                              isDark
+                                ? styles.mapExpandOverlayDark
+                                : styles.mapExpandOverlayLight,
+                            ]}
+                            onPress={() => toggleMapExpanded(journey.id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              expandedMapId === journey.id
+                                ? t("review.mapCollapse")
+                                : t("review.mapExpand")
+                            }
+                          >
+                            <MaterialIcons
+                              name={
+                                expandedMapId === journey.id
+                                  ? "close-fullscreen"
+                                  : "open-in-full"
+                              }
+                              size={15}
+                              color={isDark ? "#e2e8f0" : "#334155"}
+                            />
+                          </Pressable>
+                        ) : null}
                       </View>
                     </View>
                   ) : (
@@ -1282,55 +1748,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     backgroundColor: "#f8fafc",
   },
-  filterRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  tagFilterRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingRight: 6,
-  },
-  tagFilterChip: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#f1f5f9",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-  },
-  tagFilterChipActive: {
-    backgroundColor: "#0f766e",
-    borderColor: "#0f766e",
-  },
-  tagFilterText: {
-    fontSize: 12,
-    color: "#334155",
-    fontWeight: "600",
-  },
-  tagFilterTextActive: {
-    color: "#ffffff",
-  },
-  filterButton: {
-    backgroundColor: "#f1f5f9",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  filterButtonActive: {
-    backgroundColor: "#0f766e",
-    borderColor: "#0f766e",
-  },
-  filterButtonText: {
-    color: "#0f172a",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  filterButtonTextActive: {
-    color: "#ffffff",
-  },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 14,
@@ -1360,7 +1777,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statItem: {
-    minWidth: "47%",
+    flexBasis: "47%",
+    flexGrow: 1,
     backgroundColor: "#ffffff",
     borderRadius: 8,
     borderWidth: 1,
@@ -1390,6 +1808,101 @@ const styles = StyleSheet.create({
   mapTitle: {
     fontWeight: "600",
     color: "#334155",
+  },
+  mapExpandOverlay: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapExpandOverlayLight: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  mapExpandOverlayDark: {
+    backgroundColor: "rgba(15,23,42,0.72)",
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  segmentSection: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 10,
+    gap: 8,
+  },
+  segmentTriggerRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  segmentTrigger: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  segmentTriggerLight: {
+    backgroundColor: "#ffffff",
+    borderColor: "#cbd5e1",
+  },
+  segmentTriggerDark: {
+    backgroundColor: "#0f172a",
+    borderColor: "#334155",
+  },
+  segmentTriggerActive: {
+    borderColor: "#0f766e",
+  },
+  segmentTriggerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  segmentPanel: {
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  segmentPanelLight: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e8f0",
+  },
+  segmentPanelDark: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+  },
+  segmentPanelScroll: {
+    maxHeight: 220,
+  },
+  segmentPanelItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  segmentPanelItemSelected: {
+    backgroundColor: "#0f766e",
+  },
+  segmentPanelItemText: {
+    flex: 1,
+    fontSize: 12,
+  },
+  segmentChipTextSelected: {
+    color: "#ffffff",
+  },
+  segmentStatsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   exportText: {
     color: "#0369a1",

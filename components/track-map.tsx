@@ -13,9 +13,15 @@ function toAmapCoordinate(location: TimelineLocation) {
   return toGcj02(location.latitude, location.longitude);
 }
 
-const startMarkerIcon = require("../assets/images/marker-start.png");
-const endMarkerIcon = require("../assets/images/marker-end.png");
-const midMarkerIcon = require("../assets/images/marker-mid.png");
+// Native MarkerView expects drawable resource names (see
+// plugins/with-android-map-marker-icons.js), not require() ids. iconWidth/
+// iconHeight are density-scaled by the SDK, so pass dp values directly.
+const startMarkerIcon = "marker_start";
+const endMarkerIcon = "marker_end";
+const midMarkerIcon = "marker_mid";
+
+const startEndIconSize = 28;
+const midIconSize = 20;
 
 function getAmapZoom(locations: TimelineLocation[]) {
   if (locations.length <= 1) {
@@ -43,11 +49,16 @@ function getAmapZoom(locations: TimelineLocation[]) {
 type TrackMapProps = {
   routeLocations: TimelineLocation[];
   markerLocations?: TimelineLocation[];
+  height?: number;
+  /** Extra polyline drawn on top of the route (e.g. a selected segment). */
+  highlightLocations?: TimelineLocation[];
 };
 
 export function TrackMap({
   routeLocations,
   markerLocations = routeLocations,
+  height,
+  highlightLocations,
 }: TrackMapProps) {
   const displayRouteLocations = sanitizeTrackLocations(routeLocations);
   const displayMarkerLocations = sanitizeTrackLocations(markerLocations);
@@ -69,6 +80,13 @@ export function TrackMap({
       ),
     [displayMarkerLocations],
   );
+  const amapHighlightLocations = useMemo(
+    () =>
+      sanitizeTrackLocations(highlightLocations ?? []).map((item) =>
+        toAmapCoordinate(item),
+      ),
+    [highlightLocations],
+  );
 
   if (allDisplayLocations.length === 0) {
     return null;
@@ -78,10 +96,16 @@ export function TrackMap({
     amapLocations.length > 0 ? amapLocations : amapMarkerLocations;
   const center = centerSource[Math.floor(centerSource.length / 2)];
 
+  // The MapView wrapper (expo-gaode-map) always sets flex: 1 on its container,
+  // which collapses to 0 inside auto-height parents measured with a definite
+  // constraint (e.g. RN Modal). Give the wrapper an explicit height so the
+  // flex container always has a definite parent to fill.
+  const mapHeightStyle = height != null ? { height } : null;
+
   return (
-    <View style={styles.mapWrap}>
+    <View style={[styles.mapWrap, mapHeightStyle]}>
       <MapView
-        style={styles.map}
+        style={[styles.map, mapHeightStyle]}
         myLocationEnabled={false}
         myLocationButtonEnabled={false}
         zoomControlsEnabled={false}
@@ -99,9 +123,17 @@ export function TrackMap({
             strokeColor="#0f766e"
           />
         ) : null}
+        {amapHighlightLocations.length >= 2 ? (
+          <Polyline
+            points={amapHighlightLocations}
+            strokeWidth={6}
+            strokeColor="#ea580c"
+          />
+        ) : null}
         {amapMarkerLocations.map((point, index) => {
           const isStart = index === 0;
           const isEnd = index === amapMarkerLocations.length - 1;
+          const isEndpoint = isStart || isEnd;
           return (
             <Marker
               key={`${point.latitude}-${point.longitude}-${index}`}
@@ -113,6 +145,8 @@ export function TrackMap({
                     ? endMarkerIcon
                     : midMarkerIcon
               }
+              iconWidth={isEndpoint ? startEndIconSize : midIconSize}
+              iconHeight={isEndpoint ? startEndIconSize : midIconSize}
             />
           );
         })}
