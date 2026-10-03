@@ -148,6 +148,14 @@ function computeSegmentStats(
 ): SegmentStats {
   const from = journey.entries[Math.min(startIndex, endIndex)];
   const to = journey.entries[Math.max(startIndex, endIndex)];
+  if (!from || !to) {
+    return {
+      durationMs: 0,
+      distanceKm: null,
+      avgSpeedKmh: null,
+      segmentTrack: [],
+    };
+  }
   const startMs = Date.parse(from.createdAt);
   const endMs = Date.parse(to.createdAt);
   const durationMs =
@@ -1082,15 +1090,16 @@ export default function JourneyHistoryScreen() {
           const segmentEnd = activeSegment?.end ?? lastEntryIndex;
           const isFullSegment =
             segmentStart === 0 && segmentEnd === lastEntryIndex;
-          const segmentStats = derived
-            ? getSegmentStats(
-                journey,
-                derived.track,
-                journey.id,
-                segmentStart,
-                segmentEnd,
-              )
-            : null;
+          const segmentStats =
+            derived && journey.entries.length >= 2
+              ? getSegmentStats(
+                  journey,
+                  derived.track,
+                  journey.id,
+                  segmentStart,
+                  segmentEnd,
+                )
+              : null;
 
           return (
             <View key={journey.id} style={[styles.card, themed.card]}>
