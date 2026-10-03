@@ -29,7 +29,7 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: t('tabs.explore'),
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="clock.arrow.circlepath" color={color} />,
         }}
       />
       <Tabs.Screen
