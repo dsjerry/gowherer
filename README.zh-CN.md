@@ -128,6 +128,9 @@ npm run web
   - 作用：高德 Android 原生 SDK Key（用于应用内高德地图选点）。
   - 是否必需：Android 地图选点功能需要。
   - 默认值：未设置环境变量时回退到 `app.config.ts` 中配置的 key。
+- `AMAP_ANDROID_DEBUG_KEY`（可选，仅本地开发）
+  - 作用：debug 构建专用的高德 Android Key。debug 包名为 `com.dsjerry.gowherer.debug`，需在高德控制台用 `android/app/debug.keystore` 的 SHA1 单独申请，未配置时 debug 构建回退使用 `AMAP_ANDROID_API_KEY`（高德校验不通过时地图会显示空白）。
+  - 是否必需：否（仅影响本地 `expo run:android` 的地图显示）。
 
 原生模块说明：高德 SDK 选点需要使用自定义 Dev Client 或 EAS 构建，Expo Go 中不可用。
 

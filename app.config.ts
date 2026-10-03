@@ -5,6 +5,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
     process.env.EAS_PROJECT_ID ?? "82904fd8-1c6c-4a9f-bae4-b3c2446c9ac9";
   const appVersion = process.env.APP_VERSION ?? "1.0.0";
   const amapAndroidApiKey = process.env.AMAP_ANDROID_API_KEY;
+  const amapAndroidDebugKey = process.env.AMAP_ANDROID_DEBUG_KEY;
   const amapWebKey = process.env.EXPO_PUBLIC_AMAP_WEB_KEY;
 
   return {
@@ -69,6 +70,14 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
       ],
       "./plugins/with-android-pointer-tagging",
       "./plugins/with-android-abi-splits",
+      "./plugins/with-android-map-marker-icons",
+      [
+        "./plugins/with-android-debug-identity",
+        {
+          releaseAmapAndroidKey: amapAndroidApiKey ?? "your-android-key",
+          debugAmapAndroidKey: amapAndroidDebugKey,
+        },
+      ],
       [
         "expo-splash-screen",
         {

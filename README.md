@@ -128,6 +128,9 @@ npm run web
   - Purpose: AMap Android native SDK key (used by in-app AMap place picker).
   - Required: Required for Android map place picker.
   - Default: falls back to key configured in `app.config.ts` when env is not set.
+- `AMAP_ANDROID_DEBUG_KEY` (optional, local development only)
+  - Purpose: AMap Android key for debug builds. The debug package is `com.dsjerry.gowherer.debug`; request a dedicated key in the AMap console with the SHA1 of `android/app/debug.keystore`. When unset, debug builds fall back to `AMAP_ANDROID_API_KEY` (AMap validation fails and maps render blank).
+  - Required: No (only affects map rendering in local `expo run:android` builds).
 
 Native module note: AMap SDK features require a custom Dev Client or EAS build. They are not available in Expo Go.
 
