@@ -130,9 +130,7 @@ export function ActiveJourneyCard({
   const themedGhostButtonText = {
     color: isDark ? '#fbbf24' : '#b45309',
   };
-  const themedLabel = { color: isDark ? '#cbd5e1' : '#334155' };
-  const themedInput = {
-    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+  const themedInput = {    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
     borderColor: isDark ? '#334155' : '#cbd5e1',
     color: isDark ? '#e2e8f0' : '#0f172a',
   };
@@ -359,67 +357,110 @@ export function ActiveJourneyCard({
         </ScrollView>
       ) : null}
 
-      {/* Action buttons */}
-      <View style={styles.actionRow}>
+      {/* Media & location toolbar */}
+      <View style={styles.toolRow}>
         <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
+          style={[styles.toolButton, themedSecondaryButton]}
           onPress={onOpenLocationPicker}
           disabled={openingLocationPicker}
         >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
+          <MaterialIcons name="place" size={22} color={isDark ? '#5eead4' : '#0f766e'} />
+          <Text
+            style={[styles.toolButtonLabel, themedSecondaryButtonText]}
+            numberOfLines={2}
+          >
             {openingLocationPicker
               ? t('journey.openingMap')
-              : `📍 ${t('journey.addLocation')}`}
+              : t('journey.addLocation')}
           </Text>
         </Pressable>
-      </View>
-      <View style={styles.actionRow}>
         <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
+          style={[styles.toolButton, themedSecondaryButton]}
           onPress={onPickMediaFromLibrary}
           disabled={pickingMedia}
         >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {pickingMedia
-              ? t('journey.readingAlbum')
-              : `🖼️ ${t('journey.addFromAlbum')}`}
+          <MaterialIcons
+            name="photo-library"
+            size={22}
+            color={isDark ? '#5eead4' : '#0f766e'}
+          />
+          <Text
+            style={[styles.toolButtonLabel, themedSecondaryButtonText]}
+            numberOfLines={2}
+          >
+            {pickingMedia ? t('journey.readingAlbum') : t('journey.addFromAlbum')}
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
+          style={[styles.toolButton, themedSecondaryButton]}
           onPress={onCapturePhoto}
           disabled={pickingMedia}
         >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {pickingMedia
-              ? t('journey.processingMedia')
-              : `📷 ${t('journey.takePhoto')}`}
+          <MaterialIcons
+            name="photo-camera"
+            size={22}
+            color={isDark ? '#5eead4' : '#0f766e'}
+          />
+          <Text
+            style={[styles.toolButtonLabel, themedSecondaryButtonText]}
+            numberOfLines={2}
+          >
+            {pickingMedia ? t('journey.processingMedia') : t('journey.takePhoto')}
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
+          style={[styles.toolButton, themedSecondaryButton]}
           onPress={onCaptureVideo}
           disabled={pickingMedia}
         >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {pickingMedia
-              ? t('journey.processingMedia')
-              : `🎥 ${t('journey.takeVideo')}`}
+          <MaterialIcons
+            name="videocam"
+            size={22}
+            color={isDark ? '#5eead4' : '#0f766e'}
+          />
+          <Text
+            style={[styles.toolButtonLabel, themedSecondaryButtonText]}
+            numberOfLines={2}
+          >
+            {pickingMedia ? t('journey.processingMedia') : t('journey.takeVideo')}
           </Text>
         </Pressable>
-      </View>
-      <View style={styles.actionRow}>
         <Pressable
-          style={[styles.secondaryButton, themedSecondaryButton]}
-          onPress={() =>
-            isRecording ? onStopRecording() : onStartRecording()
-          }
+          style={[
+            styles.toolButton,
+            themedSecondaryButton,
+            isRecording && {
+              backgroundColor: isDark ? '#7f1d1d' : '#fee2e2',
+            },
+          ]}
+          onPress={isRecording ? onStopRecording : onStartRecording}
           disabled={pickingMedia}
         >
-          <Text style={[styles.secondaryButtonText, themedSecondaryButtonText]}>
-            {isRecording
-              ? `⏹️ ${t('journey.stopRecording')}`
-              : `🎙️ ${t('journey.recordAudio')}`}
+          <MaterialIcons
+            name={isRecording ? 'stop' : 'mic'}
+            size={22}
+            color={
+              isRecording
+                ? isDark
+                  ? '#f87171'
+                  : '#dc2626'
+                : isDark
+                  ? '#5eead4'
+                  : '#0f766e'
+            }
+          />
+          <Text
+            style={[
+              styles.toolButtonLabel,
+              themedSecondaryButtonText,
+              isRecording && {
+                color: isDark ? '#f87171' : '#dc2626',
+                fontWeight: '700',
+              },
+            ]}
+            numberOfLines={2}
+          >
+            {isRecording ? t('journey.stopRecording') : t('journey.recordAudio')}
           </Text>
         </Pressable>
       </View>
@@ -604,21 +645,28 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     padding: 4,
   },
-  secondaryButton: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+  toolRow: {
+    flexDirection: 'row',
+    gap: 6,
   },
-  secondaryButtonText: {
-    color: '#0f172a',
+  toolButton: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  toolButtonLabel: {
+    fontSize: 11,
     fontWeight: '500',
+    textAlign: 'center',
   },
   primaryButton: {
     backgroundColor: '#0f766e',
     borderRadius: 12,
     paddingVertical: 11,
     alignItems: 'center',
+    marginTop: 14,
   },
   primaryButtonText: {
     color: '#ffffff',
