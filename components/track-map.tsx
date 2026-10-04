@@ -49,16 +49,21 @@ function getAmapZoom(locations: TimelineLocation[]) {
 type TrackMapProps = {
   routeLocations: TimelineLocation[];
   markerLocations?: TimelineLocation[];
-  height?: number;
   /** Extra polyline drawn on top of the route (e.g. a selected segment). */
   highlightLocations?: TimelineLocation[];
+  /**
+   * Whether pan/zoom gestures are enabled. Defaults to a static preview: AMap
+   * does not call `requestDisallowInterceptTouchEvent`, so an interactive map
+   * inside a scrollable list loses its drags to the list / tab pager.
+   */
+  interactive?: boolean;
 };
 
 export function TrackMap({
   routeLocations,
   markerLocations = routeLocations,
-  height,
   highlightLocations,
+  interactive = false,
 }: TrackMapProps) {
   const displayRouteLocations = sanitizeTrackLocations(routeLocations);
   const displayMarkerLocations = sanitizeTrackLocations(markerLocations);
@@ -96,19 +101,17 @@ export function TrackMap({
     amapLocations.length > 0 ? amapLocations : amapMarkerLocations;
   const center = centerSource[Math.floor(centerSource.length / 2)];
 
-  // The MapView wrapper (expo-gaode-map) always sets flex: 1 on its container,
-  // which collapses to 0 inside auto-height parents measured with a definite
-  // constraint (e.g. RN Modal). Give the wrapper an explicit height so the
-  // flex container always has a definite parent to fill.
-  const mapHeightStyle = height != null ? { height } : null;
-
   return (
-    <View style={[styles.mapWrap, mapHeightStyle]}>
+    <View style={styles.mapWrap}>
       <MapView
-        style={[styles.map, mapHeightStyle]}
+        style={styles.map}
         myLocationEnabled={false}
         myLocationButtonEnabled={false}
         zoomControlsEnabled={false}
+        scrollGesturesEnabled={interactive}
+        zoomGesturesEnabled={interactive}
+        rotateGesturesEnabled={interactive}
+        tiltGesturesEnabled={interactive}
         initialCameraPosition={{
           target: center,
           zoom: getAmapZoom(
@@ -156,7 +159,10 @@ export function TrackMap({
 }
 
 const styles = StyleSheet.create({
+  // Fills the caller-provided box; expo-gaode-map's own wrapper needs a
+  // definite parent height, which the caller now supplies (see explore.tsx).
   mapWrap: {
+    flex: 1,
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
@@ -165,6 +171,6 @@ const styles = StyleSheet.create({
   },
   map: {
     width: "100%",
-    height: 180,
+    flex: 1,
   },
 });

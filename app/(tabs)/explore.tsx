@@ -26,8 +26,13 @@ import {
   Text,
   TextInput,
   View,
-  useWindowDimensions,
 } from "react-native";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { TrackMap } from "@/components/track-map";
@@ -59,6 +64,15 @@ type TFunction = (
   key: string,
   params?: Record<string, string | number>,
 ) => string;
+
+/** Top padding of the review list content, below the status bar. */
+const LIST_CONTENT_TOP_PADDING = 12;
+/** Gap kept below an enlarged map so its collapse button stays reachable. */
+const ENLARGED_MAP_BOTTOM_GAP = 24;
+/** Collapsed height of an inline track map. */
+const PREVIEW_MAP_HEIGHT = 180;
+/** Duration of the enlarge / collapse transition. */
+const MAP_RESIZE_DURATION = 260;
 
 function formatDateTime(iso?: string) {
   if (!iso) {
@@ -761,7 +775,6 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
 
 export default function JourneyHistoryScreen() {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
   const canExpandMap = Platform.OS !== "web";
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -862,7 +875,7 @@ export default function JourneyHistoryScreen() {
   const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [enlargedMapId, setEnlargedMapId] = useState<string | null>(null);
-  const [mapInteracting, setMapInteracting] = useState(false);
+  const [listViewportHeight, setListViewportHeight] = useState(0);
   const [reviewHydrated, setReviewHydrated] = useState(false);
   const [segmentRange, setSegmentRange] = useState<{
     journeyId: string;
@@ -880,6 +893,21 @@ export default function JourneyHistoryScreen() {
   const mapWrapRefs = useRef<Record<string, View | null>>({});
   const scrollYRef = useRef(0);
 
+  // Fill the list's visible area, minus the content's own top padding and a gap
+  // that keeps the collapse button reachable.
+  const enlargedMapHeight = Math.max(
+    240,
+    listViewportHeight -
+      insets.top -
+      LIST_CONTENT_TOP_PADDING -
+      ENLARGED_MAP_BOTTOM_GAP,
+  );
+
+  const mapHeight = useSharedValue(PREVIEW_MAP_HEIGHT);
+  const animatedMapStyle = useAnimatedStyle(() => ({
+    height: mapHeight.value,
+  }));
+
   // Reuse the card's already-rendering map instance (style-only height
   // change) — the AMap SDK renders a NEW map instance black while other
   // instances exist, so enlarging must never remount.
@@ -892,27 +920,53 @@ export default function JourneyHistoryScreen() {
     (scrollView as unknown as View).measureInWindow((_x, scrollViewY) => {
       mapWrap.measureInWindow((_mapX, mapY) => {
         const contentY = mapY - scrollViewY + scrollYRef.current;
-        scrollView.scrollTo({ y: Math.max(0, contentY - 60), animated: true });
+        scrollView.scrollTo({
+          y: Math.max(0, contentY - insets.top - LIST_CONTENT_TOP_PADDING),
+          animated: true,
+        });
       });
     });
   }
 
+  // Clear only if this map is still the enlarged one — the user may have
+  // opened another map while the shrink was still running.
+  const collapseEnlargedMap = useCallback((journeyId: string) => {
+    setEnlargedMapId((prev) => (prev === journeyId ? null : prev));
+  }, []);
+
   function toggleMapEnlarged(journeyId: string) {
-    const enlarging = enlargedMapId !== journeyId;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setEnlargedMapId(enlarging ? journeyId : null);
-    if (enlarging) {
-      setTimeout(() => scrollMapIntoView(journeyId), 350);
+    if (enlargedMapId !== journeyId) {
+      setEnlargedMapId(journeyId);
+      mapHeight.value = withTiming(enlargedMapHeight, {
+        duration: MAP_RESIZE_DURATION,
+      });
+      setTimeout(
+        () => scrollMapIntoView(journeyId),
+        MAP_RESIZE_DURATION + 40,
+      );
+      return;
     }
+    // Stay mounted at the enlarged height until the shrink finishes, otherwise
+    // the height would snap back before the animation could run.
+    mapHeight.value = withTiming(
+      PREVIEW_MAP_HEIGHT,
+      { duration: MAP_RESIZE_DURATION },
+      (finished) => {
+        if (finished) {
+          runOnJS(collapseEnlargedMap)(journeyId);
+        }
+      },
+    );
   }
 
   const navigation = useNavigation();
 
-  // The AMap view handles horizontal drags itself; suspend tab swiping while it
-  // is being touched so panning the map does not switch tabs.
+  // Only an enlarged map takes gestures, so suspend tab swiping while one is
+  // open. This toggles on the expand button's tap — never mid-gesture — which
+  // is what makes it beat the pager's native touch interception.
   useEffect(() => {
-    navigation.setOptions({ swipeEnabled: !mapInteracting });
-  }, [navigation, mapInteracting]);
+    navigation.setOptions({ swipeEnabled: enlargedMapId === null });
+  }, [navigation, enlargedMapId]);
 
   const reloadJourneys = useCallback(async () => {
     const stored = await loadJourneys();
@@ -1221,9 +1275,16 @@ export default function JourneyHistoryScreen() {
       ref={scrollViewRef}
       contentContainerStyle={[
         styles.container,
-        { paddingTop: insets.top + 12 },
+        { paddingTop: insets.top + LIST_CONTENT_TOP_PADDING },
       ]}
-      scrollEnabled={!mapInteracting && enlargedMapId === null}
+      scrollEnabled={enlargedMapId === null}
+      onLayout={(event) => {
+        setListViewportHeight(event.nativeEvent.layout.height);
+      }}
+      onScroll={(event) => {
+        scrollYRef.current = event.nativeEvent.contentOffset.y;
+      }}
+      scrollEventThrottle={16}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -1757,11 +1818,16 @@ export default function JourneyHistoryScreen() {
                       <Text style={[styles.mapTitle, themed.mapTitle]}>
                         {t("review.trackMapTitle")}
                       </Text>
-                      <View
-                        style={styles.mapWrapInner}
-                        onTouchStart={() => setMapInteracting(true)}
-                        onTouchEnd={() => setMapInteracting(false)}
-                        onTouchCancel={() => setMapInteracting(false)}
+                      <Animated.View
+                        style={[
+                          styles.mapWrapInner,
+                          enlargedMapId === journey.id
+                            ? animatedMapStyle
+                            : { height: PREVIEW_MAP_HEIGHT },
+                        ]}
+                        ref={(node: View | null) => {
+                          mapWrapRefs.current[journey.id] = node;
+                        }}
                       >
                         <TrackMap
                           routeLocations={routeLocations}
@@ -1771,11 +1837,7 @@ export default function JourneyHistoryScreen() {
                               ? undefined
                               : segmentStats?.segmentTrack
                           }
-                          height={
-                            enlargedMapId === journey.id
-                              ? Math.round(windowHeight * 0.5)
-                              : undefined
-                          }
+                          interactive={enlargedMapId === journey.id}
                         />
                         {canExpandMap ? (
                           <Pressable
@@ -1804,7 +1866,7 @@ export default function JourneyHistoryScreen() {
                             />
                           </Pressable>
                         ) : null}
-                      </View>
+                      </Animated.View>
                     </View>
                   ) : (
                     <Text style={[styles.emptyText, themed.emptyText]}>
