@@ -69,7 +69,9 @@ jobs:
       - name: Build debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1024m" \
+            --no-daemon
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
