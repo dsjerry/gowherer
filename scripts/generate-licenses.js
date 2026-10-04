@@ -6,6 +6,9 @@ const rootDir = path.resolve(__dirname, '..');
 const outputDir = path.join(rootDir, 'assets');
 const outputPath = path.join(outputDir, 'licenses.json');
 
+const packageJson = require(path.join(rootDir, 'package.json'));
+const directDependencyNames = new Set(Object.keys(packageJson.dependencies ?? {}));
+
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
@@ -45,14 +48,20 @@ checker.init(
 
     const entries = Object.entries(packages)
       .map(([key, info]) => {
-        const [name, version] = key.split('@');
+        // Keys look like `name@version`, where `name` may itself be scoped
+        // (`@scope/name@version`), so split on the last `@`.
+        const atIndex = key.lastIndexOf('@');
+        const fallbackName = atIndex > 0 ? key.slice(0, atIndex) : key;
+        const fallbackVersion = atIndex > 0 ? key.slice(atIndex + 1) : '';
+        const name = info.name || fallbackName;
         return {
-          name: info.name || name,
-          version: info.version || version,
+          name,
+          version: info.version || fallbackVersion,
           licenses: info.licenses ?? 'Unknown',
           licenseText: pickLicenseText(info),
           repository: info.repository || '',
           publisher: info.publisher || '',
+          direct: directDependencyNames.has(name),
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));

@@ -87,6 +87,13 @@ const en = {
     licensesAppTitle: "App License",
     licensesDependenciesTitle: "Dependencies",
     licensesVersion: "Version {version}",
+    licensesSummary:
+      "{total} packages · {direct} direct · {transitive} transitive",
+    licensesDirectTitle: "Direct dependencies",
+    licensesTransitiveTitle: "Transitive dependencies",
+    licensesSearchPlaceholder: "Search by package name",
+    licensesFilterAll: "All",
+    licensesEmpty: "No matching packages",
   },
   common: {
     cancel: "Cancel",

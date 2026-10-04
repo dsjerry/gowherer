@@ -77,6 +77,13 @@ const zh = {
     licensesAppTitle: "应用许可",
     licensesDependenciesTitle: "依赖列表",
     licensesVersion: "版本 {version}",
+    licensesSummary:
+      "共 {total} 个依赖 · 直接 {direct} · 传递 {transitive}",
+    licensesDirectTitle: "直接依赖",
+    licensesTransitiveTitle: "传递依赖",
+    licensesSearchPlaceholder: "搜索依赖名称",
+    licensesFilterAll: "全部",
+    licensesEmpty: "没有匹配的依赖",
   },
   common: {
     cancel: "取消",
