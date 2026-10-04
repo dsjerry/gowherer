@@ -66,7 +66,10 @@ checker.init(
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    fs.writeFileSync(outputPath, JSON.stringify({ generatedAt: new Date().toISOString(), entries }, null, 2));
+    fs.writeFileSync(
+      outputPath,
+      JSON.stringify({ generatedAt: new Date().toISOString(), entries }, null, 2),
+    );
     console.log(`Saved licenses to ${outputPath}`);
-  }
+  },
 );

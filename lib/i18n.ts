@@ -72,7 +72,8 @@ export function createTranslator(locale: Locale) {
 
 export function getTemplateDefaults(locale: Locale): EntryTemplateConfig {
   const dict = translations[locale] as { templates?: EntryTemplateConfig };
-  const templates = dict.templates ?? (translations.en as { templates: EntryTemplateConfig }).templates;
+  const templates =
+    dict.templates ?? (translations.en as { templates: EntryTemplateConfig }).templates;
   return {
     travel: templates.travel.map((item) => ({ ...item, tags: [...item.tags] })),
     commute: templates.commute.map((item) => ({ ...item, tags: [...item.tags] })),

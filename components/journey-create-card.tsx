@@ -48,9 +48,7 @@ export function JourneyCreateCard({
 
   return (
     <View style={[styles.card, themedCard]}>
-      <Text style={[styles.sectionTitle, themedSectionTitle]}>
-        {t('journey.startNew')}
-      </Text>
+      <Text style={[styles.sectionTitle, themedSectionTitle]}>{t('journey.startNew')}</Text>
       <View style={styles.kindRow}>
         <Pressable
           style={[
@@ -103,15 +101,9 @@ export function JourneyCreateCard({
         placeholderTextColor={themedPlaceholder}
         style={[styles.input, themedInput]}
       />
-      <Pressable
-        style={styles.primaryButton}
-        onPress={onCreateJourney}
-        disabled={creating}
-      >
+      <Pressable style={styles.primaryButton} onPress={onCreateJourney} disabled={creating}>
         <Text style={styles.primaryButtonText}>
-          {creating
-            ? t('journey.creatingJourney')
-            : t('journey.createJourney')}
+          {creating ? t('journey.creatingJourney') : t('journey.createJourney')}
         </Text>
       </Pressable>
     </View>

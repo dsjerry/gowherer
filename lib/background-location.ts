@@ -1,16 +1,16 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ExpoGaodeMapModule, type Coordinates } from "expo-gaode-map";
-import { Platform } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ExpoGaodeMapModule, type Coordinates } from 'expo-gaode-map';
+import { Platform } from 'react-native';
 
-import { toTimelineLocation } from "@/lib/current-location";
-import { appendJourneyTrackLocations } from "@/lib/journey-repository";
-import { normalizeTrackLocation } from "@/lib/track-utils";
-import { TimelineLocation } from "@/types/journey";
+import { toTimelineLocation } from '@/lib/current-location';
+import { appendJourneyTrackLocations } from '@/lib/journey-repository';
+import { normalizeTrackLocation } from '@/lib/track-utils';
+import { TimelineLocation } from '@/types/journey';
 
 const MAX_COLLECTION_ACCURACY_METERS = 100;
 
-const TRACKING_JOURNEY_ID_KEY = "gowherer:tracking:journey-id:v1";
-const TRACKING_BATCH_PREFIX = "gowherer:tracking:batch:v1";
+const TRACKING_JOURNEY_ID_KEY = 'gowherer:tracking:journey-id:v1';
+const TRACKING_BATCH_PREFIX = 'gowherer:tracking:batch:v1';
 
 let locationListener: { remove: () => void } | null = null;
 
@@ -20,13 +20,13 @@ async function appendTrackLocation(location: Coordinates) {
     return;
   }
 
-  const timelineLocation = toTimelineLocation(location, "tracking");
+  const timelineLocation = toTimelineLocation(location, 'tracking');
   if (!timelineLocation) {
     return;
   }
 
   if (
-    typeof timelineLocation.accuracy === "number" &&
+    typeof timelineLocation.accuracy === 'number' &&
     timelineLocation.accuracy > MAX_COLLECTION_ACCURACY_METERS
   ) {
     return;
@@ -39,7 +39,7 @@ async function appendTrackLocation(location: Coordinates) {
 }
 
 export async function isBackgroundLocationTrackingAvailable() {
-  if (Platform.OS === "web") {
+  if (Platform.OS === 'web') {
     return false;
   }
 
@@ -47,7 +47,7 @@ export async function isBackgroundLocationTrackingAvailable() {
 }
 
 export async function isLocationTrackingActive() {
-  if (Platform.OS === "web") {
+  if (Platform.OS === 'web') {
     return false;
   }
 
@@ -59,10 +59,10 @@ export async function startLocationTracking(
   _options: {
     notificationTitle: string;
     notificationBody: string;
-    journeyKind?: "travel" | "commute";
+    journeyKind?: 'travel' | 'commute';
   },
 ) {
-  if (Platform.OS === "web") {
+  if (Platform.OS === 'web') {
     return;
   }
 
@@ -85,7 +85,7 @@ export async function startLocationTracking(
 }
 
 export async function stopLocationTracking() {
-  if (Platform.OS !== "web" && (await ExpoGaodeMapModule.isStarted())) {
+  if (Platform.OS !== 'web' && (await ExpoGaodeMapModule.isStarted())) {
     ExpoGaodeMapModule.stop();
   }
 
@@ -117,9 +117,7 @@ export async function syncBufferedTrackLocations(journeyId: string) {
       return Array.isArray(parsed)
         ? parsed
             .map((location) => normalizeTrackLocation(location))
-            .filter((location): location is TimelineLocation =>
-              Boolean(location),
-            )
+            .filter((location): location is TimelineLocation => Boolean(location))
         : [];
     } catch {
       return [];

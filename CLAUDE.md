@@ -21,3 +21,4 @@ Expo/React Native journey tracking app.
 - Components handle their own theming via `useColorScheme()` and i18n via `useI18n()`
 - Async operations use `void` for fire-and-forget calls within event handlers
 - State effects use the `active` flag pattern to avoid updates after unmount
+- Formatting is Prettier (`.prettierrc`: single quotes, 100 columns). Run `npm run format`; `npm run format:check` must pass. Do not hand-format — `.gitattributes` pins text files to LF so Prettier's `endOfLine: lf` stays consistent on Windows

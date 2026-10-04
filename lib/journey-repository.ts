@@ -21,7 +21,7 @@ function cleanupRemovedMedia(before: Journey[], after: Journey[]) {
 let writeQueue = Promise.resolve<Journey[] | void>(undefined);
 
 async function enqueueJourneyMutation(
-  mutator: (journeys: Journey[]) => Journey[]
+  mutator: (journeys: Journey[]) => Journey[],
 ): Promise<Journey[]> {
   const run = async () => {
     const current = await loadJourneys();
@@ -31,7 +31,10 @@ async function enqueueJourneyMutation(
   };
 
   const nextRun = writeQueue.then(run, run);
-  writeQueue = nextRun.then(() => undefined, () => undefined);
+  writeQueue = nextRun.then(
+    () => undefined,
+    () => undefined,
+  );
   return nextRun;
 }
 
@@ -57,18 +60,16 @@ export async function markJourneyCompleted(journeyId: string) {
     journeys.map((item) =>
       item.id === journeyId
         ? { ...item, status: 'completed' as const, endedAt: new Date().toISOString() }
-        : item
-    )
+        : item,
+    ),
   );
 }
 
 export async function insertJourneyEntry(journeyId: string, entry: TimelineEntry) {
   return enqueueJourneyMutation((journeys) =>
     journeys.map((item) =>
-      item.id === journeyId
-        ? { ...item, entries: [...item.entries, entry] }
-        : item
-    )
+      item.id === journeyId ? { ...item, entries: [...item.entries, entry] } : item,
+    ),
   );
 }
 
@@ -78,11 +79,9 @@ export async function replaceJourneyEntry(journeyId: string, entry: TimelineEntr
       item.id === journeyId
         ? {
             ...item,
-            entries: item.entries.map((existing) =>
-              existing.id === entry.id ? entry : existing
-            ),
+            entries: item.entries.map((existing) => (existing.id === entry.id ? entry : existing)),
           }
-        : item
+        : item,
     );
     cleanupRemovedMedia(journeys, next);
     return next;
@@ -97,7 +96,7 @@ export async function deleteJourneyEntry(journeyId: string, entryId: string) {
             ...item,
             entries: item.entries.filter((entry) => entry.id !== entryId),
           }
-        : item
+        : item,
     );
     cleanupRemovedMedia(journeys, next);
     return next;
@@ -106,7 +105,7 @@ export async function deleteJourneyEntry(journeyId: string, entryId: string) {
 
 export async function appendJourneyTrackLocations(
   journeyId: string,
-  locations: TimelineLocation[]
+  locations: TimelineLocation[],
 ) {
   if (locations.length === 0) {
     return loadJourneys();
@@ -119,8 +118,8 @@ export async function appendJourneyTrackLocations(
             ...item,
             trackLocations: [...item.trackLocations, ...locations],
           }
-        : item
-    )
+        : item,
+    ),
   );
 }
 

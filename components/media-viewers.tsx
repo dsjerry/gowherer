@@ -8,12 +8,7 @@ export function PreviewVideo({ uri }: { uri: string }) {
   });
 
   return (
-    <VideoView
-      player={player}
-      style={styles.previewMedia}
-      nativeControls
-      contentFit="contain"
-    />
+    <VideoView player={player} style={styles.previewMedia} nativeControls contentFit="contain" />
   );
 }
 

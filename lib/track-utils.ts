@@ -1,14 +1,12 @@
-import { TimelineLocation } from "@/types/journey";
+import { TimelineLocation } from '@/types/journey';
 
 const MAX_TRACKING_ACCURACY_METERS = 100;
 const MAX_TRACKING_SPEED_KMH = 180;
 const MIN_TRACKING_DISTANCE_METERS = 3;
 const MAX_NEIGHBOR_DISTANCE_METERS = 500;
 
-export function normalizeTrackLocation(
-  location: unknown,
-): TimelineLocation | null {
-  if (!location || typeof location !== "object") {
+export function normalizeTrackLocation(location: unknown): TimelineLocation | null {
+  if (!location || typeof location !== 'object') {
     return null;
   }
 
@@ -36,27 +34,20 @@ export function normalizeTrackLocation(
   }
 
   const capturedAt =
-    typeof raw.capturedAt === "string" &&
-    Number.isFinite(Date.parse(raw.capturedAt))
+    typeof raw.capturedAt === 'string' && Number.isFinite(Date.parse(raw.capturedAt))
       ? new Date(raw.capturedAt).toISOString()
       : undefined;
   const source =
-    raw.source === "tracking"
-      ? "tracking"
-      : raw.source === "manual"
-        ? "manual"
-        : undefined;
+    raw.source === 'tracking' ? 'tracking' : raw.source === 'manual' ? 'manual' : undefined;
 
   const coordSystem =
-    raw.coordSystem === "wgs84" || raw.coordSystem === "gcj02"
-      ? raw.coordSystem
-      : undefined;
+    raw.coordSystem === 'wgs84' || raw.coordSystem === 'gcj02' ? raw.coordSystem : undefined;
 
   return {
     latitude,
     longitude,
     accuracy: Number.isFinite(raw.accuracy) ? Number(raw.accuracy) : undefined,
-    placeName: typeof raw.placeName === "string" ? raw.placeName : undefined,
+    placeName: typeof raw.placeName === 'string' ? raw.placeName : undefined,
     capturedAt,
     source,
     coordSystem,
@@ -79,9 +70,7 @@ export function haversineKm(a: TimelineLocation, b: TimelineLocation) {
   const lat1 = toRad(a.latitude);
   const lat2 = toRad(b.latitude);
 
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   return earthKm * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
@@ -110,9 +99,7 @@ function mergeLocationMeta(
   };
 }
 
-export function smoothTrackLocations(
-  locations: TimelineLocation[],
-): TimelineLocation[] {
+export function smoothTrackLocations(locations: TimelineLocation[]): TimelineLocation[] {
   const safeLocations = sanitizeTrackLocations(locations);
   if (safeLocations.length < 3) {
     return safeLocations;
@@ -127,10 +114,8 @@ export function smoothTrackLocations(
 
   let estLat = safeLocations[0].latitude;
   let estLng = safeLocations[0].longitude;
-  let estVarLat =
-    DEFAULT_ACCURACY * DEFAULT_ACCURACY * metersToDegLat * metersToDegLat;
-  let estVarLng =
-    DEFAULT_ACCURACY * DEFAULT_ACCURACY * metersToDegLng * metersToDegLng;
+  let estVarLat = DEFAULT_ACCURACY * DEFAULT_ACCURACY * metersToDegLat * metersToDegLat;
+  let estVarLng = DEFAULT_ACCURACY * DEFAULT_ACCURACY * metersToDegLng * metersToDegLng;
 
   const smoothed: TimelineLocation[] = [
     { ...safeLocations[0], latitude: estLat, longitude: estLng },
@@ -138,16 +123,11 @@ export function smoothTrackLocations(
 
   for (let i = 1; i < safeLocations.length; i += 1) {
     const current = safeLocations[i];
-    const accuracyM =
-      typeof current.accuracy === "number"
-        ? current.accuracy
-        : DEFAULT_ACCURACY;
+    const accuracyM = typeof current.accuracy === 'number' ? current.accuracy : DEFAULT_ACCURACY;
     const measVarLat = accuracyM * accuracyM * metersToDegLat * metersToDegLat;
     const measVarLng = accuracyM * accuracyM * metersToDegLng * metersToDegLng;
-    const procVarLat =
-      PROCESS_NOISE * PROCESS_NOISE * metersToDegLat * metersToDegLat;
-    const procVarLng =
-      PROCESS_NOISE * PROCESS_NOISE * metersToDegLng * metersToDegLng;
+    const procVarLat = PROCESS_NOISE * PROCESS_NOISE * metersToDegLat * metersToDegLat;
+    const procVarLng = PROCESS_NOISE * PROCESS_NOISE * metersToDegLng * metersToDegLng;
 
     estVarLat += procVarLat;
     estVarLng += procVarLng;
@@ -173,9 +153,7 @@ export function smoothTrackLocations(
 }
 
 export function prepareTrackRouteLocations(locations: TimelineLocation[]) {
-  const safeLocations = sortLocationsByCapturedAt(
-    sanitizeTrackLocations(locations),
-  );
+  const safeLocations = sortLocationsByCapturedAt(sanitizeTrackLocations(locations));
   if (safeLocations.length < 2) {
     return safeLocations;
   }
@@ -183,11 +161,11 @@ export function prepareTrackRouteLocations(locations: TimelineLocation[]) {
   const filtered: TimelineLocation[] = [];
   for (const location of safeLocations) {
     const previous = filtered[filtered.length - 1];
-    const isTrackingPoint = location.source !== "manual";
+    const isTrackingPoint = location.source !== 'manual';
 
     if (
       isTrackingPoint &&
-      typeof location.accuracy === "number" &&
+      typeof location.accuracy === 'number' &&
       location.accuracy > MAX_TRACKING_ACCURACY_METERS
     ) {
       continue;
@@ -209,8 +187,7 @@ export function prepareTrackRouteLocations(locations: TimelineLocation[]) {
 
     if (previous.capturedAt && location.capturedAt) {
       const durationHours =
-        (Date.parse(location.capturedAt) - Date.parse(previous.capturedAt)) /
-        3600000;
+        (Date.parse(location.capturedAt) - Date.parse(previous.capturedAt)) / 3600000;
       if (durationHours > 0) {
         const speedKmh = distanceKm / durationHours;
         if (speedKmh > MAX_TRACKING_SPEED_KMH) {
@@ -267,10 +244,7 @@ function perpendicularDistanceKm(
   } as TimelineLocation);
 }
 
-function douglasPeucker(
-  locations: TimelineLocation[],
-  epsilonKm: number,
-): TimelineLocation[] {
+function douglasPeucker(locations: TimelineLocation[], epsilonKm: number): TimelineLocation[] {
   if (locations.length < 3) {
     return locations;
   }
@@ -307,10 +281,7 @@ export function simplifyTrackLocations(
   }
 
   const totalDistanceKm = calculateTrackDistanceKm(safeLocations);
-  const epsilonKm = Math.max(
-    0.0005,
-    (totalDistanceKm / safeLocations.length) * 0.5,
-  );
+  const epsilonKm = Math.max(0.0005, (totalDistanceKm / safeLocations.length) * 0.5);
 
   let result = douglasPeucker(safeLocations, epsilonKm);
   let currentEpsilon = epsilonKm;

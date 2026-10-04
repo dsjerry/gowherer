@@ -1,13 +1,13 @@
-import { MapView, Marker, Polyline } from "expo-gaode-map";
-import { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { MapView, Marker, Polyline } from 'expo-gaode-map';
+import { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import { toGcj02 } from "@/lib/reverse-geocode";
-import { sanitizeTrackLocations } from "@/lib/track-utils";
-import { TimelineLocation } from "@/types/journey";
+import { toGcj02 } from '@/lib/reverse-geocode';
+import { sanitizeTrackLocations } from '@/lib/track-utils';
+import { TimelineLocation } from '@/types/journey';
 
 function toAmapCoordinate(location: TimelineLocation) {
-  if (location.coordSystem === "gcj02") {
+  if (location.coordSystem === 'gcj02') {
     return { latitude: location.latitude, longitude: location.longitude };
   }
   return toGcj02(location.latitude, location.longitude);
@@ -16,9 +16,9 @@ function toAmapCoordinate(location: TimelineLocation) {
 // Native MarkerView expects drawable resource names (see
 // plugins/with-android-map-marker-icons.js), not require() ids. iconWidth/
 // iconHeight are density-scaled by the SDK, so pass dp values directly.
-const startMarkerIcon = "marker_start";
-const endMarkerIcon = "marker_end";
-const midMarkerIcon = "marker_mid";
+const startMarkerIcon = 'marker_start';
+const endMarkerIcon = 'marker_end';
+const midMarkerIcon = 'marker_mid';
 
 const startEndIconSize = 28;
 const midIconSize = 20;
@@ -72,24 +72,15 @@ export function TrackMap({
     ...displayMarkerLocations,
   ]);
   const amapLocations = useMemo(
-    () =>
-      displayRouteLocations.map((item) =>
-        toAmapCoordinate(item),
-      ),
+    () => displayRouteLocations.map((item) => toAmapCoordinate(item)),
     [displayRouteLocations],
   );
   const amapMarkerLocations = useMemo(
-    () =>
-      displayMarkerLocations.map((item) =>
-        toAmapCoordinate(item),
-      ),
+    () => displayMarkerLocations.map((item) => toAmapCoordinate(item)),
     [displayMarkerLocations],
   );
   const amapHighlightLocations = useMemo(
-    () =>
-      sanitizeTrackLocations(highlightLocations ?? []).map((item) =>
-        toAmapCoordinate(item),
-      ),
+    () => sanitizeTrackLocations(highlightLocations ?? []).map((item) => toAmapCoordinate(item)),
     [highlightLocations],
   );
 
@@ -97,8 +88,7 @@ export function TrackMap({
     return null;
   }
 
-  const centerSource =
-    amapLocations.length > 0 ? amapLocations : amapMarkerLocations;
+  const centerSource = amapLocations.length > 0 ? amapLocations : amapMarkerLocations;
   const center = centerSource[Math.floor(centerSource.length / 2)];
 
   return (
@@ -114,24 +104,14 @@ export function TrackMap({
         tiltGesturesEnabled={interactive}
         initialCameraPosition={{
           target: center,
-          zoom: getAmapZoom(
-            amapLocations.length > 0 ? amapLocations : amapMarkerLocations,
-          ),
+          zoom: getAmapZoom(amapLocations.length > 0 ? amapLocations : amapMarkerLocations),
         }}
       >
         {amapLocations.length >= 2 ? (
-          <Polyline
-            points={amapLocations}
-            strokeWidth={4}
-            strokeColor="#0f766e"
-          />
+          <Polyline points={amapLocations} strokeWidth={4} strokeColor="#0f766e" />
         ) : null}
         {amapHighlightLocations.length >= 2 ? (
-          <Polyline
-            points={amapHighlightLocations}
-            strokeWidth={6}
-            strokeColor="#ea580c"
-          />
+          <Polyline points={amapHighlightLocations} strokeWidth={6} strokeColor="#ea580c" />
         ) : null}
         {amapMarkerLocations.map((point, index) => {
           const isStart = index === 0;
@@ -141,13 +121,7 @@ export function TrackMap({
             <Marker
               key={`${point.latitude}-${point.longitude}-${index}`}
               position={point}
-              icon={
-                isStart
-                  ? startMarkerIcon
-                  : isEnd
-                    ? endMarkerIcon
-                    : midMarkerIcon
-              }
+              icon={isStart ? startMarkerIcon : isEnd ? endMarkerIcon : midMarkerIcon}
               iconWidth={isEndpoint ? startEndIconSize : midIconSize}
               iconHeight={isEndpoint ? startEndIconSize : midIconSize}
             />
@@ -164,13 +138,13 @@ const styles = StyleSheet.create({
   mapWrap: {
     flex: 1,
     borderRadius: 12,
-    overflow: "hidden",
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: '#e2e8f0',
     marginTop: 6,
   },
   map: {
-    width: "100%",
+    width: '100%',
     flex: 1,
   },
 });

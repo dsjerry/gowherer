@@ -31,8 +31,8 @@ function normalizeTemplateItem(item: unknown): EntryTemplate | null {
           maybeTemplate.tags
             .filter((tag): tag is string => typeof tag === 'string')
             .map((tag) => tag.trim())
-            .filter(Boolean)
-        )
+            .filter(Boolean),
+        ),
       )
     : [];
 
@@ -47,7 +47,7 @@ function normalizeTemplateItem(item: unknown): EntryTemplate | null {
 function normalizeTemplateList(
   raw: unknown,
   kind: JourneyKind,
-  fallback: EntryTemplateConfig
+  fallback: EntryTemplateConfig,
 ): EntryTemplate[] {
   if (!Array.isArray(raw)) {
     return fallback[kind];
@@ -64,7 +64,10 @@ function normalizeTemplateList(
   return normalized;
 }
 
-export function normalizeTemplateConfig(raw: unknown, fallback: EntryTemplateConfig): EntryTemplateConfig {
+export function normalizeTemplateConfig(
+  raw: unknown,
+  fallback: EntryTemplateConfig,
+): EntryTemplateConfig {
   if (!raw || typeof raw !== 'object') {
     return fallback;
   }
@@ -98,7 +101,7 @@ export async function loadEntryTemplateConfig(locale: Locale): Promise<EntryTemp
 
 export async function saveEntryTemplateConfig(
   locale: Locale,
-  config: EntryTemplateConfig
+  config: EntryTemplateConfig,
 ): Promise<void> {
   await AsyncStorage.setItem(getEntryTemplateStorageKey(locale), JSON.stringify(config));
 }

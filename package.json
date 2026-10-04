@@ -14,6 +14,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "licenses:generate": "node ./scripts/generate-licenses.js",
     "prestart": "npm run licenses:generate",
     "preandroid": "npm run licenses:generate",
@@ -70,6 +72,7 @@
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.1",
     "license-checker": "^25.0.1",
+    "prettier": "^3.9.9",
     "typescript": "~5.9.2"
   },
   "private": true

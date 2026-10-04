@@ -20,12 +20,7 @@ interface Props {
   onClose: () => void;
   templateKind: JourneyKind;
   entryTemplates: EntryTemplate[];
-  onSave: (
-    label: string,
-    text: string,
-    tags: string[],
-    editingId: string | null
-  ) => void;
+  onSave: (label: string, text: string, tags: string[], editingId: string | null) => void;
   onRemove: (templateId: string) => void;
   onReset: () => void;
 }
@@ -49,9 +44,7 @@ export function TemplateModal({
   const [tagsInput, setTagsInput] = useState('');
 
   function kindLabel(kind: JourneyKind) {
-    return t(
-      kind === 'travel' ? 'journey.kind.travel' : 'journey.kind.commute'
-    );
+    return t(kind === 'travel' ? 'journey.kind.travel' : 'journey.kind.commute');
   }
 
   function resetEditor() {
@@ -81,14 +74,14 @@ export function TemplateModal({
         tagsInput
           .split(/[,，、]/)
           .map((item) => item.trim())
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     );
 
     if (!label || !text) {
       Alert.alert(
         t('journey.alertTemplateIncompleteTitle'),
-        t('journey.alertTemplateIncompleteBody')
+        t('journey.alertTemplateIncompleteBody'),
       );
       return;
     }
@@ -99,10 +92,7 @@ export function TemplateModal({
 
   function handleRemove(templateId: string) {
     if (entryTemplates.length <= 1) {
-      Alert.alert(
-        t('journey.alertTemplateMinimumTitle'),
-        t('journey.alertTemplateMinimumBody')
-      );
+      Alert.alert(t('journey.alertTemplateMinimumTitle'), t('journey.alertTemplateMinimumBody'));
       return;
     }
     onRemove(templateId);
@@ -112,20 +102,16 @@ export function TemplateModal({
   }
 
   function handleReset() {
-    Alert.alert(
-      t('journey.alertResetTemplatesTitle'),
-      t('journey.alertResetTemplatesBody'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.confirm'),
-          onPress: () => {
-            onReset();
-            resetEditor();
-          },
+    Alert.alert(t('journey.alertResetTemplatesTitle'), t('journey.alertResetTemplatesBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.confirm'),
+        onPress: () => {
+          onReset();
+          resetEditor();
         },
-      ]
-    );
+      },
+    ]);
   }
 
   const themedCard = {
@@ -154,12 +140,7 @@ export function TemplateModal({
   const themedCancelButtonText = { color: isDark ? '#cbd5e1' : '#334155' };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={[styles.card, themedCard]}>
           <View style={styles.header}>
@@ -175,20 +156,12 @@ export function TemplateModal({
 
           <ScrollView style={styles.templateList}>
             {entryTemplates.map((template) => (
-              <View
-                key={template.id}
-                style={[styles.templateItem, themedItem]}
-              >
-                <Text style={[styles.templateItemTitle, themedItemTitle]}>
-                  {template.label}
-                </Text>
-                <Text style={[styles.templateItemText, themedItemText]}>
-                  {template.text}
-                </Text>
+              <View key={template.id} style={[styles.templateItem, themedItem]}>
+                <Text style={[styles.templateItemTitle, themedItemTitle]}>{template.label}</Text>
+                <Text style={[styles.templateItemText, themedItemText]}>{template.text}</Text>
                 {template.tags.length > 0 ? (
                   <Text style={[styles.templateItemText, themedItemText]}>
-                    {t('common.tags')}：
-                    {template.tags.map((tag) => `#${tag}`).join(' ')}
+                    {t('common.tags')}：{template.tags.map((tag) => `#${tag}`).join(' ')}
                   </Text>
                 ) : null}
                 <View style={styles.inlineRow}>
@@ -208,13 +181,11 @@ export function TemplateModal({
                             style: 'destructive',
                             onPress: () => handleRemove(template.id),
                           },
-                        ]
+                        ],
                       )
                     }
                   >
-                    <Text style={styles.deleteText}>
-                      {t('common.delete')}
-                    </Text>
+                    <Text style={styles.deleteText}>{t('common.delete')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -224,9 +195,7 @@ export function TemplateModal({
           <View style={styles.editorSection}>
             <Text style={[styles.editorLabel, themedLabel]}>
               {t('journey.templateEditorTitle', {
-                mode: editingId
-                  ? t('journey.templateModeEdit')
-                  : t('journey.templateModeCreate'),
+                mode: editingId ? t('journey.templateModeEdit') : t('journey.templateModeCreate'),
               })}
             </Text>
             <TextInput
@@ -252,41 +221,22 @@ export function TemplateModal({
               style={[styles.input, themedInput]}
             />
             <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.primaryButton, styles.saveButton]}
-                onPress={handleSave}
-              >
+              <Pressable style={[styles.primaryButton, styles.saveButton]} onPress={handleSave}>
                 <Text style={styles.primaryButtonText}>
-                  {editingId
-                    ? t('journey.updateTemplate')
-                    : t('journey.saveTemplate')}
+                  {editingId ? t('journey.updateTemplate') : t('journey.saveTemplate')}
                 </Text>
               </Pressable>
               <Pressable
-                style={[
-                  styles.cancelButton,
-                  themedCancelButton,
-                  styles.resetButton,
-                ]}
+                style={[styles.cancelButton, themedCancelButton, styles.resetButton]}
                 onPress={resetEditor}
               >
-                <Text
-                  style={[
-                    styles.cancelButtonText,
-                    themedCancelButtonText,
-                  ]}
-                >
+                <Text style={[styles.cancelButtonText, themedCancelButtonText]}>
                   {t('journey.clearTemplateEdit')}
                 </Text>
               </Pressable>
             </View>
-            <Pressable
-              style={[styles.cancelButton, themedCancelButton]}
-              onPress={handleReset}
-            >
-              <Text
-                style={[styles.cancelButtonText, themedCancelButtonText]}
-              >
+            <Pressable style={[styles.cancelButton, themedCancelButton]} onPress={handleReset}>
+              <Text style={[styles.cancelButtonText, themedCancelButtonText]}>
                 {t('journey.resetTemplates')}
               </Text>
             </Pressable>

@@ -86,8 +86,8 @@ function normalizeTemplateItem(item: unknown): EntryTemplate | null {
           maybeTemplate.tags
             .filter((tag): tag is string => typeof tag === 'string')
             .map((tag) => tag.trim())
-            .filter(Boolean)
-        )
+            .filter(Boolean),
+        ),
       )
     : [];
 
@@ -131,7 +131,10 @@ function normalizeTemplateConfig(raw: unknown): EntryTemplateConfig {
 export function getDefaultEntryTemplateConfig(): EntryTemplateConfig {
   return {
     travel: DEFAULT_ENTRY_TEMPLATE_CONFIG.travel.map((item) => ({ ...item, tags: [...item.tags] })),
-    commute: DEFAULT_ENTRY_TEMPLATE_CONFIG.commute.map((item) => ({ ...item, tags: [...item.tags] })),
+    commute: DEFAULT_ENTRY_TEMPLATE_CONFIG.commute.map((item) => ({
+      ...item,
+      tags: [...item.tags],
+    })),
   };
 }
 

@@ -21,13 +21,15 @@ export const LicenseDependencyRow = memo(function LicenseDependencyRow({
   return (
     <Pressable
       style={[styles.row, { borderColor: isDark ? '#334155' : '#e2e8f0' }]}
-      onPress={() => onToggle(item.name)}>
+      onPress={() => onToggle(item.name)}
+    >
       <View style={styles.header}>
         <View style={styles.nameWrap}>
           <Text
             style={[styles.name, { color: isDark ? '#e2e8f0' : '#0f172a' }]}
             numberOfLines={1}
-            ellipsizeMode="tail">
+            ellipsizeMode="tail"
+          >
             {item.name}
           </Text>
         </View>

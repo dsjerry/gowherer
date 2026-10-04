@@ -1,28 +1,19 @@
+import { ExpoGaodeMapModule, MapView, Marker, type MapViewRef } from 'expo-gaode-map';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ExpoGaodeMapModule,
-    MapView,
-    Marker,
-    type MapViewRef,
-} from "expo-gaode-map";
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
-import { useI18n } from "@/hooks/locale-preference";
-import {
-    getLocalLogFileUri,
-    logLocalError,
-    logLocalInfo,
-} from "@/lib/local-log";
-import { reverseGeocodePlaceName } from "@/lib/reverse-geocode";
-import { TimelineLocation } from "@/types/journey";
+import { useI18n } from '@/hooks/locale-preference';
+import { getLocalLogFileUri, logLocalError, logLocalInfo } from '@/lib/local-log';
+import { reverseGeocodePlaceName } from '@/lib/reverse-geocode';
+import { TimelineLocation } from '@/types/journey';
 
 type AMapLatLng = {
   latitude: number;
@@ -42,19 +33,13 @@ const DEFAULT_CENTER: AMapLatLng = {
   longitude: 116.397477,
 };
 
-export function AMapPlacePicker({
-  visible,
-  initialLocation,
-  isDark,
-  onClose,
-  onConfirm,
-}: Props) {
+export function AMapPlacePicker({ visible, initialLocation, isDark, onClose, onConfirm }: Props) {
   const { t } = useI18n();
   const pendingCameraTargetRef = useRef<AMapLatLng | null>(null);
   const mapRef = useRef<MapViewRef | null>(null);
   const [selected, setSelected] = useState<AMapLatLng | null>(null);
   const [cameraTarget, setCameraTarget] = useState<AMapLatLng>(DEFAULT_CENTER);
-  const [placeName, setPlaceName] = useState("");
+  const [placeName, setPlaceName] = useState('');
   const [resolving, setResolving] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -98,7 +83,7 @@ export function AMapPlacePicker({
           }
         : null,
     );
-    setPlaceName(initialLocation?.placeName ?? "");
+    setPlaceName(initialLocation?.placeName ?? '');
   }, [initialLocation, visible]);
 
   useEffect(() => {
@@ -136,14 +121,10 @@ export function AMapPlacePicker({
           longitude: position.longitude,
         };
         moveCameraTo(target, 300);
-        void logLocalInfo(
-          "AMapPicker",
-          "camera moved to current location",
-          target,
-        );
+        void logLocalInfo('AMapPicker', 'camera moved to current location', target);
       } catch (error) {
-        void logLocalError("AMapPicker", error, {
-          stage: "load-current-position",
+        void logLocalError('AMapPicker', error, {
+          stage: 'load-current-position',
         });
       }
     })();
@@ -156,53 +137,39 @@ export function AMapPlacePicker({
   async function resolvePlaceName(target: AMapLatLng) {
     setResolving(true);
     try {
-      const maybeName = await reverseGeocodePlaceName(
-        target.latitude,
-        target.longitude,
-        { coordinateType: "gcj02" },
-      );
-      setPlaceName(maybeName ?? "");
+      const maybeName = await reverseGeocodePlaceName(target.latitude, target.longitude, {
+        coordinateType: 'gcj02',
+      });
+      setPlaceName(maybeName ?? '');
     } catch (error) {
-      void logLocalError("AMapPicker", error, {
-        stage: "reverse-geocode",
+      void logLocalError('AMapPicker', error, {
+        stage: 'reverse-geocode',
         target,
       });
-      setPlaceName("");
+      setPlaceName('');
     } finally {
       setResolving(false);
     }
   }
 
   async function selectByMapTap(target: AMapLatLng) {
-    if (
-      !Number.isFinite(target.latitude) ||
-      !Number.isFinite(target.longitude)
-    ) {
-      void logLocalInfo("AMapPicker", "invalid map tap coordinates", target);
+    if (!Number.isFinite(target.latitude) || !Number.isFinite(target.longitude)) {
+      void logLocalInfo('AMapPicker', 'invalid map tap coordinates', target);
       return;
     }
     setSelected(target);
-    void logLocalInfo("AMapPicker", "map pressed", target);
+    void logLocalInfo('AMapPicker', 'map pressed', target);
     await resolvePlaceName(target);
   }
 
   async function confirmSelection() {
     if (!selected) {
-      Alert.alert(
-        t("amapPicker.selectFirstTitle"),
-        t("amapPicker.selectFirstBody"),
-      );
+      Alert.alert(t('amapPicker.selectFirstTitle'), t('amapPicker.selectFirstBody'));
       return;
     }
-    if (
-      !Number.isFinite(selected.latitude) ||
-      !Number.isFinite(selected.longitude)
-    ) {
-      Alert.alert(
-        t("amapPicker.invalidPointTitle"),
-        t("amapPicker.invalidPointBody"),
-      );
-      void logLocalInfo("AMapPicker", "invalid selected coordinates", selected);
+    if (!Number.isFinite(selected.latitude) || !Number.isFinite(selected.longitude)) {
+      Alert.alert(t('amapPicker.invalidPointTitle'), t('amapPicker.invalidPointBody'));
+      void logLocalInfo('AMapPicker', 'invalid selected coordinates', selected);
       return;
     }
 
@@ -214,17 +181,17 @@ export function AMapPlacePicker({
     };
 
     try {
-      void logLocalInfo("AMapPicker", "confirm selection", location);
+      void logLocalInfo('AMapPicker', 'confirm selection', location);
       await Promise.resolve(onConfirm(location));
       onClose();
     } catch (error) {
-      void logLocalError("AMapPicker", error, {
-        stage: "confirm",
+      void logLocalError('AMapPicker', error, {
+        stage: 'confirm',
         location,
       });
       Alert.alert(
-        t("amapPicker.saveFailedTitle"),
-        t("amapPicker.saveFailedBody", { uri: getLocalLogFileUri() }),
+        t('amapPicker.saveFailedTitle'),
+        t('amapPicker.saveFailedBody', { uri: getLocalLogFileUri() }),
       );
     } finally {
       setConfirming(false);
@@ -237,10 +204,7 @@ export function AMapPlacePicker({
         ref={(ref) => {
           mapRef.current = ref;
           if (ref && pendingCameraTargetRef.current) {
-            ref.moveCamera(
-              { target: pendingCameraTargetRef.current, zoom: 16 },
-              300,
-            );
+            ref.moveCamera({ target: pendingCameraTargetRef.current, zoom: 16 }, 300);
           }
         }}
         style={styles.map}
@@ -250,9 +214,9 @@ export function AMapPlacePicker({
           void selectByMapTap(nativeEvent);
         }}
         onPressPoi={({ nativeEvent }) => {
-          void logLocalInfo("AMapPicker", "poi pressed", nativeEvent);
+          void logLocalInfo('AMapPicker', 'poi pressed', nativeEvent);
           setSelected(nativeEvent.position);
-          setPlaceName(nativeEvent.name ?? "");
+          setPlaceName(nativeEvent.name ?? '');
         }}
         initialCameraPosition={{
           target: cameraTarget ?? center,
@@ -266,7 +230,7 @@ export function AMapPlacePicker({
 
   return (
     <View
-      pointerEvents={visible ? "auto" : "none"}
+      pointerEvents={visible ? 'auto' : 'none'}
       style={[styles.host, visible ? styles.hostVisible : styles.hostHidden]}
     >
       <View style={styles.mask}>
@@ -274,20 +238,16 @@ export function AMapPlacePicker({
           style={[
             styles.card,
             {
-              backgroundColor: isDark ? "#1e293b" : "#ffffff",
-              borderColor: isDark ? "#334155" : "#e2e8f0",
+              backgroundColor: isDark ? '#1e293b' : '#ffffff',
+              borderColor: isDark ? '#334155' : '#e2e8f0',
             },
           ]}
         >
-          <Text
-            style={[styles.title, { color: isDark ? "#e2e8f0" : "#0f172a" }]}
-          >
-            {t("amapPicker.title")}
+          <Text style={[styles.title, { color: isDark ? '#e2e8f0' : '#0f172a' }]}>
+            {t('amapPicker.title')}
           </Text>
-          <Text
-            style={[styles.hint, { color: isDark ? "#94a3b8" : "#475569" }]}
-          >
-            {t("amapPicker.subtitle")}
+          <Text style={[styles.hint, { color: isDark ? '#94a3b8' : '#475569' }]}>
+            {t('amapPicker.subtitle')}
           </Text>
 
           {renderMap()}
@@ -297,36 +257,32 @@ export function AMapPlacePicker({
               style={[
                 styles.placeInput,
                 {
-                  backgroundColor: isDark ? "#0f172a" : "#f8fafc",
-                  borderColor: isDark ? "#334155" : "#cbd5e1",
-                  color: isDark ? "#e2e8f0" : "#0f172a",
+                  backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                  borderColor: isDark ? '#334155' : '#cbd5e1',
+                  color: isDark ? '#e2e8f0' : '#0f172a',
                 },
               ]}
               value={placeName}
               onChangeText={setPlaceName}
-              placeholder={t("amapPicker.placeNamePlaceholder")}
-              placeholderTextColor={isDark ? "#94a3b8" : "#64748b"}
+              placeholder={t('amapPicker.placeNamePlaceholder')}
+              placeholderTextColor={isDark ? '#94a3b8' : '#64748b'}
             />
             {resolving ? <ActivityIndicator size="small" /> : null}
           </View>
 
           {selected ? (
-            <Text
-              style={[styles.coord, { color: isDark ? "#cbd5e1" : "#334155" }]}
-            >
+            <Text style={[styles.coord, { color: isDark ? '#cbd5e1' : '#334155' }]}>
               {selected.latitude.toFixed(6)}, {selected.longitude.toFixed(6)}
             </Text>
           ) : (
-            <Text
-              style={[styles.coord, { color: isDark ? "#94a3b8" : "#64748b" }]}
-            >
-              {t("amapPicker.noneSelected")}
+            <Text style={[styles.coord, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              {t('amapPicker.noneSelected')}
             </Text>
           )}
 
           <View style={styles.actions}>
             <Pressable style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelText}>{t("amapPicker.cancel")}</Text>
+              <Text style={styles.cancelText}>{t('amapPicker.cancel')}</Text>
             </Pressable>
             <Pressable
               style={styles.confirmButton}
@@ -334,9 +290,7 @@ export function AMapPlacePicker({
               disabled={confirming}
             >
               <Text style={styles.confirmText}>
-                {confirming
-                  ? t("amapPicker.confirming")
-                  : t("amapPicker.confirm")}
+                {confirming ? t('amapPicker.confirming') : t('amapPicker.confirm')}
               </Text>
             </Pressable>
           </View>
@@ -348,7 +302,7 @@ export function AMapPlacePicker({
 
 const styles = StyleSheet.create({
   host: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
@@ -363,8 +317,8 @@ const styles = StyleSheet.create({
   },
   mask: {
     flex: 1,
-    justifyContent: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     padding: 16,
   },
   card: {
@@ -375,7 +329,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   hint: {
     fontSize: 12,
@@ -383,11 +337,11 @@ const styles = StyleSheet.create({
   map: {
     height: 300,
     borderRadius: 12,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   placeNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   placeInput: {
@@ -402,30 +356,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   actions: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 10,
   },
   cancelButton: {
     flex: 1,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: '#cbd5e1',
     paddingVertical: 10,
-    alignItems: "center",
+    alignItems: 'center',
   },
   confirmButton: {
     flex: 1,
     borderRadius: 10,
-    backgroundColor: "#2563eb",
+    backgroundColor: '#2563eb',
     paddingVertical: 10,
-    alignItems: "center",
+    alignItems: 'center',
   },
   cancelText: {
-    color: "#334155",
-    fontWeight: "600",
+    color: '#334155',
+    fontWeight: '600',
   },
   confirmText: {
-    color: "#ffffff",
-    fontWeight: "600",
+    color: '#ffffff',
+    fontWeight: '600',
   },
 });

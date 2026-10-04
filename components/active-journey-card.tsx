@@ -1,14 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaVideoCover } from '@/components/media-viewers';
@@ -130,7 +122,8 @@ export function ActiveJourneyCard({
   const themedGhostButtonText = {
     color: isDark ? '#fbbf24' : '#b45309',
   };
-  const themedInput = {    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+  const themedInput = {
+    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
     borderColor: isDark ? '#334155' : '#cbd5e1',
     color: isDark ? '#e2e8f0' : '#0f172a',
   };
@@ -160,9 +153,7 @@ export function ActiveJourneyCard({
       {/* Card header */}
       <View style={styles.cardHeader}>
         <View style={styles.headerInfo}>
-          <Text style={[styles.sectionTitle, themedSectionTitle]}>
-            {activeJourney.title}
-          </Text>
+          <Text style={[styles.sectionTitle, themedSectionTitle]}>{activeJourney.title}</Text>
           <Text style={[styles.mutedText, themedMuted]}>
             {t('journey.currentJourneyMeta', {
               kind: kindLabel(activeJourney.kind),
@@ -171,10 +162,7 @@ export function ActiveJourneyCard({
             })}
           </Text>
         </View>
-        <Pressable
-          style={[styles.ghostButton, themedGhostButton]}
-          onPress={onEndJourney}
-        >
+        <Pressable style={[styles.ghostButton, themedGhostButton]} onPress={onEndJourney}>
           <Text style={[styles.ghostButtonText, themedGhostButtonText]}>
             {t('journey.endJourney')}
           </Text>
@@ -205,9 +193,7 @@ export function ActiveJourneyCard({
       {/* Entry editor */}
       <Text style={[styles.sectionTitle, themedSectionTitle]}>
         {t('journey.recordEditorTitle', {
-          mode: editingEntryId
-            ? t('journey.modeEdit')
-            : t('journey.modeCreate'),
+          mode: editingEntryId ? t('journey.modeEdit') : t('journey.modeCreate'),
         })}
       </Text>
 
@@ -223,20 +209,14 @@ export function ActiveJourneyCard({
             <Text style={styles.linkText}>{t('journey.manageTemplates')}</Text>
           </Pressable>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.templateRow}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.templateRow}>
           {entryTemplates.map((template) => (
             <Pressable
               key={template.id}
               style={[styles.templateChip, themedTemplateChip]}
               onPress={() => onApplyTemplate(template)}
             >
-              <Text
-                style={[styles.templateChipText, themedTemplateChipText]}
-              >
+              <Text style={[styles.templateChipText, themedTemplateChipText]}>
                 {template.label}
               </Text>
             </Pressable>
@@ -272,41 +252,23 @@ export function ActiveJourneyCard({
           </Text>
         </View>
         {draftLocation ? (
-          <Pressable
-            style={styles.inlineAction}
-            onPress={onRemoveDraftLocation}
-          >
-            <Text style={styles.linkText}>
-              {t('journey.removeLocation')}
-            </Text>
+          <Pressable style={styles.inlineAction} onPress={onRemoveDraftLocation}>
+            <Text style={styles.linkText}>{t('journey.removeLocation')}</Text>
           </Pressable>
         ) : null}
       </View>
 
       {/* Draft media */}
       {draftMedia.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.mediaRow}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaRow}>
           {draftMedia.map((item) =>
             item.type === 'audio' ? (
               <View key={item.id} style={[styles.mediaPreviewBox, themedMediaBox]}>
-                <AudioPlayer
-                  uri={item.uri}
-                  label={t('journey.audioBadge')}
-                />
+                <AudioPlayer uri={item.uri} label={t('journey.audioBadge')} />
                 <View style={[styles.mediaFooter, themedMediaFooter]}>
-                  <Text style={[styles.mediaBadge, themedBadge]}>
-                    {t('journey.audioBadge')}
-                  </Text>
-                  <Pressable
-                    onPress={() => onRemoveDraftMedia(item.id)}
-                  >
-                    <Text style={styles.linkText}>
-                      {t('common.delete')}
-                    </Text>
+                  <Text style={[styles.mediaBadge, themedBadge]}>{t('journey.audioBadge')}</Text>
+                  <Pressable onPress={() => onRemoveDraftMedia(item.id)}>
+                    <Text style={styles.linkText}>{t('common.delete')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -327,12 +289,7 @@ export function ActiveJourneyCard({
                       { backgroundColor: isDark ? '#334155' : '#0f172a' },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.mediaPlaceholderText,
-                        { color: '#ffffff' },
-                      ]}
-                    >
+                    <Text style={[styles.mediaPlaceholderText, { color: '#ffffff' }]}>
                       {t('journey.mediaBadgeVideo')}
                     </Text>
                   </View>
@@ -343,16 +300,12 @@ export function ActiveJourneyCard({
                       ? t('journey.mediaBadgeVideo')
                       : t('journey.mediaBadgePhoto')}
                   </Text>
-                  <Pressable
-                    onPress={() => onRemoveDraftMedia(item.id)}
-                  >
-                    <Text style={styles.linkText}>
-                      {t('common.delete')}
-                    </Text>
+                  <Pressable onPress={() => onRemoveDraftMedia(item.id)}>
+                    <Text style={styles.linkText}>{t('common.delete')}</Text>
                   </Pressable>
                 </View>
               </View>
-            )
+            ),
           )}
         </ScrollView>
       ) : null}
@@ -365,13 +318,8 @@ export function ActiveJourneyCard({
           disabled={openingLocationPicker}
         >
           <MaterialIcons name="place" size={22} color={isDark ? '#5eead4' : '#0f766e'} />
-          <Text
-            style={[styles.toolButtonLabel, themedSecondaryButtonText]}
-            numberOfLines={2}
-          >
-            {openingLocationPicker
-              ? t('journey.openingMap')
-              : t('journey.addLocation')}
+          <Text style={[styles.toolButtonLabel, themedSecondaryButtonText]} numberOfLines={2}>
+            {openingLocationPicker ? t('journey.openingMap') : t('journey.addLocation')}
           </Text>
         </Pressable>
         <Pressable
@@ -379,15 +327,8 @@ export function ActiveJourneyCard({
           onPress={onPickMediaFromLibrary}
           disabled={pickingMedia}
         >
-          <MaterialIcons
-            name="photo-library"
-            size={22}
-            color={isDark ? '#5eead4' : '#0f766e'}
-          />
-          <Text
-            style={[styles.toolButtonLabel, themedSecondaryButtonText]}
-            numberOfLines={2}
-          >
+          <MaterialIcons name="photo-library" size={22} color={isDark ? '#5eead4' : '#0f766e'} />
+          <Text style={[styles.toolButtonLabel, themedSecondaryButtonText]} numberOfLines={2}>
             {pickingMedia ? t('journey.readingAlbum') : t('journey.addFromAlbum')}
           </Text>
         </Pressable>
@@ -396,15 +337,8 @@ export function ActiveJourneyCard({
           onPress={onCapturePhoto}
           disabled={pickingMedia}
         >
-          <MaterialIcons
-            name="photo-camera"
-            size={22}
-            color={isDark ? '#5eead4' : '#0f766e'}
-          />
-          <Text
-            style={[styles.toolButtonLabel, themedSecondaryButtonText]}
-            numberOfLines={2}
-          >
+          <MaterialIcons name="photo-camera" size={22} color={isDark ? '#5eead4' : '#0f766e'} />
+          <Text style={[styles.toolButtonLabel, themedSecondaryButtonText]} numberOfLines={2}>
             {pickingMedia ? t('journey.processingMedia') : t('journey.takePhoto')}
           </Text>
         </Pressable>
@@ -413,15 +347,8 @@ export function ActiveJourneyCard({
           onPress={onCaptureVideo}
           disabled={pickingMedia}
         >
-          <MaterialIcons
-            name="videocam"
-            size={22}
-            color={isDark ? '#5eead4' : '#0f766e'}
-          />
-          <Text
-            style={[styles.toolButtonLabel, themedSecondaryButtonText]}
-            numberOfLines={2}
-          >
+          <MaterialIcons name="videocam" size={22} color={isDark ? '#5eead4' : '#0f766e'} />
+          <Text style={[styles.toolButtonLabel, themedSecondaryButtonText]} numberOfLines={2}>
             {pickingMedia ? t('journey.processingMedia') : t('journey.takeVideo')}
           </Text>
         </Pressable>
@@ -439,15 +366,7 @@ export function ActiveJourneyCard({
           <MaterialIcons
             name={isRecording ? 'stop' : 'mic'}
             size={22}
-            color={
-              isRecording
-                ? isDark
-                  ? '#f87171'
-                  : '#dc2626'
-                : isDark
-                  ? '#5eead4'
-                  : '#0f766e'
-            }
+            color={isRecording ? (isDark ? '#f87171' : '#dc2626') : isDark ? '#5eead4' : '#0f766e'}
           />
           <Text
             style={[
@@ -466,11 +385,7 @@ export function ActiveJourneyCard({
       </View>
 
       {/* Save / Cancel */}
-      <Pressable
-        style={styles.primaryButton}
-        onPress={onSaveEntry}
-        disabled={savingEntry}
-      >
+      <Pressable style={styles.primaryButton} onPress={onSaveEntry} disabled={savingEntry}>
         <Text style={styles.primaryButtonText}>
           {savingEntry
             ? t('journey.savingEntry')
@@ -480,10 +395,7 @@ export function ActiveJourneyCard({
         </Text>
       </Pressable>
       {editingEntryId ? (
-        <Pressable
-          style={[styles.cancelButton, themedCancelButton]}
-          onPress={onResetDraft}
-        >
+        <Pressable style={[styles.cancelButton, themedCancelButton]} onPress={onResetDraft}>
           <Text style={[styles.cancelButtonText, themedCancelButtonText]}>
             {t('journey.cancelEdit')}
           </Text>

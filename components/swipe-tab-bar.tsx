@@ -21,8 +21,7 @@ export function SwipeTabBar({ state, descriptors, navigation, position }: Materi
   const isDark = colorScheme === 'dark';
   const palette = isDark ? Colors.dark : Colors.light;
 
-  const inputRange =
-    state.routes.length > 1 ? state.routes.map((_, index) => index) : [0, 1];
+  const inputRange = state.routes.length > 1 ? state.routes.map((_, index) => index) : [0, 1];
 
   const crossFade = (index: number, visible: number) =>
     position.interpolate({
@@ -106,7 +105,11 @@ export function SwipeTabBar({ state, descriptors, navigation, position }: Materi
               </Animated.Text>
               <Animated.Text
                 numberOfLines={1}
-                style={[styles.label, styles.labelOverlay, { color: palette.tint, opacity: activeOpacity }]}
+                style={[
+                  styles.label,
+                  styles.labelOverlay,
+                  { color: palette.tint, opacity: activeOpacity },
+                ]}
               >
                 {label}
               </Animated.Text>

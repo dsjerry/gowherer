@@ -1,28 +1,20 @@
-import { Stack } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import {
-    FlatList,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Stack } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { LicenseDependencyRow } from "@/components/license-dependency-row";
-import { useI18n } from "@/hooks/locale-preference";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { LicenseDependencyRow } from '@/components/license-dependency-row';
+import { useI18n } from '@/hooks/locale-preference';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
-    licenseDependencies,
-    LicenseDependency,
-    licenseDirectCount,
-    licenseGeneratedAt,
-    licenseTransitiveCount,
-    licenseTypes,
-    matchesLicenseFilter,
-} from "@/lib/license-catalog";
+  licenseDependencies,
+  LicenseDependency,
+  licenseDirectCount,
+  licenseGeneratedAt,
+  licenseTransitiveCount,
+  licenseTypes,
+  matchesLicenseFilter,
+} from '@/lib/license-catalog';
 
 const appLicense = `MIT License
 
@@ -47,23 +39,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`;
 
 type ListItem =
-  | { kind: "section"; key: string; title: string; count: number }
-  | { kind: "dependency"; key: string; dependency: LicenseDependency };
+  | { kind: 'section'; key: string; title: string; count: number }
+  | { kind: 'dependency'; key: string; dependency: LicenseDependency };
 
 export default function LicensesScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [licenseFilter, setLicenseFilter] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const chips = useMemo(
-    () => [
-      { type: null as string | null, count: licenseDependencies.length },
-      ...licenseTypes,
-    ],
+    () => [{ type: null as string | null, count: licenseDependencies.length }, ...licenseTypes],
     [],
   );
 
@@ -77,13 +66,13 @@ export default function LicensesScreen() {
       entries: LicenseDependency[];
     }[] = [
       {
-        id: "direct",
-        title: t("settings.licensesDirectTitle"),
+        id: 'direct',
+        title: t('settings.licensesDirectTitle'),
         entries: filtered.filter((dependency) => dependency.direct),
       },
       {
-        id: "transitive",
-        title: t("settings.licensesTransitiveTitle"),
+        id: 'transitive',
+        title: t('settings.licensesTransitiveTitle'),
         entries: filtered.filter((dependency) => !dependency.direct),
       },
     ];
@@ -93,13 +82,13 @@ export default function LicensesScreen() {
         ? []
         : [
             {
-              kind: "section" as const,
+              kind: 'section' as const,
               key: `section:${section.id}`,
               title: section.title,
               count: section.entries.length,
             },
             ...section.entries.map((dependency) => ({
-              kind: "dependency" as const,
+              kind: 'dependency' as const,
               key: `${section.id}:${dependency.name}@${dependency.version}`,
               dependency,
             })),
@@ -113,29 +102,29 @@ export default function LicensesScreen() {
 
   const theme = useMemo(
     () => ({
-      page: { backgroundColor: isDark ? "#0f172a" : "#f8fafc" },
+      page: { backgroundColor: isDark ? '#0f172a' : '#f8fafc' },
       card: {
-        backgroundColor: isDark ? "#1e293b" : "#ffffff",
-        borderColor: isDark ? "#334155" : "#e2e8f0",
+        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+        borderColor: isDark ? '#334155' : '#e2e8f0',
       },
-      title: { color: isDark ? "#e2e8f0" : "#0f172a" },
-      muted: { color: isDark ? "#94a3b8" : "#475569" },
-      text: { color: isDark ? "#e2e8f0" : "#0f172a" },
+      title: { color: isDark ? '#e2e8f0' : '#0f172a' },
+      muted: { color: isDark ? '#94a3b8' : '#475569' },
+      text: { color: isDark ? '#e2e8f0' : '#0f172a' },
       input: {
-        backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
-        borderColor: isDark ? "#334155" : "#e2e8f0",
+        backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
+        borderColor: isDark ? '#334155' : '#e2e8f0',
       },
       chip: {
-        backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
-        borderColor: isDark ? "#334155" : "#e2e8f0",
+        backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
+        borderColor: isDark ? '#334155' : '#e2e8f0',
       },
       chipActive: {
-        backgroundColor: isDark ? "#134e4a" : "#ccfbf1",
-        borderColor: isDark ? "#5eead4" : "#0f766e",
+        backgroundColor: isDark ? '#134e4a' : '#ccfbf1',
+        borderColor: isDark ? '#5eead4' : '#0f766e',
       },
       chipTextActive: {
-        color: isDark ? "#5eead4" : "#0f766e",
-        fontWeight: "700" as const,
+        color: isDark ? '#5eead4' : '#0f766e',
+        fontWeight: '700' as const,
       },
     }),
     [isDark],
@@ -143,7 +132,7 @@ export default function LicensesScreen() {
 
   return (
     <View style={[styles.page, theme.page]}>
-      <Stack.Screen options={{ title: t("settings.licensesTitle") }} />
+      <Stack.Screen options={{ title: t('settings.licensesTitle') }} />
       <FlatList
         data={items}
         keyExtractor={(item) => item.key}
@@ -158,20 +147,18 @@ export default function LicensesScreen() {
           <View>
             <View style={[styles.card, theme.card]}>
               <Text style={[styles.sectionTitle, theme.title]}>
-                {t("settings.licensesAppTitle")}
+                {t('settings.licensesAppTitle')}
               </Text>
-              <Text style={[styles.sectionHint, theme.muted]}>
-                {t("settings.licensesHint")}
-              </Text>
+              <Text style={[styles.sectionHint, theme.muted]}>{t('settings.licensesHint')}</Text>
               <Text style={[styles.licenseText, theme.text]}>{appLicense}</Text>
             </View>
 
             <View style={[styles.card, theme.card]}>
               <Text style={[styles.sectionTitle, theme.title]}>
-                {t("settings.licensesDependenciesTitle")}
+                {t('settings.licensesDependenciesTitle')}
               </Text>
               <Text style={[styles.sectionHint, theme.muted]}>
-                {t("settings.licensesSummary", {
+                {t('settings.licensesSummary', {
                   total: licenseDependencies.length,
                   direct: licenseDirectCount,
                   transitive: licenseTransitiveCount,
@@ -191,23 +178,12 @@ export default function LicensesScreen() {
                   const active = licenseFilter === chip.type;
                   return (
                     <Pressable
-                      key={chip.type ?? "all"}
-                      onPress={() =>
-                        setLicenseFilter(active ? null : chip.type)
-                      }
-                      style={[
-                        styles.chip,
-                        theme.chip,
-                        active && theme.chipActive,
-                      ]}
+                      key={chip.type ?? 'all'}
+                      onPress={() => setLicenseFilter(active ? null : chip.type)}
+                      style={[styles.chip, theme.chip, active && theme.chipActive]}
                     >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          active ? theme.chipTextActive : theme.muted,
-                        ]}
-                      >
-                        {`${chip.type ?? t("settings.licensesFilterAll")} ${chip.count}`}
+                      <Text style={[styles.chipText, active ? theme.chipTextActive : theme.muted]}>
+                        {`${chip.type ?? t('settings.licensesFilterAll')} ${chip.count}`}
                       </Text>
                     </Pressable>
                   );
@@ -216,8 +192,8 @@ export default function LicensesScreen() {
               <TextInput
                 value={query}
                 onChangeText={setQuery}
-                placeholder={t("settings.licensesSearchPlaceholder")}
-                placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
+                placeholder={t('settings.licensesSearchPlaceholder')}
+                placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
                 autoCapitalize="none"
                 autoCorrect={false}
                 style={[styles.searchInput, theme.input, theme.text]}
@@ -226,7 +202,7 @@ export default function LicensesScreen() {
           </View>
         }
         renderItem={({ item }) =>
-          item.kind === "section" ? (
+          item.kind === 'section' ? (
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionHeaderText, theme.title]}>
                 {`${item.title} · ${item.count}`}
@@ -241,9 +217,7 @@ export default function LicensesScreen() {
           )
         }
         ListEmptyComponent={
-          <Text style={[styles.empty, theme.muted]}>
-            {t("settings.licensesEmpty")}
-          </Text>
+          <Text style={[styles.empty, theme.muted]}>{t('settings.licensesEmpty')}</Text>
         }
       />
     </View>
@@ -267,7 +241,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   sectionHint: {
     fontSize: 12,
@@ -302,11 +276,11 @@ const styles = StyleSheet.create({
   },
   sectionHeaderText: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   empty: {
     fontSize: 13,
-    textAlign: "center",
+    textAlign: 'center',
     paddingVertical: 24,
   },
 });

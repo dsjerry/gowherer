@@ -68,7 +68,11 @@ async function persistMediaItem(media: TimelineMedia): Promise<TimelineMedia> {
 
   let thumbnailUri = media.thumbnailUri;
   if (media.thumbnailUri && !isManagedMediaUri(media.thumbnailUri)) {
-    const managedThumbnailUri = buildManagedMediaUri(`${media.id}-thumb`, 'photo', media.thumbnailUri);
+    const managedThumbnailUri = buildManagedMediaUri(
+      `${media.id}-thumb`,
+      'photo',
+      media.thumbnailUri,
+    );
     await FileSystem.copyAsync({
       from: media.thumbnailUri,
       to: managedThumbnailUri,
@@ -157,9 +161,7 @@ async function listMediaFiles() {
   }
 }
 
-export async function scanMediaStorage(
-  journeys: Journey[]
-): Promise<MediaStorageReport> {
+export async function scanMediaStorage(journeys: Journey[]): Promise<MediaStorageReport> {
   const files = await listMediaFiles();
   const referenced = collectManagedMediaUrisFromJourneys(journeys);
   const report: MediaStorageReport = {

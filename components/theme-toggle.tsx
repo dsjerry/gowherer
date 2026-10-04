@@ -18,7 +18,8 @@ export function ThemeToggle() {
           backgroundColor: isDark ? '#1e293b' : '#f8fafc',
         },
       ]}
-      onPress={toggleTheme}>
+      onPress={toggleTheme}
+    >
       <MaterialIcons
         name={resolvedTheme === 'dark' ? 'light-mode' : 'dark-mode'}
         size={18}

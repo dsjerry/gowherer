@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 
-import { ExpoGaodeMapModule } from "expo-gaode-map";
+import { ExpoGaodeMapModule } from 'expo-gaode-map';
 
-import { useI18n } from "@/hooks/locale-preference";
+import { useI18n } from '@/hooks/locale-preference';
 import {
-    isBackgroundLocationTrackingAvailable,
-    isLocationTrackingActive,
-    startLocationTracking,
-    stopLocationTracking,
-    syncBufferedTrackLocations,
-} from "@/lib/background-location";
-import { logLocalError } from "@/lib/local-log";
-import { Journey } from "@/types/journey";
+  isBackgroundLocationTrackingAvailable,
+  isLocationTrackingActive,
+  startLocationTracking,
+  stopLocationTracking,
+  syncBufferedTrackLocations,
+} from '@/lib/background-location';
+import { logLocalError } from '@/lib/local-log';
+import { Journey } from '@/types/journey';
 
 export function useLocationTracking(
   activeJourney: Journey | undefined,
@@ -72,47 +72,41 @@ export function useLocationTracking(
         const available = await isBackgroundLocationTrackingAvailable();
         if (!available) {
           Alert.alert(
-            t("journey.alertTrackingUnavailableTitle"),
-            t("journey.alertTrackingUnavailableBody"),
+            t('journey.alertTrackingUnavailableTitle'),
+            t('journey.alertTrackingUnavailableBody'),
           );
           return;
         }
 
-        const foregroundPermission =
-          await ExpoGaodeMapModule.requestLocationPermission();
+        const foregroundPermission = await ExpoGaodeMapModule.requestLocationPermission();
         if (!foregroundPermission.granted) {
           Alert.alert(
-            t("journey.alertTrackingPermissionTitle"),
-            t("journey.alertTrackingPermissionBody"),
+            t('journey.alertTrackingPermissionTitle'),
+            t('journey.alertTrackingPermissionBody'),
           );
           return;
         }
 
-        const backgroundPermission =
-          await ExpoGaodeMapModule.requestBackgroundLocationPermission();
+        const backgroundPermission = await ExpoGaodeMapModule.requestBackgroundLocationPermission();
         if (!backgroundPermission.granted) {
           Alert.alert(
-            t("journey.alertTrackingPermissionTitle"),
-            t("journey.alertTrackingPermissionBody"),
+            t('journey.alertTrackingPermissionTitle'),
+            t('journey.alertTrackingPermissionBody'),
           );
           return;
         }
 
         await startLocationTracking(activeJourney.id, {
-          notificationTitle: t("journey.trackingNotificationTitle"),
-          notificationBody: t("journey.trackingNotificationBody"),
+          notificationTitle: t('journey.trackingNotificationTitle'),
+          notificationBody: t('journey.trackingNotificationBody'),
           journeyKind: activeJourney.kind,
         });
         setLocationTracking(true);
       } catch (error) {
-        void logLocalError(
-          "JourneyScreen",
-          "failed to toggle location tracking",
-          error,
-        );
+        void logLocalError('JourneyScreen', 'failed to toggle location tracking', error);
         Alert.alert(
-          t("journey.alertTrackingStartFailedTitle"),
-          t("journey.alertTrackingStartFailedBody"),
+          t('journey.alertTrackingStartFailedTitle'),
+          t('journey.alertTrackingStartFailedBody'),
         );
       } finally {
         setTrackingBusy(false);

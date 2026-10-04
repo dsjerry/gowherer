@@ -16,9 +16,7 @@
     },
     "preview-split": {
       "extends": "preview",
-      "buildArtifactPaths": [
-        "android/app/build/outputs/apk/release/*.apk"
-      ],
+      "buildArtifactPaths": ["android/app/build/outputs/apk/release/*.apk"],
       "android": {
         "buildType": "apk",
         "resourceClass": "large",

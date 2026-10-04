@@ -52,7 +52,7 @@ function buildBackupFilename(exportedAt: string) {
 async function loadPreference<T extends string>(
   key: string,
   fallback: T,
-  guard: (value: unknown) => value is T
+  guard: (value: unknown) => value is T,
 ) {
   const raw = await AsyncStorage.getItem(key);
   return guard(raw) ? raw : fallback;
@@ -85,13 +85,19 @@ export async function buildAppBackup(appVersion: string): Promise<AppBackupV1> {
     },
     journeys,
     entryTemplates: {
-      zh: zhTemplatesRaw ? normalizeTemplateConfig(JSON.parse(zhTemplatesRaw), zhFallback) : zhFallback,
-      en: enTemplatesRaw ? normalizeTemplateConfig(JSON.parse(enTemplatesRaw), enFallback) : enFallback,
+      zh: zhTemplatesRaw
+        ? normalizeTemplateConfig(JSON.parse(zhTemplatesRaw), zhFallback)
+        : zhFallback,
+      en: enTemplatesRaw
+        ? normalizeTemplateConfig(JSON.parse(enTemplatesRaw), enFallback)
+        : enFallback,
     },
   };
 }
 
-export async function writeBackupToFile(backup: AppBackupV1): Promise<{ fileName: string; uri: string }> {
+export async function writeBackupToFile(
+  backup: AppBackupV1,
+): Promise<{ fileName: string; uri: string }> {
   const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
   if (!directory) {
     throw new Error('File system directory is unavailable.');
@@ -111,7 +117,9 @@ export function serializeBackup(backup: AppBackupV1) {
 }
 
 export function parseBackupString(raw: string): AppBackupV1 {
-  const parsed = JSON.parse(raw) as Partial<AppBackupV1> & { preferences?: Record<string, unknown> };
+  const parsed = JSON.parse(raw) as Partial<AppBackupV1> & {
+    preferences?: Record<string, unknown>;
+  };
 
   if (parsed.version !== 1) {
     throw new Error('Unsupported backup version.');
@@ -159,8 +167,14 @@ export function parseBackupString(raw: string): AppBackupV1 {
 export async function importBackup(backup: AppBackupV1): Promise<ImportResult> {
   await Promise.all([
     AsyncStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify(backup.journeys)),
-    AsyncStorage.setItem(getEntryTemplateStorageKey('zh'), JSON.stringify(backup.entryTemplates.zh)),
-    AsyncStorage.setItem(getEntryTemplateStorageKey('en'), JSON.stringify(backup.entryTemplates.en)),
+    AsyncStorage.setItem(
+      getEntryTemplateStorageKey('zh'),
+      JSON.stringify(backup.entryTemplates.zh),
+    ),
+    AsyncStorage.setItem(
+      getEntryTemplateStorageKey('en'),
+      JSON.stringify(backup.entryTemplates.en),
+    ),
     AsyncStorage.setItem(LOCALE_PREFERENCE_KEY, backup.preferences.locale),
     AsyncStorage.setItem(THEME_PREFERENCE_KEY, backup.preferences.theme),
   ]);

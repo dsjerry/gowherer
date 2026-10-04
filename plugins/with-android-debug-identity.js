@@ -1,14 +1,11 @@
-const {
-  withAppBuildGradle,
-  withFinalizedMod,
-} = require("@expo/config-plugins");
-const fs = require("fs");
-const path = require("path");
+const { withAppBuildGradle, withFinalizedMod } = require('@expo/config-plugins');
+const fs = require('fs');
+const path = require('path');
 
-const GRADLE_MARKER = "// @gowherer-debug-identity";
-const AMAP_API_KEY_META_DATA = "com.amap.api.v2.apikey";
-const APP_LABEL_PLACEHOLDER = "${appLabel}";
-const AMAP_KEY_PLACEHOLDER = "${amapApiKey}";
+const GRADLE_MARKER = '// @gowherer-debug-identity';
+const AMAP_API_KEY_META_DATA = 'com.amap.api.v2.apikey';
+const APP_LABEL_PLACEHOLDER = '${appLabel}';
+const AMAP_KEY_PLACEHOLDER = '${amapApiKey}';
 
 function escapeGradleString(value) {
   return String(value).replace(/'/g, "\\'");
@@ -23,14 +20,12 @@ function patchAndroidManifest(manifestPath) {
     return;
   }
 
-  let contents = fs.readFileSync(manifestPath, "utf8");
+  let contents = fs.readFileSync(manifestPath, 'utf8');
 
   contents = contents.replace(
     /(<application\b[^>]*?android:label=")([^"]*)(")/,
     (match, prefix, value) =>
-      value === APP_LABEL_PLACEHOLDER
-        ? match
-        : `${prefix}${APP_LABEL_PLACEHOLDER}"`,
+      value === APP_LABEL_PLACEHOLDER ? match : `${prefix}${APP_LABEL_PLACEHOLDER}"`,
   );
 
   const amapKeyPatterns = [
@@ -63,23 +58,22 @@ function patchAndroidManifest(manifestPath) {
 // in debug builds.
 module.exports = function withAndroidDebugIdentity(config, props) {
   const options = props ?? {};
-  const applicationIdSuffix = options.debugApplicationIdSuffix ?? ".debug";
-  const versionNameSuffix = options.debugVersionNameSuffix ?? "-debug";
-  const appLabelSuffix = options.debugAppLabelSuffix ?? " Dev";
-  const releaseAmapKey =
-    options.releaseAmapAndroidKey ?? options.amapAndroidKey ?? "";
+  const applicationIdSuffix = options.debugApplicationIdSuffix ?? '.debug';
+  const versionNameSuffix = options.debugVersionNameSuffix ?? '-debug';
+  const appLabelSuffix = options.debugAppLabelSuffix ?? ' Dev';
+  const releaseAmapKey = options.releaseAmapAndroidKey ?? options.amapAndroidKey ?? '';
   const debugAmapKey = options.debugAmapAndroidKey ?? releaseAmapKey;
-  const appLabel = config.name ?? "gowherer";
+  const appLabel = config.name ?? 'gowherer';
 
   config = withFinalizedMod(config, [
-    "android",
+    'android',
     (config) => {
       const manifestPath = path.join(
         config.modRequest.platformProjectRoot,
-        "app",
-        "src",
-        "main",
-        "AndroidManifest.xml",
+        'app',
+        'src',
+        'main',
+        'AndroidManifest.xml',
       );
       patchAndroidManifest(manifestPath);
       return config;
@@ -91,21 +85,18 @@ module.exports = function withAndroidDebugIdentity(config, props) {
     // Replace any previously injected block so refreshed props (e.g. a new
     // AMAP_ANDROID_DEBUG_KEY in .env) take effect on the next prebuild.
     const markerIndex = contents.indexOf(GRADLE_MARKER);
-    const base =
-      markerIndex === -1
-        ? contents
-        : contents.slice(0, markerIndex).trimEnd();
+    const base = markerIndex === -1 ? contents : contents.slice(0, markerIndex).trimEnd();
 
     const block = [
       GRADLE_MARKER,
-      "// Scoped to the debug buildType only; release keeps the original applicationId.",
+      '// Scoped to the debug buildType only; release keeps the original applicationId.',
       `android.defaultConfig.manifestPlaceholders.appLabel = '${escapeGradleString(appLabel)}'`,
       `android.defaultConfig.manifestPlaceholders.amapApiKey = '${escapeGradleString(releaseAmapKey)}'`,
       `android.buildTypes.debug.applicationIdSuffix = '${escapeGradleString(applicationIdSuffix)}'`,
       `android.buildTypes.debug.versionNameSuffix = '${escapeGradleString(versionNameSuffix)}'`,
       `android.buildTypes.debug.manifestPlaceholders.appLabel = '${escapeGradleString(appLabel + appLabelSuffix)}'`,
       `android.buildTypes.debug.manifestPlaceholders.amapApiKey = '${escapeGradleString(debugAmapKey)}'`,
-    ].join("\n");
+    ].join('\n');
 
     config.modResults.contents = `${base}\n\n${block}\n`;
     return config;

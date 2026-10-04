@@ -391,7 +391,7 @@ function buildCrc32Table() {
   for (let i = 0; i < 256; i++) {
     let c = i;
     for (let j = 0; j < 8; j++) {
-      c = (c & 1) ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
     }
     table[i] = c >>> 0;
   }
@@ -456,7 +456,9 @@ function savePng(filename, canvas, outDir) {
   const filePath = path.join(outDir, filename);
   const png = encodePng(canvas);
   fs.writeFileSync(filePath, png);
-  console.log(`Generated ${path.relative(path.join(__dirname, '..'), filePath)} (${canvas.width}x${canvas.height})`);
+  console.log(
+    `Generated ${path.relative(path.join(__dirname, '..'), filePath)} (${canvas.width}x${canvas.height})`,
+  );
 }
 
 function ensureDir(dirPath) {

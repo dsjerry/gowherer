@@ -1,7 +1,7 @@
-const { withAppBuildGradle } = require("@expo/config-plugins");
+const { withAppBuildGradle } = require('@expo/config-plugins');
 
-const IMPORT_LINE = "import com.android.build.OutputFile";
-const CONFIG_MARKER = "// @gowherer-abi-splits";
+const IMPORT_LINE = 'import com.android.build.OutputFile';
+const CONFIG_MARKER = '// @gowherer-abi-splits';
 
 const ABI_SPLIT_CONFIG = `
 ${CONFIG_MARKER}
@@ -47,13 +47,12 @@ function insertBeforePackagingOptions(contents, snippet) {
 }
 
 function insertBeforeAndroidBlockEnd(contents, snippet) {
-  const resourcesPattern =
-    /(\n\s{4}androidResources\s*\{[\s\S]*?\n\s{4}\}\n)(\})/;
+  const resourcesPattern = /(\n\s{4}androidResources\s*\{[\s\S]*?\n\s{4}\}\n)(\})/;
   if (resourcesPattern.test(contents)) {
     return contents.replace(resourcesPattern, `$1\n${snippet}\n$2`);
   }
 
-  const androidBlockStart = contents.indexOf("\nandroid {");
+  const androidBlockStart = contents.indexOf('\nandroid {');
   if (androidBlockStart === -1) {
     return contents;
   }
@@ -61,9 +60,9 @@ function insertBeforeAndroidBlockEnd(contents, snippet) {
   let depth = 0;
   for (let index = androidBlockStart; index < contents.length; index += 1) {
     const char = contents[index];
-    if (char === "{") {
+    if (char === '{') {
       depth += 1;
-    } else if (char === "}") {
+    } else if (char === '}') {
       depth -= 1;
       if (depth === 0) {
         return `${contents.slice(0, index)}\n${snippet}\n${contents.slice(index)}`;
@@ -79,15 +78,15 @@ function addAbiSplits(contents) {
     contents = `${IMPORT_LINE}\n\n${contents}`;
   }
 
-  if (!contents.includes("def enableSeparateBuildPerCPUArchitecture")) {
+  if (!contents.includes('def enableSeparateBuildPerCPUArchitecture')) {
     contents = insertBeforeAndroidBlock(contents, ABI_SPLIT_CONFIG);
   }
 
-  if (!contents.includes("splits {")) {
+  if (!contents.includes('splits {')) {
     contents = insertBeforePackagingOptions(contents, SPLITS_BLOCK);
   }
 
-  if (!contents.includes("versionCodeOverride")) {
+  if (!contents.includes('versionCodeOverride')) {
     contents = insertBeforeAndroidBlockEnd(contents, VERSION_CODE_BLOCK);
   }
 
@@ -97,7 +96,7 @@ function addAbiSplits(contents) {
 module.exports = function withAndroidAbiSplits(config) {
   return withAppBuildGradle(config, (configWithBuildGradle) => {
     configWithBuildGradle.modResults.contents = addAbiSplits(
-      configWithBuildGradle.modResults.contents
+      configWithBuildGradle.modResults.contents,
     );
     return configWithBuildGradle;
   });

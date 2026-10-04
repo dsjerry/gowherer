@@ -56,7 +56,7 @@ export function ThemePreferenceProvider({ children }: { children: ReactNode }) {
       setPreference,
       toggleTheme,
     }),
-    [preference, resolvedTheme, setPreference, toggleTheme]
+    [preference, resolvedTheme, setPreference, toggleTheme],
   );
 
   return (

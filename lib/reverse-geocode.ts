@@ -1,15 +1,15 @@
-import Constants from "expo-constants";
-import { reGeocode } from "expo-gaode-map";
+import Constants from 'expo-constants';
+import { reGeocode } from 'expo-gaode-map';
 
 import {
   buildGeocodeCacheKey,
   getCachedPlaceName,
   loadGeocodeCache,
   setCachedPlaceName,
-} from "@/lib/geocode-cache";
+} from '@/lib/geocode-cache';
 
-export type ReverseGeocodeProvider = "system" | "amap";
-export type CoordinateType = "wgs84" | "gcj02";
+export type ReverseGeocodeProvider = 'system' | 'amap';
+export type CoordinateType = 'wgs84' | 'gcj02';
 export type NearbyPlace = {
   id: string;
   name: string;
@@ -102,12 +102,9 @@ function formatAmapPlaceName(data: AmapRegeocodeResponse) {
     return undefined;
   }
 
-  const streetName = [
-    component.streetNumber?.street,
-    component.streetNumber?.number,
-  ]
+  const streetName = [component.streetNumber?.street, component.streetNumber?.number]
     .filter((item): item is string => Boolean(item && item.trim()))
-    .join("");
+    .join('');
 
   const parts = [
     component.province,
@@ -125,7 +122,7 @@ function formatAmapPlaceName(data: AmapRegeocodeResponse) {
     return undefined;
   }
 
-  return Array.from(new Set(parts)).join(" · ");
+  return Array.from(new Set(parts)).join(' · ');
 }
 
 function getGeocodingConfig(): GeocodingConfig {
@@ -133,65 +130,32 @@ function getGeocodingConfig(): GeocodingConfig {
     geocoding?: { provider?: string; amapWebKey?: string };
   };
   const rawProvider =
-    extra.geocoding?.provider ??
-    process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ??
-    "amap";
-  const provider: ReverseGeocodeProvider =
-    rawProvider === "amap" ? "amap" : "system";
+    extra.geocoding?.provider ?? process.env.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER ?? 'amap';
+  const provider: ReverseGeocodeProvider = rawProvider === 'amap' ? 'amap' : 'system';
 
   return {
     provider,
-    amapWebKey:
-      extra.geocoding?.amapWebKey ?? process.env.EXPO_PUBLIC_AMAP_WEB_KEY,
+    amapWebKey: extra.geocoding?.amapWebKey ?? process.env.EXPO_PUBLIC_AMAP_WEB_KEY,
   };
 }
 
 function isOutOfChina(latitude: number, longitude: number) {
-  return (
-    longitude < 72.004 ||
-    longitude > 137.8347 ||
-    latitude < 0.8293 ||
-    latitude > 55.8271
-  );
+  return longitude < 72.004 || longitude > 137.8347 || latitude < 0.8293 || latitude > 55.8271;
 }
 
 function transformLat(x: number, y: number) {
-  let ret =
-    -100.0 +
-    2.0 * x +
-    3.0 * y +
-    0.2 * y * y +
-    0.1 * x * y +
-    0.2 * Math.sqrt(Math.abs(x));
-  ret +=
-    ((20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0) /
-    3.0;
-  ret +=
-    ((20.0 * Math.sin(y * PI) + 40.0 * Math.sin((y / 3.0) * PI)) * 2.0) / 3.0;
-  ret +=
-    ((160.0 * Math.sin((y / 12.0) * PI) + 320 * Math.sin((y * PI) / 30.0)) *
-      2.0) /
-    3.0;
+  let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+  ret += ((20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0) / 3.0;
+  ret += ((20.0 * Math.sin(y * PI) + 40.0 * Math.sin((y / 3.0) * PI)) * 2.0) / 3.0;
+  ret += ((160.0 * Math.sin((y / 12.0) * PI) + 320 * Math.sin((y * PI) / 30.0)) * 2.0) / 3.0;
   return ret;
 }
 
 function transformLng(x: number, y: number) {
-  let ret =
-    300.0 +
-    x +
-    2.0 * y +
-    0.1 * x * x +
-    0.1 * x * y +
-    0.1 * Math.sqrt(Math.abs(x));
-  ret +=
-    ((20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0) /
-    3.0;
-  ret +=
-    ((20.0 * Math.sin(x * PI) + 40.0 * Math.sin((x / 3.0) * PI)) * 2.0) / 3.0;
-  ret +=
-    ((150.0 * Math.sin((x / 12.0) * PI) + 300.0 * Math.sin((x / 30.0) * PI)) *
-      2.0) /
-    3.0;
+  let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+  ret += ((20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0) / 3.0;
+  ret += ((20.0 * Math.sin(x * PI) + 40.0 * Math.sin((x / 3.0) * PI)) * 2.0) / 3.0;
+  ret += ((150.0 * Math.sin((x / 12.0) * PI) + 300.0 * Math.sin((x / 30.0) * PI)) * 2.0) / 3.0;
   return ret;
 }
 
@@ -207,11 +171,8 @@ function wgs84ToGcj02(latitude: number, longitude: number) {
   magic = 1 - EARTH_EE * magic * magic;
   const sqrtMagic = Math.sqrt(magic);
   const mgLat =
-    latitude +
-    (dLat * 180.0) / (((EARTH_A * (1 - EARTH_EE)) / (magic * sqrtMagic)) * PI);
-  const mgLng =
-    longitude +
-    (dLng * 180.0) / ((EARTH_A / sqrtMagic) * Math.cos(radLat) * PI);
+    latitude + (dLat * 180.0) / (((EARTH_A * (1 - EARTH_EE)) / (magic * sqrtMagic)) * PI);
+  const mgLng = longitude + (dLng * 180.0) / ((EARTH_A / sqrtMagic) * Math.cos(radLat) * PI);
 
   return { latitude: mgLat, longitude: mgLng };
 }
@@ -254,30 +215,26 @@ async function reverseGeocodeWithAmap(
   coordinateType: CoordinateType,
 ) {
   const gcj02 =
-    coordinateType === "gcj02"
-      ? { latitude, longitude }
-      : wgs84ToGcj02(latitude, longitude);
-  devLog("amap input coords transformed", {
+    coordinateType === 'gcj02' ? { latitude, longitude } : wgs84ToGcj02(latitude, longitude);
+  devLog('amap input coords transformed', {
     from: { latitude, longitude },
     to: gcj02,
   });
   const location = `${gcj02.longitude},${gcj02.latitude}`;
   const url = `https://restapi.amap.com/v3/geocode/regeo?key=${encodeURIComponent(
     amapWebKey,
-  )}&location=${encodeURIComponent(
-    location,
-  )}&extensions=base&output=JSON&language=zh_cn`;
+  )}&location=${encodeURIComponent(location)}&extensions=base&output=JSON&language=zh_cn`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`AMap reverse geocode failed: ${response.status}`);
   }
 
   const data = (await response.json()) as AmapRegeocodeResponse;
-  if (data.status !== "1") {
+  if (data.status !== '1') {
     throw new Error(
-      `AMap reverse geocode invalid status: status=${data.status ?? "N/A"} info=${
-        data.info ?? "N/A"
-      } infocode=${data.infocode ?? "N/A"}`,
+      `AMap reverse geocode invalid status: status=${data.status ?? 'N/A'} info=${
+        data.info ?? 'N/A'
+      } infocode=${data.infocode ?? 'N/A'}`,
     );
   }
   return formatAmapPlaceName(data);
@@ -291,20 +248,18 @@ export async function reverseGeocodePlaceName(
   options?: { coordinateType?: CoordinateType },
 ) {
   const config = getGeocodingConfig();
-  const coordinateType = options?.coordinateType ?? "wgs84";
-  devLog("provider selected", config.provider);
+  const coordinateType = options?.coordinateType ?? 'wgs84';
+  devLog('provider selected', config.provider);
 
   // 缓存键统一用 gcj02:同一物理地点无论调用方传哪种坐标系,都落在同一网格。
   const gcj02 =
-    coordinateType === "gcj02"
-      ? { latitude, longitude }
-      : wgs84ToGcj02(latitude, longitude);
+    coordinateType === 'gcj02' ? { latitude, longitude } : wgs84ToGcj02(latitude, longitude);
   const cacheKey = buildGeocodeCacheKey(gcj02.latitude, gcj02.longitude);
 
   await loadGeocodeCache();
   const cached = getCachedPlaceName(cacheKey);
   if (cached !== undefined) {
-    devLog("cache hit", cacheKey);
+    devLog('cache hit', cacheKey);
     return cached;
   }
 
@@ -314,7 +269,7 @@ export async function reverseGeocodePlaceName(
   }
 
   const request = (async () => {
-    if (config.provider === "amap" && config.amapWebKey) {
+    if (config.provider === 'amap' && config.amapWebKey) {
       try {
         const placeName = await reverseGeocodeWithAmap(
           latitude,
@@ -322,21 +277,18 @@ export async function reverseGeocodePlaceName(
           config.amapWebKey,
           coordinateType,
         );
-        devLog("amap result", placeName);
+        devLog('amap result', placeName);
         if (placeName) {
           return placeName;
         }
-        devLog("amap empty result, fallback to system");
+        devLog('amap empty result, fallback to system');
       } catch (error) {
-        devLog(
-          "amap failed, fallback to system",
-          error instanceof Error ? error.message : error,
-        );
+        devLog('amap failed, fallback to system', error instanceof Error ? error.message : error);
       }
     }
 
     const placeName = await reverseGeocodeWithSystem(latitude, longitude);
-    devLog("system result", placeName);
+    devLog('system result', placeName);
     return placeName;
   })();
 
@@ -358,30 +310,27 @@ export async function reverseGeocodePlaceName(
 function parseAmapPois(data: AmapNearbyResponse): NearbyPlace[] {
   const places: NearbyPlace[] = [];
   for (const poi of data.pois ?? []) {
-    if (!poi.id || typeof poi.id !== "string") {
+    if (!poi.id || typeof poi.id !== 'string') {
       continue;
     }
-    if (!poi.name || typeof poi.name !== "string" || !poi.location) {
+    if (!poi.name || typeof poi.name !== 'string' || !poi.location) {
       continue;
     }
-    if (typeof poi.location !== "string" || !poi.location.includes(",")) {
+    if (typeof poi.location !== 'string' || !poi.location.includes(',')) {
       continue;
     }
-    const [lngText, latText] = poi.location.split(",");
+    const [lngText, latText] = poi.location.split(',');
     const poiLat = Number(latText);
     const poiLng = Number(lngText);
     if (!Number.isFinite(poiLat) || !Number.isFinite(poiLng)) {
       continue;
     }
-    const trimmedAddress =
-      typeof poi.address === "string" ? poi.address.trim() : undefined;
+    const trimmedAddress = typeof poi.address === 'string' ? poi.address.trim() : undefined;
     places.push({
       id: poi.id,
       name: poi.name.trim(),
       address: trimmedAddress || undefined,
-      distance: Number.isFinite(Number(poi.distance))
-        ? Number(poi.distance)
-        : undefined,
+      distance: Number.isFinite(Number(poi.distance)) ? Number(poi.distance) : undefined,
       latitude: poiLat,
       longitude: poiLng,
     });
@@ -396,22 +345,18 @@ export async function queryNearbyPlaces(
   options?: { coordinateType?: CoordinateType },
 ): Promise<NearbyPlace[]> {
   const config = getGeocodingConfig();
-  if (config.provider !== "amap") {
+  if (config.provider !== 'amap') {
     throw new Error(
       `高德附近地点查询未启用：当前 provider 为 ${config.provider}，请在 app.config.ts / .env 中设置 EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER=amap`,
     );
   }
   if (!config.amapWebKey) {
-    throw new Error(
-      `高德附近地点查询缺少 Web Key：请配置 EXPO_PUBLIC_AMAP_WEB_KEY`,
-    );
+    throw new Error(`高德附近地点查询缺少 Web Key：请配置 EXPO_PUBLIC_AMAP_WEB_KEY`);
   }
 
-  const coordinateType = options?.coordinateType ?? "wgs84";
+  const coordinateType = options?.coordinateType ?? 'wgs84';
   const gcj02 =
-    coordinateType === "gcj02"
-      ? { latitude, longitude }
-      : wgs84ToGcj02(latitude, longitude);
+    coordinateType === 'gcj02' ? { latitude, longitude } : wgs84ToGcj02(latitude, longitude);
   const location = `${gcj02.longitude},${gcj02.latitude}`;
   const url = `https://restapi.amap.com/v3/place/around?key=${encodeURIComponent(
     config.amapWebKey,
@@ -420,8 +365,8 @@ export async function queryNearbyPlaces(
     Math.min(5000, Math.floor(radius)),
   )}&sortrule=distance&offset=20&page=1&extensions=base&output=JSON`;
 
-  const redactedUrl = url.replace(/key=[^&]+/, "key=***");
-  devLog("queryNearbyPlaces request", {
+  const redactedUrl = url.replace(/key=[^&]+/, 'key=***');
+  devLog('queryNearbyPlaces request', {
     url: redactedUrl,
     coordinateType,
     original: { latitude, longitude },
@@ -434,17 +379,17 @@ export async function queryNearbyPlaces(
   }
 
   const data = (await response.json()) as AmapNearbyResponse;
-  devLog("queryNearbyPlaces response", {
+  devLog('queryNearbyPlaces response', {
     status: data.status,
     info: data.info,
     infocode: data.infocode,
     poiCount: data.pois?.length,
   });
-  if (data.status !== "1") {
+  if (data.status !== '1') {
     throw new Error(
-      `AMap nearby place invalid status: status=${data.status ?? "N/A"} info=${
-        data.info ?? "N/A"
-      } infocode=${data.infocode ?? "N/A"}`,
+      `AMap nearby place invalid status: status=${data.status ?? 'N/A'} info=${
+        data.info ?? 'N/A'
+      } infocode=${data.infocode ?? 'N/A'}`,
     );
   }
 
@@ -467,22 +412,17 @@ export async function searchPlaces(
   }
 
   const config = getGeocodingConfig();
-  if (config.provider !== "amap") {
+  if (config.provider !== 'amap') {
     throw new Error(
       `高德地点搜索未启用：当前 provider 为 ${config.provider}，请在 app.config.ts / .env 中设置 EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER=amap`,
     );
   }
   if (!config.amapWebKey) {
-    throw new Error(
-      `高德地点搜索缺少 Web Key：请配置 EXPO_PUBLIC_AMAP_WEB_KEY`,
-    );
+    throw new Error(`高德地点搜索缺少 Web Key：请配置 EXPO_PUBLIC_AMAP_WEB_KEY`);
   }
 
   const near = options?.near;
-  const radius = Math.max(
-    200,
-    Math.min(50000, Math.floor(options?.radius ?? 5000)),
-  );
+  const radius = Math.max(200, Math.min(50000, Math.floor(options?.radius ?? 5000)));
 
   if (!near) {
     // No center to search around: fall back to a nationwide keyword search.
@@ -494,19 +434,19 @@ export async function searchPlaces(
       throw new Error(`AMap place search failed: ${response.status}`);
     }
     const data = (await response.json()) as AmapNearbyResponse;
-    if (data.status !== "1") {
+    if (data.status !== '1') {
       throw new Error(
-        `AMap place search invalid status: status=${data.status ?? "N/A"} info=${
-          data.info ?? "N/A"
-        } infocode=${data.infocode ?? "N/A"}`,
+        `AMap place search invalid status: status=${data.status ?? 'N/A'} info=${
+          data.info ?? 'N/A'
+        } infocode=${data.infocode ?? 'N/A'}`,
       );
     }
     return parseAmapPois(data);
   }
 
-  const coordinateType = options?.coordinateType ?? "wgs84";
+  const coordinateType = options?.coordinateType ?? 'wgs84';
   const gcj02 =
-    coordinateType === "gcj02"
+    coordinateType === 'gcj02'
       ? { latitude: near.latitude, longitude: near.longitude }
       : wgs84ToGcj02(near.latitude, near.longitude);
   const location = `${gcj02.longitude},${gcj02.latitude}`;
@@ -516,8 +456,8 @@ export async function searchPlaces(
     trimmed,
   )}&sortrule=distance&offset=20&page=1&extensions=base&output=JSON`;
 
-  const redactedUrl = url.replace(/key=[^&]+/, "key=***");
-  devLog("searchPlaces request", {
+  const redactedUrl = url.replace(/key=[^&]+/, 'key=***');
+  devLog('searchPlaces request', {
     url: redactedUrl,
     keyword: trimmed,
     radius,
@@ -530,17 +470,17 @@ export async function searchPlaces(
   }
 
   const data = (await response.json()) as AmapNearbyResponse;
-  devLog("searchPlaces response", {
+  devLog('searchPlaces response', {
     status: data.status,
     info: data.info,
     infocode: data.infocode,
     poiCount: data.pois?.length,
   });
-  if (data.status !== "1") {
+  if (data.status !== '1') {
     throw new Error(
-      `AMap place search invalid status: status=${data.status ?? "N/A"} info=${
-        data.info ?? "N/A"
-      } infocode=${data.infocode ?? "N/A"}`,
+      `AMap place search invalid status: status=${data.status ?? 'N/A'} info=${
+        data.info ?? 'N/A'
+      } infocode=${data.infocode ?? 'N/A'}`,
     );
   }
 

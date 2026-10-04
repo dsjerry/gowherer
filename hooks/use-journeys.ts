@@ -67,12 +67,12 @@ export function useJourneys() {
 
   const activeJourney = useMemo(
     () => journeys.find((item) => item.status === 'active'),
-    [journeys]
+    [journeys],
   );
 
   const completedJourneysCount = useMemo(
     () => journeys.filter((item) => item.status === 'completed').length,
-    [journeys]
+    [journeys],
   );
 
   return {

@@ -9,10 +9,7 @@ type TrackMapProps = {
   markerLocations?: TimelineLocation[];
 };
 
-export function TrackMap({
-  routeLocations,
-  markerLocations = routeLocations,
-}: TrackMapProps) {
+export function TrackMap({ routeLocations, markerLocations = routeLocations }: TrackMapProps) {
   const { t } = useI18n();
   const displayRouteLocations = sanitizeTrackLocations(routeLocations);
   const displayMarkerLocations = sanitizeTrackLocations(markerLocations);
@@ -30,12 +27,17 @@ export function TrackMap({
     <View style={styles.fallbackBox}>
       <Text style={styles.title}>{t('trackMap.webTitle')}</Text>
       <Text style={styles.line}>
-        {t('trackMap.webStart', { lat: first.latitude.toFixed(5), lng: first.longitude.toFixed(5) })}
+        {t('trackMap.webStart', {
+          lat: first.latitude.toFixed(5),
+          lng: first.longitude.toFixed(5),
+        })}
       </Text>
       <Text style={styles.line}>
         {t('trackMap.webEnd', { lat: last.latitude.toFixed(5), lng: last.longitude.toFixed(5) })}
       </Text>
-      <Text style={styles.line}>{t('trackMap.webCount', { count: displayMarkerLocations.length })}</Text>
+      <Text style={styles.line}>
+        {t('trackMap.webCount', { count: displayMarkerLocations.length })}
+      </Text>
     </View>
   );
 }

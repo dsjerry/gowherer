@@ -1,0 +1,19 @@
+# generated native projects
+/android
+/ios
+/dist
+/.expo
+
+# generated / vendored
+/node_modules
+/assets
+/package-lock.json
+/credentials.json
+/credentials
+
+# hand-written docs and tooling content
+/docs
+/.agents
+/.claude
+/.codex
+/.omo

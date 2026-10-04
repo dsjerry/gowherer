@@ -47,25 +47,23 @@ function normalizeLicense(value: string | string[] | undefined): string {
 export const licenseGeneratedAt: string | undefined = licenseData.generatedAt;
 
 /** Entries sorted by package name, as written by the generator. */
-export const licenseDependencies: LicenseDependency[] = (licenseData.entries ?? []).map(
-  (entry) => {
-    const licenseType = normalizeLicense(entry.licenses);
-    return {
-      name: entry.name ?? 'Unknown',
-      version: entry.version ?? '-',
-      licenseType,
-      licenseText: entry.licenseText || licenseType,
-      repository: entry.repository ?? '',
-      direct: entry.direct === true,
-    };
-  }
-);
+export const licenseDependencies: LicenseDependency[] = (licenseData.entries ?? []).map((entry) => {
+  const licenseType = normalizeLicense(entry.licenses);
+  return {
+    name: entry.name ?? 'Unknown',
+    version: entry.version ?? '-',
+    licenseType,
+    licenseText: entry.licenseText || licenseType,
+    repository: entry.repository ?? '',
+    direct: entry.direct === true,
+  };
+});
 
 const licenseTypeCounts = new Map<string, number>();
 for (const dependency of licenseDependencies) {
   licenseTypeCounts.set(
     dependency.licenseType,
-    (licenseTypeCounts.get(dependency.licenseType) ?? 0) + 1
+    (licenseTypeCounts.get(dependency.licenseType) ?? 0) + 1,
   );
 }
 
@@ -79,7 +77,7 @@ export const licenseTransitiveCount = licenseDependencies.length - licenseDirect
 
 export function matchesLicenseFilter(
   dependency: LicenseDependency,
-  filters: { query: string; licenseType: string | null }
+  filters: { query: string; licenseType: string | null },
 ): boolean {
   if (filters.licenseType && dependency.licenseType !== filters.licenseType) {
     return false;

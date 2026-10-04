@@ -1,12 +1,5 @@
 import { Image } from 'expo-image';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AudioPlayer } from '@/components/audio-player';
 import { MediaVideoCover } from '@/components/media-viewers';
@@ -36,12 +29,7 @@ function mediaPreviewUri(media: TimelineMedia) {
   return media.uri;
 }
 
-export function TimelineList({
-  entries,
-  onEditEntry,
-  onDeleteEntry,
-  onPreviewMedia,
-}: Props) {
+export function TimelineList({ entries, onEditEntry, onDeleteEntry, onPreviewMedia }: Props) {
   const { t } = useI18n();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -66,9 +54,7 @@ export function TimelineList({
 
   return (
     <View style={[styles.card, themedCard]}>
-      <Text style={[styles.sectionTitle, themedSectionTitle]}>
-        {t('journey.timelineTitle')}
-      </Text>
+      <Text style={[styles.sectionTitle, themedSectionTitle]}>{t('journey.timelineTitle')}</Text>
       {entries.map((entry, index) => (
         <View key={entry.id} style={styles.timelineItem}>
           <View style={[styles.timelineDot, themedDot]} />
@@ -94,7 +80,7 @@ export function TimelineList({
                           style: 'destructive',
                           onPress: () => onDeleteEntry(entry.id),
                         },
-                      ]
+                      ],
                     )
                   }
                 >
@@ -103,17 +89,13 @@ export function TimelineList({
               </View>
             </View>
             {entry.text ? (
-              <Text style={[styles.timelineText, themedText]}>
-                {entry.text}
-              </Text>
+              <Text style={[styles.timelineText, themedText]}>{entry.text}</Text>
             ) : null}
             {entry.tags.length > 0 ? (
               <View style={styles.tagRow}>
                 {entry.tags.map((tag) => (
                   <View key={tag} style={[styles.tagChip, themedTagChip]}>
-                    <Text style={[styles.tagChipText, themedTagChipText]}>
-                      #{tag}
-                    </Text>
+                    <Text style={[styles.tagChipText, themedTagChipText]}>#{tag}</Text>
                   </View>
                 ))}
               </View>
@@ -121,25 +103,16 @@ export function TimelineList({
             {entry.location ? (
               <Text style={[styles.mutedText, themedMuted]}>
                 📍
-                {entry.location.placeName
-                  ? ` ${entry.location.placeName} · `
-                  : ' '}
-                {entry.location.latitude.toFixed(5)},{' '}
-                {entry.location.longitude.toFixed(5)}
+                {entry.location.placeName ? ` ${entry.location.placeName} · ` : ' '}
+                {entry.location.latitude.toFixed(5)}, {entry.location.longitude.toFixed(5)}
               </Text>
             ) : null}
             {entry.media.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {entry.media.map((media) =>
                   media.type === 'audio' ? (
-                    <View
-                      key={media.id}
-                      style={[styles.mediaPreviewBox, themedMediaBox]}
-                    >
-                      <AudioPlayer
-                        uri={media.uri}
-                        label={t('journey.audioBadge')}
-                      />
+                    <View key={media.id} style={[styles.mediaPreviewBox, themedMediaBox]}>
+                      <AudioPlayer uri={media.uri} label={t('journey.audioBadge')} />
                       <Text style={[styles.mediaBadge, themedBadge]}>
                         {t('journey.audioBadge')}
                       </Text>
@@ -167,12 +140,7 @@ export function TimelineList({
                             },
                           ]}
                         >
-                          <Text
-                            style={[
-                              styles.mediaPlaceholderText,
-                              { color: '#ffffff' },
-                            ]}
-                          >
+                          <Text style={[styles.mediaPlaceholderText, { color: '#ffffff' }]}>
                             {t('journey.mediaBadgeVideo')}
                           </Text>
                         </View>
@@ -183,14 +151,12 @@ export function TimelineList({
                           : t('journey.mediaBadgePhoto')}
                       </Text>
                     </Pressable>
-                  )
+                  ),
                 )}
               </ScrollView>
             ) : null}
           </View>
-          {index < entries.length - 1 ? (
-            <View style={[styles.timelineLine, themedLine]} />
-          ) : null}
+          {index < entries.length - 1 ? <View style={[styles.timelineLine, themedLine]} /> : null}
         </View>
       ))}
     </View>

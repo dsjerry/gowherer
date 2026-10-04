@@ -61,13 +61,11 @@ export function LocalePreferenceProvider({ children }: { children: ReactNode }) 
       setPreference,
       t,
     }),
-    [preference, resolvedLocale, setPreference, t]
+    [preference, resolvedLocale, setPreference, t],
   );
 
   return (
-    <LocalePreferenceContext.Provider value={value}>
-      {children}
-    </LocalePreferenceContext.Provider>
+    <LocalePreferenceContext.Provider value={value}>{children}</LocalePreferenceContext.Provider>
   );
 }
 

@@ -39,7 +39,8 @@ export default function TabLayout() {
         // cold start stays light while neighbours are ready before a swipe.
         lazy: true,
         lazyPreloadDistance: 1,
-      }}>
+      }}
+    >
       <SwipeTabs.Screen
         name="index"
         options={{
