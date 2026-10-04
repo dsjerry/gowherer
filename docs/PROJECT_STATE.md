@@ -350,6 +350,10 @@ Latest updates (2026-03-08):
 ## Work Log (2026-10-04)
 
 ### Completed
+- Re-added the map enlarge toggle (user request): an icon button at the map's bottom-right corner (`open-in-full` / `close-fullscreen`) toggles the card's map between 180dp and 50% viewport height in place — reusing the same AMap instance (style-only change, no remount, no multi-instance risk). While enlarged, the page ScrollView is disabled so map pan/zoom never scrolls the list.
+- On-device verification via adb: precise-tap (uiautomator bounds) toggles enlargement; 50% view renders the full route.
+
+### Completed
 - Reworked the review list to an accordion model (user request, supersedes the static-preview + expand-in-place design):
   - Exactly one journey card renders content (and its single small interactive AMap map with the route line) at a time; other cards collapse to header-only.
   - Default: the first completed journey with track/markers is expanded on load; switching cards unmounts the previous map, waits 400ms, then mounts the next (verified: no black maps, no GL errors on device).

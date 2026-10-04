@@ -25,6 +25,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -759,6 +760,8 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
 
 export default function JourneyHistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const canExpandMap = Platform.OS !== "web";
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const { t, locale } = useI18n();
@@ -857,6 +860,7 @@ export default function JourneyHistoryScreen() {
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
   const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [enlargedMapId, setEnlargedMapId] = useState<string | null>(null);
   const [mapInteracting, setMapInteracting] = useState(false);
   const [reviewHydrated, setReviewHydrated] = useState(false);
   const [segmentRange, setSegmentRange] = useState<{
@@ -872,6 +876,34 @@ export default function JourneyHistoryScreen() {
     null,
   );
   const scrollViewRef = useRef<ScrollView>(null);
+  const mapWrapRefs = useRef<Record<string, View | null>>({});
+  const scrollYRef = useRef(0);
+
+  // Reuse the card's already-rendering map instance (style-only height
+  // change) — the AMap SDK renders a NEW map instance black while other
+  // instances exist, so enlarging must never remount.
+  function scrollMapIntoView(journeyId: string) {
+    const scrollView = scrollViewRef.current;
+    const mapWrap = mapWrapRefs.current[journeyId];
+    if (!scrollView || !mapWrap) {
+      return;
+    }
+    (scrollView as unknown as View).measureInWindow((_x, scrollViewY) => {
+      mapWrap.measureInWindow((_mapX, mapY) => {
+        const contentY = mapY - scrollViewY + scrollYRef.current;
+        scrollView.scrollTo({ y: Math.max(0, contentY - 60), animated: true });
+      });
+    });
+  }
+
+  function toggleMapEnlarged(journeyId: string) {
+    const enlarging = enlargedMapId !== journeyId;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setEnlargedMapId(enlarging ? journeyId : null);
+    if (enlarging) {
+      setTimeout(() => scrollMapIntoView(journeyId), 350);
+    }
+  }
 
   const reloadJourneys = useCallback(async () => {
     const stored = await loadJourneys();
@@ -1182,7 +1214,7 @@ export default function JourneyHistoryScreen() {
         styles.container,
         { paddingTop: insets.top + 12 },
       ]}
-      scrollEnabled={!mapInteracting}
+      scrollEnabled={!mapInteracting && enlargedMapId === null}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -1717,6 +1749,7 @@ export default function JourneyHistoryScreen() {
                         {t("review.trackMapTitle")}
                       </Text>
                       <View
+                        style={styles.mapWrapInner}
                         onTouchStart={() => setMapInteracting(true)}
                         onTouchEnd={() => setMapInteracting(false)}
                         onTouchCancel={() => setMapInteracting(false)}
@@ -1729,7 +1762,39 @@ export default function JourneyHistoryScreen() {
                               ? undefined
                               : segmentStats?.segmentTrack
                           }
+                          height={
+                            enlargedMapId === journey.id
+                              ? Math.round(windowHeight * 0.5)
+                              : undefined
+                          }
                         />
+                        {canExpandMap ? (
+                          <Pressable
+                            style={[
+                              styles.mapEnlargeButton,
+                              isDark
+                                ? styles.mapEnlargeButtonDark
+                                : styles.mapEnlargeButtonLight,
+                            ]}
+                            onPress={() => toggleMapEnlarged(journey.id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              enlargedMapId === journey.id
+                                ? t("review.mapCollapse")
+                                : t("review.mapExpand")
+                            }
+                          >
+                            <MaterialIcons
+                              name={
+                                enlargedMapId === journey.id
+                                  ? "close-fullscreen"
+                                  : "open-in-full"
+                              }
+                              size={16}
+                              color={isDark ? "#e2e8f0" : "#334155"}
+                            />
+                          </Pressable>
+                        ) : null}
                       </View>
                     </View>
                   ) : (
@@ -2072,6 +2137,29 @@ const styles = StyleSheet.create({
   mapTitle: {
     fontWeight: "600",
     color: "#334155",
+  },
+  mapWrapInner: {
+    position: "relative",
+  },
+  mapEnlargeButton: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapEnlargeButtonLight: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  mapEnlargeButtonDark: {
+    backgroundColor: "rgba(15,23,42,0.72)",
+    borderWidth: 1,
+    borderColor: "#334155",
   },
   segmentSection: {
     borderRadius: 10,
