@@ -1,6 +1,13 @@
 import Constants from "expo-constants";
 import { reGeocode } from "expo-gaode-map";
 
+import {
+  buildGeocodeCacheKey,
+  getCachedPlaceName,
+  loadGeocodeCache,
+  setCachedPlaceName,
+} from "@/lib/geocode-cache";
+
 export type ReverseGeocodeProvider = "system" | "amap";
 export type CoordinateType = "wgs84" | "gcj02";
 export type NearbyPlace = {
@@ -276,6 +283,8 @@ async function reverseGeocodeWithAmap(
   return formatAmapPlaceName(data);
 }
 
+const inFlightLookups = new Map<string, Promise<string | undefined>>();
+
 export async function reverseGeocodePlaceName(
   latitude: number,
   longitude: number,
@@ -285,30 +294,65 @@ export async function reverseGeocodePlaceName(
   const coordinateType = options?.coordinateType ?? "wgs84";
   devLog("provider selected", config.provider);
 
-  if (config.provider === "amap" && config.amapWebKey) {
-    try {
-      const placeName = await reverseGeocodeWithAmap(
-        latitude,
-        longitude,
-        config.amapWebKey,
-        coordinateType,
-      );
-      devLog("amap result", placeName);
-      if (placeName) {
-        return placeName;
-      }
-      devLog("amap empty result, fallback to system");
-    } catch (error) {
-      devLog(
-        "amap failed, fallback to system",
-        error instanceof Error ? error.message : error,
-      );
-    }
+  // 缓存键统一用 gcj02:同一物理地点无论调用方传哪种坐标系,都落在同一网格。
+  const gcj02 =
+    coordinateType === "gcj02"
+      ? { latitude, longitude }
+      : wgs84ToGcj02(latitude, longitude);
+  const cacheKey = buildGeocodeCacheKey(gcj02.latitude, gcj02.longitude);
+
+  await loadGeocodeCache();
+  const cached = getCachedPlaceName(cacheKey);
+  if (cached !== undefined) {
+    devLog("cache hit", cacheKey);
+    return cached;
   }
 
-  const placeName = await reverseGeocodeWithSystem(latitude, longitude);
-  devLog("system result", placeName);
-  return placeName;
+  const inFlight = inFlightLookups.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const request = (async () => {
+    if (config.provider === "amap" && config.amapWebKey) {
+      try {
+        const placeName = await reverseGeocodeWithAmap(
+          latitude,
+          longitude,
+          config.amapWebKey,
+          coordinateType,
+        );
+        devLog("amap result", placeName);
+        if (placeName) {
+          return placeName;
+        }
+        devLog("amap empty result, fallback to system");
+      } catch (error) {
+        devLog(
+          "amap failed, fallback to system",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
+    const placeName = await reverseGeocodeWithSystem(latitude, longitude);
+    devLog("system result", placeName);
+    return placeName;
+  })();
+
+  const tracked = request
+    .then((placeName) => {
+      // 只缓存有效结果,失败/空结果下次继续尝试真实请求。
+      if (placeName) {
+        setCachedPlaceName(cacheKey, placeName);
+      }
+      return placeName;
+    })
+    .finally(() => {
+      inFlightLookups.delete(cacheKey);
+    });
+  inFlightLookups.set(cacheKey, tracked);
+  return tracked;
 }
 
 function parseAmapPois(data: AmapNearbyResponse): NearbyPlace[] {
