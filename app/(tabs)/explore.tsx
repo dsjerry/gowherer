@@ -1,18 +1,25 @@
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
-import * as ExpoFileSystem from "expo-file-system";
+import Constants from "expo-constants";
+import { File, Paths } from "expo-file-system";
+import * as FileSystemLegacy from "expo-file-system/legacy";
 import { Image } from "expo-image";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { VideoView, useVideoPlayer } from "expo-video";
-import { useCallback, useMemo, useRef, useState } from "react";
+import * as VideoThumbnails from "expo-video-thumbnails";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   LayoutAnimation,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,12 +33,19 @@ import { TrackMap } from "@/components/track-map";
 import { useI18n } from "@/hooks/locale-preference";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { deleteJourney as deleteJourneyById } from "@/lib/journey-repository";
+import { logLocalError } from "@/lib/local-log";
 import { loadJourneys } from "@/lib/journey-storage";
+import {
+  REVIEW_COLLAPSED_KEY,
+  REVIEW_FILTERS_KEY,
+} from "@/lib/storage-keys";
 import {
   calculateTrackDistanceKm,
   haversineKm,
   sanitizeTrackLocations,
+  simplifyTrackLocations,
 } from "@/lib/track-utils";
+import { toGcj02 } from "@/lib/reverse-geocode";
 import {
   Journey,
   JourneyKind,
@@ -259,13 +273,6 @@ function includesQueryText(source: string | undefined, query: string) {
   return source.toLowerCase().includes(query);
 }
 
-function mediaPreviewUri(media: TimelineMedia) {
-  if (media.type === "video") {
-    return media.thumbnailUri;
-  }
-  return media.uri;
-}
-
 function escapeHtml(text: string) {
   return text
     .replaceAll("&", "&amp;")
@@ -275,53 +282,218 @@ function escapeHtml(text: string) {
     .replaceAll("'", "&#39;");
 }
 
-async function readImageAsBase64(uri: string): Promise<string | null> {
+const PDF_IMAGE_MAX_EDGE = 1280;
+const PDF_IMAGE_COMPRESS = 0.7;
+
+// Downscale + re-encode to JPEG before inlining so a photo-heavy journey does
+// not produce a multi-hundred-MB HTML string. Falls back to the raw file when
+// the manipulator fails.
+async function buildEmbeddedImage(uri: string): Promise<string | null> {
   try {
-    if (!uri || uri.startsWith("data:")) return uri;
-    if (uri.startsWith("file://") || uri.startsWith("content://")) {
-      const base64 = await ExpoFileSystem.readAsStringAsync(uri, {
+    if (!uri || uri.startsWith("data:")) {
+      return uri;
+    }
+    // First render at native size to read dimensions (ImageRef cannot be
+    // resized after render), then re-decode scaled down when oversized.
+    let rendered = await ImageManipulator.manipulate(uri).renderAsync();
+    if (Math.max(rendered.width, rendered.height) > PDF_IMAGE_MAX_EDGE) {
+      const scale = PDF_IMAGE_MAX_EDGE / Math.max(rendered.width, rendered.height);
+      rendered = await ImageManipulator.manipulate(uri)
+        .resize({
+          width: Math.round(rendered.width * scale),
+          height: Math.round(rendered.height * scale),
+        })
+        .renderAsync();
+    }
+    const result = await rendered.saveAsync({
+      compress: PDF_IMAGE_COMPRESS,
+      format: SaveFormat.JPEG,
+      base64: true,
+    });
+    return `data:image/jpeg;base64,${result.base64}`;
+  } catch {
+    try {
+      if (!uri || uri.startsWith("data:")) return uri;
+      if (!uri.startsWith("file://") && !uri.startsWith("content://")) {
+        return uri;
+      }
+      const base64 = await FileSystemLegacy.readAsStringAsync(uri, {
         encoding: "base64" as const,
       });
       const ext = uri.split(".").pop()?.toLowerCase() ?? "jpg";
       const mime = ext === "png" ? "png" : ext === "webp" ? "webp" : "jpeg";
       return `data:image/${mime};base64,${base64}`;
+    } catch {
+      return null;
     }
-    return uri;
+  }
+}
+
+async function buildVideoThumbnailDataUri(
+  uri: string,
+): Promise<string | null> {
+  try {
+    const { uri: thumbnailUri } = await VideoThumbnails.getThumbnailAsync(uri, {
+      time: 500,
+    });
+    return await buildEmbeddedImage(thumbnailUri);
   } catch {
     return null;
   }
 }
 
-async function buildEntryMediaHtml(media: TimelineMedia[]): Promise<string> {
-  const photos = media.filter((m) => m.type === "photo");
-  if (photos.length === 0) {
-    const videoCount = media.filter((m) => m.type === "video").length;
-    const audioCount = media.filter((m) => m.type === "audio").length;
-    if (videoCount === 0 && audioCount === 0) return "";
-    return `<div style="color:#64748b;font-size:12px;margin-top:8px;">${videoCount} 视频 · ${audioCount} 音频</div>`;
-  }
-
-  const imageTags = await Promise.all(
-    photos.map(async (photo) => {
-      const src = await readImageAsBase64(photo.uri);
-      if (!src) return "";
-      return `<img src="${src}" style="width:100%;height:200px;object-fit:cover;border-radius:8px;" />`;
-    }),
+function mediaCellHtml(dataUri: string, badge: string) {
+  return (
+    `<div style="flex:1;min-width:0;position:relative;">` +
+    `<img src="${dataUri}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;display:block;" />` +
+    `<span style="position:absolute;right:5px;bottom:5px;background:rgba(15,23,42,0.55);color:#ffffff;font-size:9px;padding:1px 5px;border-radius:6px;">${badge}</span>` +
+    `</div>`
   );
-  const validImages = imageTags.filter(Boolean);
-  if (validImages.length === 0) return "";
+}
 
-  if (validImages.length === 1) {
-    return `<div style="margin-top:10px;">${validImages[0]}</div>`;
+// Lightweight static map image used as the list preview; the interactive AMap
+// view is only mounted when the user expands the card.
+function StaticTrackImage({
+  uri,
+  isDark,
+}: {
+  uri: string | undefined;
+  isDark: boolean;
+}) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={styles.staticTrackImage}
+        contentFit="cover"
+        transition={150}
+      />
+    );
+  }
+  return (
+    <View
+      style={[
+        styles.staticTrackImage,
+        styles.staticTrackPlaceholder,
+        { backgroundColor: isDark ? "#0f172a" : "#f8fafc" },
+      ]}
+    >
+      <ActivityIndicator size="small" color={isDark ? "#94a3b8" : "#64748b"} />
+    </View>
+  );
+}
+
+const videoThumbCache = new Map<string, string>();
+
+// Review timeline videos render as generated thumbnails with a play badge;
+// the actual player only runs inside the full-screen preview modal.
+function VideoThumbCover({ uri }: { uri: string }) {
+  const [thumbnail, setThumbnail] = useState<string | null>(
+    videoThumbCache.get(uri) ?? null,
+  );
+
+  useEffect(() => {
+    if (thumbnail) {
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const { uri: thumbnailUri } = await VideoThumbnails.getThumbnailAsync(
+          uri,
+          { time: 500 },
+        );
+        videoThumbCache.set(uri, thumbnailUri);
+        if (active) {
+          setThumbnail(thumbnailUri);
+        }
+      } catch {
+        // Keep the loading placeholder on failure.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [uri, thumbnail]);
+
+  return (
+    <View style={styles.videoThumbWrap}>
+      {thumbnail ? (
+        <Image
+          source={{ uri: thumbnail }}
+          style={styles.mediaPreview}
+          contentFit="cover"
+        />
+      ) : (
+        <View
+          style={[
+            styles.mediaPlaceholder,
+            styles.videoThumbWrap,
+            { backgroundColor: "#0f172a" },
+          ]}
+        >
+          <ActivityIndicator size="small" color="#94a3b8" />
+        </View>
+      )}
+      <View style={styles.videoPlayBadge} pointerEvents="none">
+        <MaterialIcons name="play-arrow" size={20} color="#ffffff" />
+      </View>
+    </View>
+  );
+}
+
+async function buildEntryMediaHtml(
+  media: TimelineMedia[],
+  t: TFunction,
+): Promise<string> {
+  const cells: string[] = [];
+  let unrenderedVideos = 0;
+  let audioCount = 0;
+
+  // Sequential on purpose: parallel renders of full-size photos spike memory.
+  for (const item of media) {
+    if (item.type === "audio") {
+      audioCount += 1;
+      continue;
+    }
+    if (item.type === "video") {
+      const thumbnail = await buildVideoThumbnailDataUri(item.uri);
+      if (thumbnail) {
+        cells.push(mediaCellHtml(thumbnail, t("journey.mediaBadgeVideo")));
+      } else {
+        unrenderedVideos += 1;
+      }
+      continue;
+    }
+    const dataUri = await buildEmbeddedImage(item.uri);
+    if (dataUri) {
+      cells.push(mediaCellHtml(dataUri, t("journey.mediaBadgePhoto")));
+    }
   }
 
-  const gridHtml = validImages
-    .map(
-      (img) =>
-        `<div style="flex:1;min-width:0;">${img.replace("height:200px", "height:140px")}</div>`,
-    )
-    .join("");
-  return `<div style="display:flex;gap:6px;margin-top:10px;">${gridHtml}</div>`;
+  const lines: string[] = [];
+  for (let i = 0; i < cells.length; i += 3) {
+    lines.push(
+      `<div style="display:flex;gap:6px;margin-top:8px;">${cells
+        .slice(i, i + 3)
+        .join("")}</div>`,
+    );
+  }
+  if (unrenderedVideos > 0) {
+    lines.push(
+      `<div style="color:#64748b;font-size:12px;margin-top:6px;">${t(
+        "journey.mediaBadgeVideo",
+      )} × ${unrenderedVideos}</div>`,
+    );
+  }
+  if (audioCount > 0) {
+    lines.push(
+      `<div style="color:#64748b;font-size:12px;margin-top:6px;">${t(
+        "journey.audioBadge",
+      )} × ${audioCount}</div>`,
+    );
+  }
+  return lines.join("");
 }
 
 function buildTrackSvgDataUri(
@@ -371,16 +543,105 @@ function buildTrackSvgDataUri(
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+function getAmapWebKey() {
+  const extra = (Constants.expoConfig?.extra ?? {}) as {
+    geocoding?: { amapWebKey?: string };
+  };
+  return (
+    extra.geocoding?.amapWebKey ?? process.env.EXPO_PUBLIC_AMAP_WEB_KEY
+  );
+}
+
+// A real AMap static map when the web key is available; the hand-drawn SVG
+// polyline stays as the offline fallback.
+async function buildTrackImage(
+  locations: TimelineLocation[],
+  t: TFunction,
+): Promise<string | null> {
+  if (locations.length < 2) {
+    return null;
+  }
+  const staticMapUri = await buildTrackStaticMapUri(locations);
+  return staticMapUri ?? buildTrackSvgDataUri(locations, {
+    start: t("review.html.start"),
+    end: t("review.html.end"),
+  });
+}
+
+async function buildTrackStaticMapUri(
+  locations: TimelineLocation[],
+): Promise<string | null> {
+  try {
+    const amapWebKey = getAmapWebKey();
+    if (!amapWebKey) {
+      return null;
+    }
+
+    const simplified = simplifyTrackLocations(locations, 160);
+    if (simplified.length < 2) {
+      return null;
+    }
+    const gcjPoints = simplified.map((point) => {
+      if (point.coordSystem === "gcj02") {
+        return { latitude: point.latitude, longitude: point.longitude };
+      }
+      const converted = toGcj02(point.latitude, point.longitude);
+      return { latitude: converted.latitude, longitude: converted.longitude };
+    });
+
+    const lats = gcjPoints.map((p) => p.latitude);
+    const lngs = gcjPoints.map((p) => p.longitude);
+    const span = Math.max(
+      Math.max(...lats) - Math.min(...lats),
+      Math.max(...lngs) - Math.min(...lngs),
+    );
+    const zoom =
+      span < 0.005
+        ? 15
+        : span < 0.01
+          ? 14
+          : span < 0.02
+            ? 13
+            : span < 0.05
+              ? 12
+              : span < 0.1
+                ? 11
+                : span < 0.5
+                  ? 10
+                  : span < 1
+                    ? 9
+                    : span < 3
+                      ? 8
+                      : 7;
+
+    const start = gcjPoints[0];
+    const end = gcjPoints[gcjPoints.length - 1];
+    const center = gcjPoints[Math.floor(gcjPoints.length / 2)];
+    const params = new URLSearchParams({
+      key: amapWebKey,
+      location: `${center.longitude.toFixed(6)},${center.latitude.toFixed(6)}`,
+      zoom: String(zoom),
+      size: "750*360",
+      scale: "2",
+      markers: `mid,0x0284C7,A:${start.longitude.toFixed(6)},${start.latitude.toFixed(6)}|mid,0xDC2626,B:${end.longitude.toFixed(6)},${end.latitude.toFixed(6)}`,
+      path: `weight:6|color:0x0f766e|locations:${gcjPoints
+        .map((p) => `${p.longitude.toFixed(6)},${p.latitude.toFixed(6)}`)
+        .join(";")}`,
+    });
+    return `https://restapi.amap.com/v3/staticmap?${params.toString()}`;
+  } catch (error) {
+    void logLocalError("JourneyScreen", "build static map failed", error);
+    return null;
+  }
+}
+
 async function journeyToHtml(journey: Journey, t: TFunction): Promise<string> {
   const stats = computeJourneyStats(journey);
   const routeLocations = getJourneyTrackLocations(journey);
   const fallbackLocations = getJourneyEntryLocations(journey);
   const locations =
     routeLocations.length >= 2 ? routeLocations : fallbackLocations;
-  const trackSvgUri = buildTrackSvgDataUri(locations, {
-    start: t("review.html.start"),
-    end: t("review.html.end"),
-  });
+  const trackImageUri = await buildTrackImage(locations, t);
 
   const tagsHtml = journey.tags.length
     ? `<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">${journey.tags
@@ -424,8 +685,8 @@ async function journeyToHtml(journey: Journey, t: TFunction): Promise<string> {
         t("review.html.totalEntries", { count: journey.entries.length }),
       )}</p>
       ${
-        trackSvgUri
-          ? `<img src="${trackSvgUri}" alt="${escapeHtml(t("review.html.trackAlt"))}" style="width:90%;max-width:780px;margin-top:24px;border:1px solid #e2e8f0;border-radius:12px;" />`
+        trackImageUri
+          ? `<img src="${trackImageUri}" alt="${escapeHtml(t("review.html.trackAlt"))}" style="width:90%;max-width:780px;margin-top:24px;border:1px solid #e2e8f0;border-radius:12px;" />`
           : `<div style="margin-top:24px;padding:14px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#64748b;font-size:13px;">${escapeHtml(
               t("review.html.trackEmpty"),
             )}</div>`
@@ -449,7 +710,7 @@ async function journeyToHtml(journey: Journey, t: TFunction): Promise<string> {
             )
             .join("")}</div>`
         : "";
-      const mediaHtml = await buildEntryMediaHtml(entry.media);
+      const mediaHtml = await buildEntryMediaHtml(entry.media, t);
       const textHtml = entry.text
         ? `<div style="margin-top:8px;line-height:1.7;color:#1e293b;font-size:14px;">${escapeHtml(entry.text)}</div>`
         : `<div style="margin-top:8px;color:#94a3b8;font-size:13px;font-style:italic;">${escapeHtml(t("review.html.noText"))}</div>`;
@@ -494,22 +755,6 @@ function PreviewVideo({ uri }: { uri: string }) {
       style={styles.previewMedia}
       nativeControls
       contentFit="contain"
-    />
-  );
-}
-
-function MediaVideoCover({ uri }: { uri: string }) {
-  const player = useVideoPlayer({ uri }, (videoPlayer) => {
-    videoPlayer.loop = false;
-    videoPlayer.muted = true;
-  });
-
-  return (
-    <VideoView
-      player={player}
-      style={styles.mediaPreview}
-      nativeControls={false}
-      contentFit="cover"
     />
   );
 }
@@ -637,13 +882,18 @@ export default function JourneyHistoryScreen() {
     },
   };
   const [journeys, setJourneys] = useState<Journey[]>([]);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<JourneyFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
+  const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
   const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<string[]>([]);
   const [mapInteracting, setMapInteracting] = useState(false);
   const [expandedMapId, setExpandedMapId] = useState<string | null>(null);
+  const [staticMapUris, setStaticMapUris] = useState<Record<string, string>>({});
+  const [reviewHydrated, setReviewHydrated] = useState(false);
   const [segmentRange, setSegmentRange] = useState<{
     journeyId: string;
     start: number | null;
@@ -660,15 +910,23 @@ export default function JourneyHistoryScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const mapWrapRefs = useRef<Record<string, View | null>>({});
   const scrollYRef = useRef(0);
+  const staticMapGeneratedRef = useRef<Set<string>>(new Set());
+
+  const reloadJourneys = useCallback(async () => {
+    const stored = await loadJourneys();
+    setJourneys(stored);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
         const stored = await loadJourneys();
-        if (active) {
-          setJourneys(stored);
+        if (!active) {
+          return;
         }
+        setJourneys(stored);
+        setHasLoadedOnce(true);
       })();
 
       return () => {
@@ -676,6 +934,80 @@ export default function JourneyHistoryScreen() {
       };
     }, []),
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await reloadJourneys();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reloadJourneys]);
+
+  // Load persisted UI state BEFORE the persist effects below — their mount
+  // writes would otherwise clobber the stored values with initial defaults.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const storedCollapsed = await AsyncStorage.getItem(REVIEW_COLLAPSED_KEY);
+        if (active && storedCollapsed) {
+          const parsed = JSON.parse(storedCollapsed);
+          if (Array.isArray(parsed)) {
+            setCollapsedJourneyIds(parsed.map(String));
+          }
+        }
+        const storedFilters = await AsyncStorage.getItem(REVIEW_FILTERS_KEY);
+        if (active && storedFilters) {
+          const parsed = JSON.parse(storedFilters) as {
+            filter?: string;
+            selectedTag?: string | null;
+          };
+          if (
+            parsed.filter === "all" ||
+            parsed.filter === "travel" ||
+            parsed.filter === "commute"
+          ) {
+            setFilter(parsed.filter);
+          }
+          if (parsed.selectedTag === null || typeof parsed.selectedTag === "string") {
+            setSelectedTag(parsed.selectedTag);
+          }
+        }
+      } catch {
+        // Ignore malformed persisted state.
+      }
+      if (active) {
+        setReviewHydrated(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Persist review list UI state across sessions — but only AFTER the
+  // persisted values have been loaded, otherwise the mount run would clobber
+  // them with initial defaults before the read completes.
+  useEffect(() => {
+    if (!reviewHydrated) {
+      return;
+    }
+    AsyncStorage.setItem(
+      REVIEW_COLLAPSED_KEY,
+      JSON.stringify(collapsedJourneyIds),
+    ).catch(() => {});
+  }, [reviewHydrated, collapsedJourneyIds]);
+
+  useEffect(() => {
+    if (!reviewHydrated) {
+      return;
+    }
+    AsyncStorage.setItem(
+      REVIEW_FILTERS_KEY,
+      JSON.stringify({ filter, selectedTag }),
+    ).catch(() => {});
+  }, [reviewHydrated, filter, selectedTag]);
 
   const completedJourneys = useMemo(
     () => journeys.filter((item) => item.status === "completed"),
@@ -697,6 +1029,44 @@ export default function JourneyHistoryScreen() {
     }
     return map;
   }, [completedJourneys]);
+
+  // Build lightweight static map previews (plain images, no native AMap
+  // instances) for every journey once. Interactive AMap views are only
+  // mounted on demand when a card is expanded.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      for (const journey of completedJourneys) {
+        if (staticMapGeneratedRef.current.has(journey.id)) {
+          continue;
+        }
+        staticMapGeneratedRef.current.add(journey.id);
+        const derived = journeyDerivedById.get(journey.id);
+        const locations =
+          derived && derived.track.length >= 2
+            ? derived.track
+            : getJourneyEntryLocations(journey);
+        if (locations.length < 2) {
+          continue;
+        }
+        try {
+          const uri = await buildTrackStaticMapUri(locations);
+          if (active && uri) {
+            setStaticMapUris((prev) => ({ ...prev, [journey.id]: uri }));
+          }
+        } catch (error) {
+          void logLocalError(
+            "JourneyScreen",
+            "static map preview failed",
+            error,
+          );
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [completedJourneys, journeyDerivedById]);
 
   const availableTags = useMemo(
     () =>
@@ -802,25 +1172,38 @@ export default function JourneyHistoryScreen() {
   // GLMapEngine). Enlarging reuses the card's already-rendering map instead of
   // mounting a second one.
   function toggleMapExpanded(journeyId: string) {
-    const expanding = expandedMapId !== journeyId;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedMapId(expanding ? journeyId : null);
-
-    if (!expanding) {
+    if (expandedMapId === journeyId) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setExpandedMapId(null);
       return;
     }
 
-    const scrollView = scrollViewRef.current;
-    const mapWrap = mapWrapRefs.current[journeyId];
-    if (!scrollView || !mapWrap) {
-      return;
-    }
-    (scrollView as unknown as View).measureInWindow((_x, scrollViewY) => {
-      mapWrap.measureInWindow((_mapX, mapY) => {
-        const contentY = mapY - scrollViewY + scrollYRef.current;
-        scrollView.scrollTo({ y: Math.max(0, contentY - 60), animated: true });
+    // AMap instances cannot be created while another instance is alive (new
+    // surfaces render black), so unmount the previous interactive map and let
+    // its teardown settle before creating the next one.
+    const openInteractiveMap = () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setExpandedMapId(journeyId);
+      const scrollView = scrollViewRef.current;
+      const mapWrap = mapWrapRefs.current[journeyId];
+      if (!scrollView || !mapWrap) {
+        return;
+      }
+      (scrollView as unknown as View).measureInWindow((_x, scrollViewY) => {
+        mapWrap.measureInWindow((_mapX, mapY) => {
+          const contentY = mapY - scrollViewY + scrollYRef.current;
+          scrollView.scrollTo({ y: Math.max(0, contentY - 60), animated: true });
+        });
       });
-    });
+    };
+
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (expandedMapId != null) {
+      setExpandedMapId(null);
+      setTimeout(openInteractiveMap, 400);
+      return;
+    }
+    openInteractiveMap();
   }
 
   // Start/end default to the first/last record point; picking one side just
@@ -843,6 +1226,10 @@ export default function JourneyHistoryScreen() {
   }
 
   async function exportJourneyPdf(journey: Journey) {
+    if (exportingPdfId) {
+      return;
+    }
+    setExportingPdfId(journey.id);
     try {
       const html = await journeyToHtml(journey, t);
       if (Platform.OS === "web") {
@@ -854,23 +1241,45 @@ export default function JourneyHistoryScreen() {
         html,
         base64: false,
       });
+      // Share a human-readable filename instead of the printer's random one.
+      const safeTitle =
+        journey.title.replace(/[\\/:*?"<>|\n\r]/g, "").trim().slice(0, 50) ||
+        "journey";
+      const destination = new File(Paths.cache, `${safeTitle}.pdf`);
+      new File(file.uri).copy(destination);
+      const pdfUri = destination.uri;
 
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
         Alert.alert(
           t("review.exportSuccessTitle"),
-          t("review.exportSuccessBody", { uri: file.uri }),
+          t("review.exportSuccessBody", { uri: pdfUri }),
         );
         return;
       }
 
-      await Sharing.shareAsync(file.uri, {
+      await Sharing.shareAsync(pdfUri, {
         mimeType: "application/pdf",
-        dialogTitle: `${journey.title}.pdf`,
+        dialogTitle: `${safeTitle}.pdf`,
       });
     } catch {
       Alert.alert(t("review.exportFailedTitle"), t("review.exportFailedBody"));
+    } finally {
+      setExportingPdfId(null);
     }
+  }
+
+  if (!hasLoadedOnce) {
+    return (
+      <View
+        style={[
+          styles.center,
+          { backgroundColor: isDark ? "#0f172a" : "#f8fafc" },
+        ]}
+      >
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   return (
@@ -885,6 +1294,14 @@ export default function JourneyHistoryScreen() {
       onScroll={(event) => {
         scrollYRef.current = event.nativeEvent.contentOffset.y;
       }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={isDark ? "#5eead4" : "#0f766e"}
+          colors={[isDark ? "#5eead4" : "#0f766e"]}
+        />
+      }
     >
       <View style={styles.pageHeader}>
         <Text style={[styles.title, themed.title]}>{t("review.title")}</Text>
@@ -1144,12 +1561,22 @@ export default function JourneyHistoryScreen() {
                     />
                   </Pressable>
                   {!isCollapsed ? (
-                    <Pressable onPress={() => void exportJourneyPdf(journey)}>
-                      <MaterialIcons
-                        name="picture-as-pdf"
-                        size={20}
-                        color={isDark ? "#7dd3fc" : "#0369a1"}
-                      />
+                    <Pressable
+                      onPress={() => void exportJourneyPdf(journey)}
+                      disabled={exportingPdfId === journey.id}
+                    >
+                      {exportingPdfId === journey.id ? (
+                        <ActivityIndicator
+                          size={18}
+                          color={isDark ? "#7dd3fc" : "#0369a1"}
+                        />
+                      ) : (
+                        <MaterialIcons
+                          name="picture-as-pdf"
+                          size={20}
+                          color={isDark ? "#7dd3fc" : "#0369a1"}
+                        />
+                      )}
                     </Pressable>
                   ) : null}
                   {!isCollapsed ? (
@@ -1408,18 +1835,28 @@ export default function JourneyHistoryScreen() {
                         onTouchEnd={() => setMapInteracting(false)}
                         onTouchCancel={() => setMapInteracting(false)}
                       >
-                        <TrackMap
-                          routeLocations={routeLocations}
-                          markerLocations={markerLocations}
-                          highlightLocations={
-                            isFullSegment ? undefined : segmentStats?.segmentTrack
-                          }
-                          height={
-                            expandedMapId === journey.id
-                              ? Math.round(windowHeight * 0.7)
-                              : undefined
-                          }
-                        />
+                        {expandedMapId === journey.id ? (
+                          <TrackMap
+                            routeLocations={routeLocations}
+                            markerLocations={markerLocations}
+                            highlightLocations={
+                              isFullSegment
+                                ? undefined
+                                : segmentStats?.segmentTrack
+                            }
+                            height={Math.round(windowHeight * 0.7)}
+                          />
+                        ) : (
+                          <Pressable
+                            onPress={() => toggleMapExpanded(journey.id)}
+                            disabled={!staticMapUris[journey.id]}
+                          >
+                            <StaticTrackImage
+                              uri={staticMapUris[journey.id]}
+                              isDark={isDark}
+                            />
+                          </Pressable>
+                        )}
                         {canExpandMap ? (
                           <Pressable
                             style={[
@@ -1601,35 +2038,7 @@ export default function JourneyHistoryScreen() {
                                               setPreviewMedia(media)
                                             }
                                           >
-                                            {mediaPreviewUri(media) ? (
-                                              <Image
-                                                source={{
-                                                  uri: mediaPreviewUri(media),
-                                                }}
-                                                style={styles.mediaPreview}
-                                                contentFit="cover"
-                                              />
-                                            ) : media.type === "video" ? (
-                                              <MediaVideoCover
-                                                uri={media.uri}
-                                              />
-                                            ) : (
-                                              <View
-                                                style={[
-                                                  styles.mediaPlaceholder,
-                                                  themed.mediaPlaceholder,
-                                                ]}
-                                              >
-                                                <Text
-                                                  style={[
-                                                    styles.mediaPlaceholderText,
-                                                    themed.mediaPlaceholderText,
-                                                  ]}
-                                                >
-                                                  {t("common.video")}
-                                                </Text>
-                                              </View>
-                                            )}
+                                            <VideoThumbCover uri={media.uri} />
                                             <Text
                                               style={[
                                                 styles.mediaBadge,
@@ -1907,6 +2316,33 @@ const styles = StyleSheet.create({
   },
   segmentChipTextSelected: {
     color: "#ffffff",
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  staticTrackImage: {
+    width: "100%",
+    height: 180,
+  },
+  staticTrackPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  videoThumbWrap: {
+    width: 110,
+    height: 80,
+  },
+  videoPlayBadge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,23,42,0.25)",
   },
   segmentStatsRow: {
     flexDirection: "row",
