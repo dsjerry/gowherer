@@ -347,6 +347,19 @@ Latest updates (2026-03-08):
 - Wire `Journey.trackLocations` into the recap map (`components/track-map.tsx`) so the continuous track replaces or supplements manual location entries when drawing the route.
 - Consider adding a "tracking is active" indicator (e.g., subtle badge or pulsing dot) so users know background tracking is running.
 
+## Work Log (2026-10-04)
+
+### Completed
+- Split Android workflow into CI and Release per standard practice:
+  - `ci.yml`: push main/dev → lint + licenses + Android debug build (workflow artifact only, 14-day retention); PR → lint. Typecheck included as non-blocking until pre-existing type errors are fixed.
+  - `release.yml`: tag `v*` push → version parsed from tag (replaces manual app_version input) → signed universal APK + AAB → GitHub Release on that tag; workflow_dispatch kept as fallback with the old build_type choice.
+  - Removed `android-build.yml` and the `Setup Android SDK` step entirely (upstream removed the `tools` SDK package; runners have the SDK preinstalled).
+- Added `.agents/skills/release/SKILL.md`: release checklist (versionCode/package.json/tag sync), secrets list, dispatch fallback, troubleshooting.
+
+### TODO / Follow-ups
+- The "测试" journey created during on-device verification is still in the completed list (17 条) — delete it from the review page.
+- A transient "没有匹配的已完成旅程" empty state was observed once on the review tab right after tab switch; data was intact. If it recurs, investigate `loadJourneys` timing.
+
 ## Work Log (2026-10-03)
 
 ### Completed

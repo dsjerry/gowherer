@@ -1,6 +1,9 @@
-name: Android Build
+name: Android Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       build_type:
@@ -18,7 +21,7 @@ on:
           - x86_64
           - aab
       app_version:
-        description: App version (optional, SemVer like 1.2.3)
+        description: App version (optional, SemVer like 1.2.3; ignored on tag push)
         required: false
         type: string
       release_notes:
@@ -35,7 +38,6 @@ jobs:
       EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER: ${{ vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER }}
       AMAP_ANDROID_API_KEY: ${{ secrets.AMAP_ANDROID_API_KEY }}
       EXPO_PUBLIC_AMAP_WEB_KEY: ${{ secrets.EXPO_PUBLIC_AMAP_WEB_KEY }}
-      APP_VERSION: ${{ inputs.app_version }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -59,19 +61,22 @@ jobs:
       - name: Resolve app version
         run: |
           set -euo pipefail
-          if [ -n "${APP_VERSION}" ]; then
-            resolved_version="${APP_VERSION}"
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            resolved_version="${GITHUB_REF_NAME#v}"
+          elif [ -n "${APP_VERSION_INPUT:-}" ]; then
+            resolved_version="${APP_VERSION_INPUT}"
           else
             resolved_version=$(node -p "require('./package.json').version")
           fi
           echo "APP_VERSION=${resolved_version}" >> "$GITHUB_ENV"
           echo "Resolved APP_VERSION=${resolved_version}"
+        env:
+          APP_VERSION_INPUT: ${{ inputs.app_version }}
 
       - name: Validate version format
-        if: env.APP_VERSION != ''
         run: |
           if ! echo "${APP_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Invalid app_version: ${APP_VERSION}. Expected SemVer like 1.2.3"
+            echo "Invalid app version: ${APP_VERSION}. Expected SemVer like 1.2.3"
             exit 1
           fi
 
@@ -88,9 +93,7 @@ jobs:
           echo "EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER=${EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER:-amap}" >> .env
           echo "AMAP_ANDROID_API_KEY=${AMAP_ANDROID_API_KEY}" >> .env
           echo "EXPO_PUBLIC_AMAP_WEB_KEY=${EXPO_PUBLIC_AMAP_WEB_KEY}" >> .env
-          if [ -n "${APP_VERSION}" ]; then
-            echo "APP_VERSION=${APP_VERSION}" >> .env
-          fi
+          echo "APP_VERSION=${APP_VERSION}" >> .env
 
       - name: Prebuild Android
         run: npx expo prebuild --platform android --clean
@@ -116,18 +119,25 @@ jobs:
           android.buildTypes.release.signingConfig = android.signingConfigs.release
           GRADLE_SIGNING
 
-      # ========== Universal APK (全架构合一) ==========
+      # tag 推送默认构建 universal APK + AAB；手动触发按 build_type 选择
       - name: Build universal APK
-        if: inputs.build_type == 'universal' || inputs.build_type == 'all'
+        if: ${{ inputs.build_type == 'universal' || inputs.build_type == 'all' || startsWith(github.ref, 'refs/tags/v') }}
         run: |
           cd android
           ./gradlew assembleRelease \
             -Dorg.gradle.jvmargs="-Xmx4g" \
             --no-daemon
 
-      # ========== Split APKs (按架构拆分) ==========
+      - name: Build AAB
+        if: ${{ inputs.build_type == 'aab' || inputs.build_type == 'all' || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          cd android
+          ./gradlew bundleRelease \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            --no-daemon
+
       - name: Build split APKs
-        if: inputs.build_type == 'split' || inputs.build_type == 'all'
+        if: ${{ inputs.build_type == 'split' || inputs.build_type == 'all' }}
         run: |
           cd android
           ./gradlew assembleRelease \
@@ -137,9 +147,8 @@ jobs:
             -Dorg.gradle.workers.max=2 \
             --no-daemon
 
-      # ========== 单架构 APK ==========
       - name: Build arm64-v8a APK
-        if: inputs.build_type == 'arm64-v8a'
+        if: ${{ inputs.build_type == 'arm64-v8a' }}
         run: |
           cd android
           ./gradlew assembleRelease \
@@ -148,7 +157,7 @@ jobs:
             --no-daemon
 
       - name: Build armeabi-v7a APK
-        if: inputs.build_type == 'armeabi-v7a'
+        if: ${{ inputs.build_type == 'armeabi-v7a' }}
         run: |
           cd android
           ./gradlew assembleRelease \
@@ -157,7 +166,7 @@ jobs:
             --no-daemon
 
       - name: Build x86 APK
-        if: inputs.build_type == 'x86'
+        if: ${{ inputs.build_type == 'x86' }}
         run: |
           cd android
           ./gradlew assembleRelease \
@@ -166,7 +175,7 @@ jobs:
             --no-daemon
 
       - name: Build x86_64 APK
-        if: inputs.build_type == 'x86_64'
+        if: ${{ inputs.build_type == 'x86_64' }}
         run: |
           cd android
           ./gradlew assembleRelease \
@@ -174,26 +183,14 @@ jobs:
             -Dorg.gradle.jvmargs="-Xmx4g" \
             --no-daemon
 
-      # ========== AAB ==========
-      - name: Build AAB
-        if: inputs.build_type == 'aab' || inputs.build_type == 'all'
-        run: |
-          cd android
-          ./gradlew bundleRelease \
-            -Dorg.gradle.jvmargs="-Xmx4g" \
-            --no-daemon
-
-      # ========== 收集产物 ==========
       - name: Collect artifacts
         run: |
           set -euo pipefail
           mkdir -p dist
 
-          # APK 文件
           if [ -d android/app/build/outputs/apk/release ]; then
             find android/app/build/outputs/apk/release -name "*.apk" | while read -r f; do
               filename=$(basename "$f")
-              # 从文件名判断架构
               if echo "$filename" | grep -q "arm64"; then
                 suffix="arm64-v8a"
               elif echo "$filename" | grep -q "armeabi"; then
@@ -207,14 +204,13 @@ jobs:
               else
                 suffix="release"
               fi
-              cp "$f" "dist/gowherer-${suffix}-v${APP_VERSION:-0.0.0}.apk"
+              cp "$f" "dist/gowherer-${suffix}-v${APP_VERSION}.apk"
             done
           fi
 
-          # AAB 文件
           if [ -d android/app/build/outputs/bundle/release ]; then
             find android/app/build/outputs/bundle/release -name "*.aab" -exec \
-              cp {} "dist/gowherer-v${APP_VERSION:-0.0.0}.aab" \;
+              cp {} "dist/gowherer-v${APP_VERSION}.aab" \;
           fi
 
           echo "=== 产物列表 ==="
@@ -232,14 +228,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag="v${APP_VERSION:-0.0.0}"
-          title="GoWherer v${APP_VERSION:-${{ github.run_number }}}"
+          tag="v${APP_VERSION}"
+          title="GoWherer v${APP_VERSION}"
           notes_file=$(mktemp)
           {
-            echo "## Android Build"
+            echo "## Android Release"
             echo ""
-            echo "- Build Type: ${{ inputs.build_type }}"
-            echo "- App Version: ${APP_VERSION:-default}"
+            echo "- App Version: ${APP_VERSION}"
             echo "- Run: #${{ github.run_number }}"
             echo ""
             echo "### 产物"
@@ -258,6 +253,6 @@ jobs:
               printf '%b\n' "${{ inputs.release_notes }}"
             fi
           } > "$notes_file"
-          gh release create "$tag" --title "$title" --notes-file "$notes_file" || true
-          rm -f "$notes_file"
+          gh release create "$tag" --title "$title" --notes-file "$notes_file" --target "$GITHUB_SHA" || true
           gh release upload "$tag" dist/* --clobber
+          rm -f "$notes_file"
