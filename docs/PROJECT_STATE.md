@@ -350,6 +350,14 @@ Latest updates (2026-03-08):
 ## Work Log (2026-10-04)
 
 ### Completed
+- Reworked the review list to an accordion model (user request, supersedes the static-preview + expand-in-place design):
+  - Exactly one journey card renders content (and its single small interactive AMap map with the route line) at a time; other cards collapse to header-only.
+  - Default: the first completed journey with track/markers is expanded on load; switching cards unmounts the previous map, waits 400ms, then mounts the next (verified: no black maps, no GL errors on device).
+  - Removed the static-preview machinery (staticMapUris/buildTrackStaticMapUri previews/StaticTrackImage), the map-expand overlay, scroll-disable-while-expanded, and the collapsed-id persistence.
+  - Rationale: AMap fails to create map instances while others are alive (black surfaces); reusing always-alive instances (previous design) kept 7+ live GL surfaces; accordion keeps at most one, and creation-after-full-teardown works (verified on device).
+- Also verified: marker icons show on the card map; no GL errors after card switching.
+
+### Completed
 - Default-expand the first track-bearing journey in the review list (user request):
   - On focus, if the currently expanded journey is gone, the first completed journey with track/markers auto-expands its interactive map (route line visible by default); other cards stay on lightweight static previews.
   - The auto-expand auto-scrolls the map into view after mount (~600ms), since page scroll is disabled while a map is expanded.

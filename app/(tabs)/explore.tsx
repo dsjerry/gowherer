@@ -25,7 +25,6 @@ import {
   Text,
   TextInput,
   View,
-  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -36,7 +35,6 @@ import { deleteJourney as deleteJourneyById } from "@/lib/journey-repository";
 import { logLocalError } from "@/lib/local-log";
 import { loadJourneys } from "@/lib/journey-storage";
 import {
-  REVIEW_COLLAPSED_KEY,
   REVIEW_FILTERS_KEY,
 } from "@/lib/storage-keys";
 import {
@@ -348,38 +346,6 @@ function mediaCellHtml(dataUri: string, badge: string) {
     `<img src="${dataUri}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;display:block;" />` +
     `<span style="position:absolute;right:5px;bottom:5px;background:rgba(15,23,42,0.55);color:#ffffff;font-size:9px;padding:1px 5px;border-radius:6px;">${badge}</span>` +
     `</div>`
-  );
-}
-
-// Lightweight static map image used as the list preview; the interactive AMap
-// view is only mounted when the user expands the card.
-function StaticTrackImage({
-  uri,
-  isDark,
-}: {
-  uri: string | undefined;
-  isDark: boolean;
-}) {
-  if (uri) {
-    return (
-      <Image
-        source={{ uri }}
-        style={styles.staticTrackImage}
-        contentFit="cover"
-        transition={150}
-      />
-    );
-  }
-  return (
-    <View
-      style={[
-        styles.staticTrackImage,
-        styles.staticTrackPlaceholder,
-        { backgroundColor: isDark ? "#0f172a" : "#f8fafc" },
-      ]}
-    >
-      <ActivityIndicator size="small" color={isDark ? "#94a3b8" : "#64748b"} />
-    </View>
   );
 }
 
@@ -793,7 +759,6 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
 
 export default function JourneyHistoryScreen() {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const { t, locale } = useI18n();
@@ -891,10 +856,8 @@ export default function JourneyHistoryScreen() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
   const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
-  const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<string[]>([]);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [mapInteracting, setMapInteracting] = useState(false);
-  const [expandedMapId, setExpandedMapId] = useState<string | null>(null);
-  const [staticMapUris, setStaticMapUris] = useState<Record<string, string>>({});
   const [reviewHydrated, setReviewHydrated] = useState(false);
   const [segmentRange, setSegmentRange] = useState<{
     journeyId: string;
@@ -908,16 +871,7 @@ export default function JourneyHistoryScreen() {
   const [filterPicker, setFilterPicker] = useState<"kind" | "tag" | null>(
     null,
   );
-  const canExpandMap = Platform.OS !== "web";
   const scrollViewRef = useRef<ScrollView>(null);
-  const mapWrapRefs = useRef<Record<string, View | null>>({});
-  const scrollYRef = useRef(0);
-  const staticMapGeneratedRef = useRef<Set<string>>(new Set());
-  const expandedMapIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    expandedMapIdRef.current = expandedMapId;
-  }, [expandedMapId]);
 
   const reloadJourneys = useCallback(async () => {
     const stored = await loadJourneys();
@@ -935,27 +889,14 @@ export default function JourneyHistoryScreen() {
         setJourneys(stored);
         setHasLoadedOnce(true);
 
-        // Default-expand the first track-bearing journey so the route line is
-        // visible without tapping; other cards stay on lightweight static
-        // previews. Only one interactive AMap instance exists at a time.
+        // Accordion default: expand the first card so its content (incl. the
+        // small interactive map with the route line) is visible on entry.
         const completed = stored.filter((j) => j.status === "completed");
-        const expandedStillValid =
-          expandedMapIdRef.current != null &&
-          completed.some((j) => j.id === expandedMapIdRef.current);
-        if (expandedStillValid) {
-          return;
-        }
-        const firstWithTrack = completed.find(
-          (j) =>
-            getJourneyTrackLocations(j).length > 0 ||
-            getJourneyTrackMapMarkerLocations(j).length > 0,
+        setExpandedCardId((prev) =>
+          prev && completed.some((j) => j.id === prev)
+            ? prev
+            : (completed[0]?.id ?? null),
         );
-        setExpandedMapId(firstWithTrack ? firstWithTrack.id : null);
-        // Bring the auto-expanded map into view (page scroll is disabled
-        // while a map is expanded).
-        if (firstWithTrack) {
-          setTimeout(() => scrollMapIntoView(firstWithTrack.id), 600);
-        }
       })();
 
       return () => {
@@ -979,13 +920,6 @@ export default function JourneyHistoryScreen() {
     let active = true;
     (async () => {
       try {
-        const storedCollapsed = await AsyncStorage.getItem(REVIEW_COLLAPSED_KEY);
-        if (active && storedCollapsed) {
-          const parsed = JSON.parse(storedCollapsed);
-          if (Array.isArray(parsed)) {
-            setCollapsedJourneyIds(parsed.map(String));
-          }
-        }
         const storedFilters = await AsyncStorage.getItem(REVIEW_FILTERS_KEY);
         if (active && storedFilters) {
           const parsed = JSON.parse(storedFilters) as {
@@ -1015,19 +949,9 @@ export default function JourneyHistoryScreen() {
     };
   }, []);
 
-  // Persist review list UI state across sessions — but only AFTER the
+  // Persist review list filter state across sessions — but only AFTER the
   // persisted values have been loaded, otherwise the mount run would clobber
   // them with initial defaults before the read completes.
-  useEffect(() => {
-    if (!reviewHydrated) {
-      return;
-    }
-    AsyncStorage.setItem(
-      REVIEW_COLLAPSED_KEY,
-      JSON.stringify(collapsedJourneyIds),
-    ).catch(() => {});
-  }, [reviewHydrated, collapsedJourneyIds]);
-
   useEffect(() => {
     if (!reviewHydrated) {
       return;
@@ -1058,44 +982,6 @@ export default function JourneyHistoryScreen() {
     }
     return map;
   }, [completedJourneys]);
-
-  // Build lightweight static map previews (plain images, no native AMap
-  // instances) for every journey once. Interactive AMap views are only
-  // mounted on demand when a card is expanded.
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      for (const journey of completedJourneys) {
-        if (staticMapGeneratedRef.current.has(journey.id)) {
-          continue;
-        }
-        staticMapGeneratedRef.current.add(journey.id);
-        const derived = journeyDerivedById.get(journey.id);
-        const locations =
-          derived && derived.track.length >= 2
-            ? derived.track
-            : getJourneyEntryLocations(journey);
-        if (locations.length < 2) {
-          continue;
-        }
-        try {
-          const uri = await buildTrackStaticMapUri(locations);
-          if (active && uri) {
-            setStaticMapUris((prev) => ({ ...prev, [journey.id]: uri }));
-          }
-        } catch (error) {
-          void logLocalError(
-            "JourneyScreen",
-            "static map preview failed",
-            error,
-          );
-        }
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [completedJourneys, journeyDerivedById]);
 
   const availableTags = useMemo(
     () =>
@@ -1183,60 +1069,34 @@ export default function JourneyHistoryScreen() {
   async function removeJourney(journeyId: string) {
     const next = await deleteJourneyById(journeyId);
     setJourneys(next);
-    setCollapsedJourneyIds((prev) => prev.filter((id) => id !== journeyId));
-  }
-
-  function toggleJourneyCollapsed(journeyId: string) {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedMapId(null);
-    setCollapsedJourneyIds((prev) =>
-      prev.includes(journeyId)
-        ? prev.filter((id) => id !== journeyId)
-        : [...prev, journeyId],
-    );
-  }
-
-  // The AMap SDK fails to initialize the GL engine of a NEW map instance while
-  // other instances are alive (surface renders black, see logcat NPEs in
-  // GLMapEngine). Enlarging reuses the card's already-rendering map instead of
-  // mounting a second one.
-  function scrollMapIntoView(journeyId: string) {
-    const scrollView = scrollViewRef.current;
-    const mapWrap = mapWrapRefs.current[journeyId];
-    if (!scrollView || !mapWrap) {
-      return;
+    if (expandedCardId === journeyId) {
+      setExpandedCardId(null);
     }
-    (scrollView as unknown as View).measureInWindow((_x, scrollViewY) => {
-      mapWrap.measureInWindow((_mapX, mapY) => {
-        const contentY = mapY - scrollViewY + scrollYRef.current;
-        scrollView.scrollTo({ y: Math.max(0, contentY - 60), animated: true });
-      });
-    });
   }
 
-  function toggleMapExpanded(journeyId: string) {
-    if (expandedMapId === journeyId) {
+  // Accordion: exactly one journey card renders its content (and its single
+  // AMap instance) at a time — the AMap SDK renders a NEW map instance black
+  // while other instances exist, so a card switch unmounts the previous map,
+  // lets the teardown settle, then mounts the next one.
+  function toggleCardExpanded(journeyId: string) {
+    if (expandedCardId === journeyId) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setExpandedMapId(null);
+      setExpandedCardId(null);
       return;
     }
 
-    // AMap instances cannot be created while another instance is alive (new
-    // surfaces render black), so unmount the previous interactive map and let
-    // its teardown settle before creating the next one.
-    const openInteractiveMap = () => {
+    const openCard = () => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setExpandedMapId(journeyId);
-      scrollMapIntoView(journeyId);
+      setExpandedCardId(journeyId);
     };
 
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    if (expandedMapId != null) {
-      setExpandedMapId(null);
-      setTimeout(openInteractiveMap, 400);
+    if (expandedCardId != null) {
+      setExpandedCardId(null);
+      setTimeout(openCard, 400);
       return;
     }
-    openInteractiveMap();
+    openCard();
   }
 
   // Start/end default to the first/last record point; picking one side just
@@ -1322,11 +1182,7 @@ export default function JourneyHistoryScreen() {
         styles.container,
         { paddingTop: insets.top + 12 },
       ]}
-      scrollEnabled={!mapInteracting && expandedMapId === null}
-      scrollEventThrottle={100}
-      onScroll={(event) => {
-        scrollYRef.current = event.nativeEvent.contentOffset.y;
-      }}
+      scrollEnabled={!mapInteracting}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -1521,7 +1377,7 @@ export default function JourneyHistoryScreen() {
         </View>
       ) : (
         filteredJourneys.map((journey) => {
-          const isCollapsed = collapsedJourneyIds.includes(journey.id);
+          const isCollapsed = expandedCardId !== journey.id;
           const derived = journeyDerivedById.get(journey.id);
           const stats = derived?.stats ?? computeJourneyStats(journey);
           const routeLocations =
@@ -1586,7 +1442,7 @@ export default function JourneyHistoryScreen() {
                   ) : null}
                 </View>
                 <View style={styles.journeyHeaderActions}>
-                  <Pressable onPress={() => toggleJourneyCollapsed(journey.id)}>
+                  <Pressable onPress={() => toggleCardExpanded(journey.id)}>
                     <MaterialIcons
                       name={isCollapsed ? "expand-more" : "expand-less"}
                       size={22}
@@ -1861,62 +1717,19 @@ export default function JourneyHistoryScreen() {
                         {t("review.trackMapTitle")}
                       </Text>
                       <View
-                        ref={(el) => {
-                          mapWrapRefs.current[journey.id] = el;
-                        }}
                         onTouchStart={() => setMapInteracting(true)}
                         onTouchEnd={() => setMapInteracting(false)}
                         onTouchCancel={() => setMapInteracting(false)}
                       >
-                        {expandedMapId === journey.id ? (
-                          <TrackMap
-                            routeLocations={routeLocations}
-                            markerLocations={markerLocations}
-                            highlightLocations={
-                              isFullSegment
-                                ? undefined
-                                : segmentStats?.segmentTrack
-                            }
-                            height={Math.round(windowHeight * 0.7)}
-                          />
-                        ) : (
-                          <Pressable
-                            onPress={() => toggleMapExpanded(journey.id)}
-                            disabled={!staticMapUris[journey.id]}
-                          >
-                            <StaticTrackImage
-                              uri={staticMapUris[journey.id]}
-                              isDark={isDark}
-                            />
-                          </Pressable>
-                        )}
-                        {canExpandMap ? (
-                          <Pressable
-                            style={[
-                              styles.mapExpandOverlay,
-                              isDark
-                                ? styles.mapExpandOverlayDark
-                                : styles.mapExpandOverlayLight,
-                            ]}
-                            onPress={() => toggleMapExpanded(journey.id)}
-                            accessibilityRole="button"
-                            accessibilityLabel={
-                              expandedMapId === journey.id
-                                ? t("review.mapCollapse")
-                                : t("review.mapExpand")
-                            }
-                          >
-                            <MaterialIcons
-                              name={
-                                expandedMapId === journey.id
-                                  ? "close-fullscreen"
-                                  : "open-in-full"
-                              }
-                              size={15}
-                              color={isDark ? "#e2e8f0" : "#334155"}
-                            />
-                          </Pressable>
-                        ) : null}
+                        <TrackMap
+                          routeLocations={routeLocations}
+                          markerLocations={markerLocations}
+                          highlightLocations={
+                            isFullSegment
+                              ? undefined
+                              : segmentStats?.segmentTrack
+                          }
+                        />
                       </View>
                     </View>
                   ) : (
@@ -2259,26 +2072,6 @@ const styles = StyleSheet.create({
   mapTitle: {
     fontWeight: "600",
     color: "#334155",
-  },
-  mapExpandOverlay: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mapExpandOverlayLight: {
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  mapExpandOverlayDark: {
-    backgroundColor: "rgba(15,23,42,0.72)",
-    borderWidth: 1,
-    borderColor: "#334155",
   },
   segmentSection: {
     borderRadius: 10,
