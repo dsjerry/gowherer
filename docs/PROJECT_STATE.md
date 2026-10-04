@@ -350,6 +350,13 @@ Latest updates (2026-03-08):
 ## Work Log (2026-10-04)
 
 ### Completed
+- Fixed static map preview cropping the route out of view:
+  - AMap staticmap zoom is not standard Mercator-256; calibrated against rendered output (~123 logical px/deg lng at zoom 6, doubling per level). Center/zoom now fit the route bounds (bounds center, 0.85 view padding).
+  - Removed the `path` overlay param entirely — AMap staticmap path does not render for this key in any tested format (pipe/comma styles, encoded separators); start/end markers DO render (`mid,0xRRGGBB,L:lng,lat` groups joined by %7C, uppercase hex).
+- Fixed expanded-map interaction jitter (page list scrolling during map pan/zoom): outer ScrollView `scrollEnabled` is now false while a card map is expanded; collapse the map to scroll again.
+- On-device verification via adb: static preview centers the full route; expanded map pans with the list stationary.
+
+### Completed
 - Split Android workflow into CI and Release per standard practice:
   - `ci.yml`: push main/dev → lint + licenses + Android debug build (workflow artifact only, 14-day retention); PR → lint. Typecheck included as non-blocking until pre-existing type errors are fixed.
   - `release.yml`: tag `v*` push → version parsed from tag (replaces manual app_version input) → signed universal APK + AAB → GitHub Release on that tag; workflow_dispatch kept as fallback with the old build_type choice.

@@ -591,42 +591,44 @@ async function buildTrackStaticMapUri(
 
     const lats = gcjPoints.map((p) => p.latitude);
     const lngs = gcjPoints.map((p) => p.longitude);
-    const span = Math.max(
-      Math.max(...lats) - Math.min(...lats),
-      Math.max(...lngs) - Math.min(...lngs),
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const spanLat = Math.max(maxLat - minLat, 0.0001);
+    const spanLng = Math.max(maxLng - minLng, 0.0001);
+
+    // Fit the whole route into the preview. AMap staticmap zoom is NOT
+    // standard Mercator-256 — calibrated against rendered output: ~123 logical
+    // px per degree of longitude at zoom 6, doubling per level, ~114 px/deg
+    // latitude at this latitude band.
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+    const IMAGE_W = 750;
+    const IMAGE_H = 360;
+    const VIEW_PADDING = 0.85;
+    const zoomFitLng = Math.log2(
+      (VIEW_PADDING * IMAGE_W) / (spanLng * 123),
     );
-    const zoom =
-      span < 0.005
-        ? 15
-        : span < 0.01
-          ? 14
-          : span < 0.02
-            ? 13
-            : span < 0.05
-              ? 12
-              : span < 0.1
-                ? 11
-                : span < 0.5
-                  ? 10
-                  : span < 1
-                    ? 9
-                    : span < 3
-                      ? 8
-                      : 7;
+    const zoomFitLat = Math.log2(
+      (VIEW_PADDING * IMAGE_H) / (spanLat * 114),
+    );
+    const zoom = Math.max(
+      4,
+      Math.min(17, 6 + Math.floor(Math.min(zoomFitLng, zoomFitLat))),
+    );
 
     const start = gcjPoints[0];
     const end = gcjPoints[gcjPoints.length - 1];
-    const center = gcjPoints[Math.floor(gcjPoints.length / 2)];
     const params = new URLSearchParams({
       key: amapWebKey,
-      location: `${center.longitude.toFixed(6)},${center.latitude.toFixed(6)}`,
+      location: `${centerLng.toFixed(6)},${centerLat.toFixed(6)}`,
       zoom: String(zoom),
-      size: "750*360",
+      size: `${IMAGE_W}*${IMAGE_H}`,
       scale: "2",
+      // AMap path overlays do not render for this key; start/end markers do
+      // (multi-group lists need %7C-encoded separators and uppercase hex).
       markers: `mid,0x0284C7,A:${start.longitude.toFixed(6)},${start.latitude.toFixed(6)}|mid,0xDC2626,B:${end.longitude.toFixed(6)},${end.latitude.toFixed(6)}`,
-      path: `weight:6|color:0x0f766e|locations:${gcjPoints
-        .map((p) => `${p.longitude.toFixed(6)},${p.latitude.toFixed(6)}`)
-        .join(";")}`,
     });
     return `https://restapi.amap.com/v3/staticmap?${params.toString()}`;
   } catch (error) {
@@ -1289,7 +1291,7 @@ export default function JourneyHistoryScreen() {
         styles.container,
         { paddingTop: insets.top + 12 },
       ]}
-      scrollEnabled={!mapInteracting}
+      scrollEnabled={!mapInteracting && expandedMapId === null}
       scrollEventThrottle={100}
       onScroll={(event) => {
         scrollYRef.current = event.nativeEvent.contentOffset.y;
