@@ -5,6 +5,7 @@ import {
 } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 import { LocalePreferenceProvider } from "@/hooks/locale-preference";
@@ -19,11 +20,13 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <LocalePreferenceProvider>
-      <ThemePreferenceProvider>
-        <RootNavigator />
-      </ThemePreferenceProvider>
-    </LocalePreferenceProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <LocalePreferenceProvider>
+        <ThemePreferenceProvider>
+          <RootNavigator />
+        </ThemePreferenceProvider>
+      </LocalePreferenceProvider>
+    </GestureHandlerRootView>
   );
 }
 

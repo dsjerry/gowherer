@@ -8,6 +8,7 @@ import * as FileSystemLegacy from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as Print from "expo-print";
+import { useNavigation } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -904,6 +905,14 @@ export default function JourneyHistoryScreen() {
       setTimeout(() => scrollMapIntoView(journeyId), 350);
     }
   }
+
+  const navigation = useNavigation();
+
+  // The AMap view handles horizontal drags itself; suspend tab swiping while it
+  // is being touched so panning the map does not switch tabs.
+  useEffect(() => {
+    navigation.setOptions({ swipeEnabled: !mapInteracting });
+  }, [navigation, mapInteracting]);
 
   const reloadJourneys = useCallback(async () => {
     const stored = await loadJourneys();
