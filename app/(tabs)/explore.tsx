@@ -913,6 +913,11 @@ export default function JourneyHistoryScreen() {
   const mapWrapRefs = useRef<Record<string, View | null>>({});
   const scrollYRef = useRef(0);
   const staticMapGeneratedRef = useRef<Set<string>>(new Set());
+  const expandedMapIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    expandedMapIdRef.current = expandedMapId;
+  }, [expandedMapId]);
 
   const reloadJourneys = useCallback(async () => {
     const stored = await loadJourneys();
@@ -929,6 +934,28 @@ export default function JourneyHistoryScreen() {
         }
         setJourneys(stored);
         setHasLoadedOnce(true);
+
+        // Default-expand the first track-bearing journey so the route line is
+        // visible without tapping; other cards stay on lightweight static
+        // previews. Only one interactive AMap instance exists at a time.
+        const completed = stored.filter((j) => j.status === "completed");
+        const expandedStillValid =
+          expandedMapIdRef.current != null &&
+          completed.some((j) => j.id === expandedMapIdRef.current);
+        if (expandedStillValid) {
+          return;
+        }
+        const firstWithTrack = completed.find(
+          (j) =>
+            getJourneyTrackLocations(j).length > 0 ||
+            getJourneyTrackMapMarkerLocations(j).length > 0,
+        );
+        setExpandedMapId(firstWithTrack ? firstWithTrack.id : null);
+        // Bring the auto-expanded map into view (page scroll is disabled
+        // while a map is expanded).
+        if (firstWithTrack) {
+          setTimeout(() => scrollMapIntoView(firstWithTrack.id), 600);
+        }
       })();
 
       return () => {
@@ -1173,6 +1200,20 @@ export default function JourneyHistoryScreen() {
   // other instances are alive (surface renders black, see logcat NPEs in
   // GLMapEngine). Enlarging reuses the card's already-rendering map instead of
   // mounting a second one.
+  function scrollMapIntoView(journeyId: string) {
+    const scrollView = scrollViewRef.current;
+    const mapWrap = mapWrapRefs.current[journeyId];
+    if (!scrollView || !mapWrap) {
+      return;
+    }
+    (scrollView as unknown as View).measureInWindow((_x, scrollViewY) => {
+      mapWrap.measureInWindow((_mapX, mapY) => {
+        const contentY = mapY - scrollViewY + scrollYRef.current;
+        scrollView.scrollTo({ y: Math.max(0, contentY - 60), animated: true });
+      });
+    });
+  }
+
   function toggleMapExpanded(journeyId: string) {
     if (expandedMapId === journeyId) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1186,17 +1227,7 @@ export default function JourneyHistoryScreen() {
     const openInteractiveMap = () => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setExpandedMapId(journeyId);
-      const scrollView = scrollViewRef.current;
-      const mapWrap = mapWrapRefs.current[journeyId];
-      if (!scrollView || !mapWrap) {
-        return;
-      }
-      (scrollView as unknown as View).measureInWindow((_x, scrollViewY) => {
-        mapWrap.measureInWindow((_mapX, mapY) => {
-          const contentY = mapY - scrollViewY + scrollYRef.current;
-          scrollView.scrollTo({ y: Math.max(0, contentY - 60), animated: true });
-        });
-      });
+      scrollMapIntoView(journeyId);
     };
 
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

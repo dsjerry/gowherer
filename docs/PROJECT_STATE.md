@@ -350,6 +350,10 @@ Latest updates (2026-03-08):
 ## Work Log (2026-10-04)
 
 ### Completed
+- Default-expand the first track-bearing journey in the review list (user request):
+  - On focus, if the currently expanded journey is gone, the first completed journey with track/markers auto-expands its interactive map (route line visible by default); other cards stay on lightweight static previews.
+  - The auto-expand auto-scrolls the map into view after mount (~600ms), since page scroll is disabled while a map is expanded.
+  - `expandedMapIdRef` mirrors the expansion state for the focus effect.
 - Fixed static map preview cropping the route out of view:
   - AMap staticmap zoom is not standard Mercator-256; calibrated against rendered output (~123 logical px/deg lng at zoom 6, doubling per level). Center/zoom now fit the route bounds (bounds center, 0.85 view padding).
   - Removed the `path` overlay param entirely — AMap staticmap path does not render for this key in any tested format (pipe/comma styles, encoded separators); start/end markers DO render (`mid,0xRRGGBB,L:lng,lat` groups joined by %7C, uppercase hex).
