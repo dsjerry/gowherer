@@ -1,0 +1,382 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GoWherer 应用架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "gowherer-architecture.html",
+    "repository": {
+      "url": "https://github.com/dsjerry/gowherer",
+      "revision": "70f45ea95bdc148f49aa8b958fa8bf6fc8751291"
+    },
+    "viewBox": [
+      1220,
+      610
+    ],
+    "views": [
+      {
+        "id": "journey-data",
+        "label": "旅程数据主链路",
+        "focus": [
+          "screens",
+          "hooks",
+          "journey-svc",
+          "journey-store"
+        ],
+        "note": "从屏幕操作到 AsyncStorage 持久化的主路径"
+      },
+      {
+        "id": "tracking",
+        "label": "后台定位与轨迹",
+        "focus": [
+          "hooks",
+          "bg-track",
+          "amap-native",
+          "journey-svc",
+          "trackmap"
+        ],
+        "note": "轨迹点如何采集、入库并回放成路线"
+      },
+      {
+        "id": "map-geo",
+        "label": "地图与地理编码",
+        "focus": [
+          "trackmap",
+          "geocode",
+          "amap-native",
+          "amap-api"
+        ],
+        "note": "原生 SDK 与 Web API 的分工及回退关系"
+      },
+      {
+        "id": "export-build",
+        "label": "导出与构建",
+        "focus": [
+          "screens",
+          "amap-api"
+        ],
+        "note": "PDF 导出在 explore 内联完成,封面走 staticmap;发布走 GitHub Actions 与 EAS"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "screens",
+      "type": "frontend",
+      "label": "旅程屏幕",
+      "sublabel": "Expo Router (tabs)",
+      "tag": "index · explore · settings",
+      "pos": [
+        60,
+        90
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "app/(tabs)/index.tsx"
+        },
+        {
+          "path": "app/(tabs)/explore.tsx"
+        }
+      ]
+    },
+    {
+      "id": "hooks",
+      "type": "frontend",
+      "label": "数据与追踪 Hooks",
+      "sublabel": "use-journeys · use-location-tracking",
+      "pos": [
+        60,
+        232
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "hooks/use-journeys.ts"
+        },
+        {
+          "path": "hooks/use-location-tracking.ts"
+        }
+      ]
+    },
+    {
+      "id": "trackmap",
+      "type": "frontend",
+      "label": "轨迹地图",
+      "sublabel": "components/track-map",
+      "tag": "原生 AMap / Web 回退",
+      "pos": [
+        360,
+        232
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "components/track-map.tsx"
+        },
+        {
+          "path": "components/track-map.web.tsx"
+        }
+      ]
+    },
+    {
+      "id": "geocode",
+      "type": "backend",
+      "label": "逆地理编码",
+      "sublabel": "lib/reverse-geocode",
+      "tag": "WGS84 → GCJ-02",
+      "pos": [
+        660,
+        232
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "lib/reverse-geocode.ts"
+        }
+      ]
+    },
+    {
+      "id": "media-store",
+      "type": "database",
+      "label": "媒体存储",
+      "sublabel": "lib/media-storage · expo-file-system",
+      "tag": "photo · video · audio",
+      "pos": [
+        960,
+        232
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "lib/media-storage.ts"
+        }
+      ]
+    },
+    {
+      "id": "journey-svc",
+      "type": "backend",
+      "label": "旅程仓库",
+      "sublabel": "lib/journey-repository",
+      "pos": [
+        60,
+        374
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "lib/journey-repository.ts"
+        }
+      ]
+    },
+    {
+      "id": "bg-track",
+      "type": "backend",
+      "label": "后台定位任务",
+      "sublabel": "lib/background-location",
+      "tag": "高德原生后台定位",
+      "pos": [
+        360,
+        374
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "lib/background-location.ts"
+        }
+      ]
+    },
+    {
+      "id": "amap-native",
+      "type": "backend",
+      "label": "高德原生模块",
+      "sublabel": "expo-gaode-map",
+      "tag": "config plugins · 隐私合规",
+      "pos": [
+        660,
+        374
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "lib/amap-privacy.ts"
+        },
+        {
+          "path": "plugins/with-android-map-marker-icons.js"
+        }
+      ]
+    },
+    {
+      "id": "amap-api",
+      "type": "external",
+      "label": "高德 Web API",
+      "sublabel": "restapi.amap.com",
+      "tag": "regeo · staticmap",
+      "pos": [
+        960,
+        374
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "journey-store",
+      "type": "database",
+      "label": "AsyncStorage",
+      "sublabel": "lib/journey-storage",
+      "tag": "JOURNEY_STORAGE_KEY",
+      "pos": [
+        60,
+        516
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "sources": [
+        {
+          "path": "lib/journey-storage.ts"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "应用与服务层(Expo Router + Expo SDK 55)",
+      "wraps": [
+        "screens",
+        "hooks",
+        "trackmap",
+        "geocode",
+        "media-store"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "后台任务 · 原生模块 · 本地存储",
+      "wraps": [
+        "journey-svc",
+        "bg-track",
+        "amap-native",
+        "journey-store"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "screens-hooks",
+      "from": "screens",
+      "to": "hooks",
+      "label": "旅程状态 / 追踪控制",
+      "variant": "emphasis",
+      "labelDy": 24
+    },
+    {
+      "id": "screens-trackmap",
+      "from": "screens",
+      "to": "trackmap",
+      "label": "轨迹展示"
+    },
+    {
+      "id": "screens-geocode",
+      "from": "screens",
+      "to": "geocode",
+      "label": "地名解析"
+    },
+    {
+      "id": "screens-media",
+      "from": "screens",
+      "to": "media-store",
+      "label": "persistTimelineMedia"
+    },
+    {
+      "id": "hooks-journey-svc",
+      "from": "hooks",
+      "to": "journey-svc",
+      "label": "旅程 / 条目读写",
+      "variant": "emphasis",
+      "labelDy": 24
+    },
+    {
+      "id": "hooks-bg-track",
+      "from": "hooks",
+      "to": "bg-track",
+      "label": "start / stop"
+    },
+    {
+      "id": "bg-track-journey-svc",
+      "from": "bg-track",
+      "to": "journey-svc",
+      "label": "追加轨迹点",
+      "labelAt": [
+        300,
+        480
+      ]
+    },
+    {
+      "id": "journey-svc-store",
+      "from": "journey-svc",
+      "to": "journey-store",
+      "label": "loadJourneys / saveJourneys",
+      "variant": "emphasis",
+      "labelDy": 24
+    },
+    {
+      "id": "trackmap-amap-native",
+      "from": "trackmap",
+      "to": "amap-native",
+      "label": "MapView / Polyline"
+    },
+    {
+      "id": "bg-track-amap-native",
+      "from": "bg-track",
+      "to": "amap-native",
+      "label": "定位监听",
+      "labelAt": [
+        580,
+        480
+      ]
+    },
+    {
+      "id": "geocode-amap-native",
+      "from": "geocode",
+      "to": "amap-native",
+      "label": "原生 reGeocode",
+      "labelDy": 24
+    },
+    {
+      "id": "geocode-amap-api",
+      "from": "geocode",
+      "to": "amap-api",
+      "label": "HTTP 回退"
+    }
+  ]
+}
