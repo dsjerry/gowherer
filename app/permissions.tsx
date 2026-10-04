@@ -4,7 +4,6 @@ import * as ImagePicker from "expo-image-picker";
 import { Stack } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useI18n } from "@/hooks/locale-preference";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -26,7 +25,6 @@ type PermissionStatus = {
 };
 
 export default function PermissionsScreen() {
-  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const { t } = useI18n();
@@ -119,7 +117,7 @@ export default function PermissionsScreen() {
   };
 
   return (
-    <View style={[styles.page, theme.page, { paddingTop: insets.top + 12 }]}>
+    <View style={[styles.page, theme.page, { paddingTop: 12 }]}>
       <Stack.Screen options={{ title: t("settings.permissionsTitle") }} />
       <View style={[styles.card, theme.card]}>
         <Text style={[styles.sectionTitle, theme.title]}>
