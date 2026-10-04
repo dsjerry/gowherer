@@ -1,8 +1,21 @@
 import { Journey, JourneyKind, TimelineEntry, TimelineLocation } from '@/types/journey';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
+import { logLocalError } from '@/lib/local-log';
+import { deleteMediaFiles, diffManagedMediaUris } from '@/lib/media-storage';
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** 数据备份导入是直写 AsyncStorage,不走这里;那部分遗留孤儿由设置页清理兜底。 */
+function cleanupRemovedMedia(before: Journey[], after: Journey[]) {
+  const removed = diffManagedMediaUris(before, after);
+  if (removed.length === 0) {
+    return;
+  }
+  void deleteMediaFiles(removed).catch((error) => {
+    void logLocalError('media-cleanup', error, { count: removed.length });
+  });
 }
 
 let writeQueue = Promise.resolve<Journey[] | void>(undefined);
@@ -60,8 +73,8 @@ export async function insertJourneyEntry(journeyId: string, entry: TimelineEntry
 }
 
 export async function replaceJourneyEntry(journeyId: string, entry: TimelineEntry) {
-  return enqueueJourneyMutation((journeys) =>
-    journeys.map((item) =>
+  return enqueueJourneyMutation((journeys) => {
+    const next = journeys.map((item) =>
       item.id === journeyId
         ? {
             ...item,
@@ -70,21 +83,25 @@ export async function replaceJourneyEntry(journeyId: string, entry: TimelineEntr
             ),
           }
         : item
-    )
-  );
+    );
+    cleanupRemovedMedia(journeys, next);
+    return next;
+  });
 }
 
 export async function deleteJourneyEntry(journeyId: string, entryId: string) {
-  return enqueueJourneyMutation((journeys) =>
-    journeys.map((item) =>
+  return enqueueJourneyMutation((journeys) => {
+    const next = journeys.map((item) =>
       item.id === journeyId
         ? {
             ...item,
             entries: item.entries.filter((entry) => entry.id !== entryId),
           }
         : item
-    )
-  );
+    );
+    cleanupRemovedMedia(journeys, next);
+    return next;
+  });
 }
 
 export async function appendJourneyTrackLocations(
@@ -108,11 +125,16 @@ export async function appendJourneyTrackLocations(
 }
 
 export async function overwriteJourneys(journeys: Journey[]) {
-  return enqueueJourneyMutation(() => journeys);
+  return enqueueJourneyMutation((current) => {
+    cleanupRemovedMedia(current, journeys);
+    return journeys;
+  });
 }
 
 export async function deleteJourney(journeyId: string) {
-  return enqueueJourneyMutation((journeys) =>
-    journeys.filter((journey) => journey.id !== journeyId)
-  );
+  return enqueueJourneyMutation((journeys) => {
+    const next = journeys.filter((journey) => journey.id !== journeyId);
+    cleanupRemovedMedia(journeys, next);
+    return next;
+  });
 }

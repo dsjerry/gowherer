@@ -4,7 +4,7 @@ import * as DocumentPicker from "expo-document-picker"
 import * as FileSystem from "expo-file-system/legacy"
 import { useRouter } from "expo-router"
 import * as Sharing from "expo-sharing"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import {
   Alert,
   Platform,
@@ -31,6 +31,12 @@ import {
 import { LocalePreference } from "@/lib/i18n"
 import { loadJourneys, saveJourneys } from "@/lib/journey-storage"
 import { cleanupOldMediaCache, migrateMediaFiles } from "@/lib/media-migration"
+import {
+  deleteOrphanMediaFiles,
+  formatMediaBytes,
+  scanMediaStorage,
+} from "@/lib/media-storage"
+import { Journey } from "@/types/journey"
 
 export default function SettingsScreen() {
   const router = useRouter()
@@ -43,6 +49,8 @@ export default function SettingsScreen() {
   const [exportingData, setExportingData] = useState(false)
   const [importingData, setImportingData] = useState(false)
   const [migratingMedia, setMigratingMedia] = useState(false)
+  const [cleaningMedia, setCleaningMedia] = useState(false)
+  const cleanupJourneysRef = useRef<Journey[] | null>(null)
 
   const theme = useMemo(
     () => ({
@@ -201,6 +209,70 @@ export default function SettingsScreen() {
     }
   }
 
+  async function handleCleanupMedia() {
+    setCleaningMedia(true)
+    try {
+      const journeys = await loadJourneys()
+      const report = await scanMediaStorage(journeys)
+      if (report.orphanCount === 0) {
+        Alert.alert(
+          t("settings.mediaCleanupNoneTitle"),
+          t("settings.mediaCleanupNoneBody", {
+            count: report.fileCount,
+            size: formatMediaBytes(report.totalBytes),
+          }),
+        )
+        return
+      }
+      cleanupJourneysRef.current = journeys
+      Alert.alert(
+        t("settings.mediaCleanupConfirmTitle"),
+        t("settings.mediaCleanupConfirmBody", {
+          count: report.orphanCount,
+          size: formatMediaBytes(report.orphanBytes),
+        }),
+        [
+          { text: t("common.cancel"), style: "cancel" },
+          {
+            text: t("common.confirm"),
+            style: "destructive",
+            onPress: () => void confirmCleanupMedia(),
+          },
+        ],
+      )
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      Alert.alert(
+        t("settings.mediaCleanupFailedTitle"),
+        `${t("settings.mediaCleanupFailedBody")}\n\n${errMsg}`,
+      )
+    } finally {
+      setCleaningMedia(false)
+    }
+  }
+
+  async function confirmCleanupMedia() {
+    const journeys = cleanupJourneysRef.current
+    cleanupJourneysRef.current = null
+    if (!journeys) return
+    try {
+      const result = await deleteOrphanMediaFiles(journeys)
+      Alert.alert(
+        t("settings.mediaCleanupDoneTitle"),
+        t("settings.mediaCleanupDoneBody", {
+          count: result.deletedCount,
+          size: formatMediaBytes(result.freedBytes),
+        }),
+      )
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      Alert.alert(
+        t("settings.mediaCleanupFailedTitle"),
+        `${t("settings.mediaCleanupFailedBody")}\n\n${errMsg}`,
+      )
+    }
+  }
+
   return (
     <ScrollView
       style={theme.page}
@@ -276,7 +348,7 @@ export default function SettingsScreen() {
               theme.divider,
             ]}
             onPress={() => void handleExportData()}
-            disabled={exportingData || importingData}
+            disabled={exportingData || importingData || cleaningMedia}
           >
             <View style={styles.rowTextWrap}>
               <Text style={[styles.listItemText, theme.rowText]}>
@@ -302,7 +374,7 @@ export default function SettingsScreen() {
               theme.divider,
             ]}
             onPress={handleImportData}
-            disabled={exportingData || importingData}
+            disabled={exportingData || importingData || cleaningMedia}
           >
             <View style={styles.rowTextWrap}>
               <Text style={[styles.listItemText, theme.rowText]}>
@@ -321,9 +393,14 @@ export default function SettingsScreen() {
             />
           </Pressable>
           <Pressable
-            style={[styles.listRowButton, styles.listItem]}
+            style={[
+              styles.listRowButton,
+              styles.listItem,
+              styles.listItemBorder,
+              theme.divider,
+            ]}
             onPress={() => void handleMigrateMedia()}
-            disabled={exportingData || importingData || migratingMedia}
+            disabled={exportingData || importingData || migratingMedia || cleaningMedia}
           >
             <View style={styles.rowTextWrap}>
               <Text style={[styles.listItemText, theme.rowText]}>
@@ -336,6 +413,27 @@ export default function SettingsScreen() {
               </Text>
             </View>
             <MaterialIcons name="storage" size={20} color={theme.muted.color} />
+          </Pressable>
+          <Pressable
+            style={[styles.listRowButton, styles.listItem]}
+            onPress={() => void handleCleanupMedia()}
+            disabled={exportingData || importingData || migratingMedia || cleaningMedia}
+          >
+            <View style={styles.rowTextWrap}>
+              <Text style={[styles.listItemText, theme.rowText]}>
+                {t("settings.mediaCleanupTitle")}
+              </Text>
+              <Text style={[styles.rowHint, theme.rowHint]}>
+                {cleaningMedia
+                  ? t("settings.mediaCleanupBusy")
+                  : t("settings.mediaCleanupHint")}
+              </Text>
+            </View>
+            <MaterialIcons
+              name="cleaning-services"
+              size={20}
+              color={theme.muted.color}
+            />
           </Pressable>
         </View>
       </View>

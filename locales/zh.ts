@@ -44,6 +44,18 @@ const zh = {
     mediaMigrationPartialBody: "成功迁移 {count} 个文件，但部分文件迁移失败。",
     mediaMigrationFailedTitle: "迁移失败",
     mediaMigrationFailedBody: "媒体文件迁移失败，请重试。",
+    mediaCleanupTitle: "媒体存储清理",
+    mediaCleanupHint: "扫描并删除不再被任何旅程引用的媒体文件。",
+    mediaCleanupBusy: "正在扫描媒体文件...",
+    mediaCleanupNoneTitle: "无需清理",
+    mediaCleanupNoneBody: "共 {count} 个媒体文件，占用 {size}，没有发现孤儿文件。",
+    mediaCleanupConfirmTitle: "发现孤儿媒体文件",
+    mediaCleanupConfirmBody:
+      "有 {count} 个文件（约 {size}）不再被任何旅程引用，删除后无法恢复。确定清理？",
+    mediaCleanupDoneTitle: "清理完成",
+    mediaCleanupDoneBody: "已删除 {count} 个文件，释放 {size}。",
+    mediaCleanupFailedTitle: "清理失败",
+    mediaCleanupFailedBody: "媒体文件清理失败，请重试。",
     aboutTitle: "关于",
     aboutIntro:
       "gowherer 又名 去哪儿，以时间线的形式来记录旅途的每一刻，在时间线上，你可以随意添加文案、图片、视频和定位。",

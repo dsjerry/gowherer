@@ -50,6 +50,20 @@ const en = {
     mediaMigrationFailedTitle: "Migration failed",
     mediaMigrationFailedBody:
       "Failed to migrate media files. Please try again.",
+    mediaCleanupTitle: "Clean up media storage",
+    mediaCleanupHint:
+      "Scan for and delete media files no longer referenced by any journey.",
+    mediaCleanupBusy: "Scanning media files...",
+    mediaCleanupNoneTitle: "Nothing to clean",
+    mediaCleanupNoneBody:
+      "{count} media files in use, taking {size}. No orphaned files found.",
+    mediaCleanupConfirmTitle: "Orphaned media files found",
+    mediaCleanupConfirmBody:
+      "{count} files (~{size}) are no longer referenced by any journey and cannot be recovered after deletion. Clean up now?",
+    mediaCleanupDoneTitle: "Cleanup complete",
+    mediaCleanupDoneBody: "Deleted {count} files and freed {size}.",
+    mediaCleanupFailedTitle: "Cleanup failed",
+    mediaCleanupFailedBody: "Media cleanup failed. Please try again.",
     aboutTitle: "About",
     aboutIntro:
       "GoWherer (also known as “去哪儿”) records every journey moment on a timeline, where you can add notes, photos, videos, and locations freely.",
