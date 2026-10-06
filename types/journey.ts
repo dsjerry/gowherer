@@ -2,6 +2,15 @@ export type JourneyStatus = 'active' | 'completed';
 export type MediaType = 'photo' | 'video' | 'audio';
 export type JourneyKind = 'travel' | 'commute';
 
+export type JourneyCostMode = 'metro' | 'rail' | 'bus' | 'taxi' | 'flight' | 'other';
+
+/** 记录条目上的交通费（区间/备注由条目文案与定位承担） */
+export type EntryCost = {
+  mode: JourneyCostMode;
+  /** 金额（元），保留两位小数 */
+  amount: number;
+};
+
 export type TimelineLocation = {
   latitude: number;
   longitude: number;
@@ -30,6 +39,8 @@ export type TimelineEntry = {
   location?: TimelineLocation;
   media: TimelineMedia[];
   tags: string[];
+  /** 本段交通花费 */
+  cost?: EntryCost;
 };
 
 export type Journey = {

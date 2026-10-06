@@ -5,6 +5,7 @@ import { AudioPlayer } from '@/components/audio-player';
 import { MediaVideoCover } from '@/components/media-viewers';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { formatCostAmount } from '@/lib/journey-cost';
 import { TimelineEntry, TimelineMedia } from '@/types/journey';
 
 interface Props {
@@ -46,6 +47,8 @@ export function TimelineList({ entries, onEditEntry, onDeleteEntry, onPreviewMed
   const themedText = { color: isDark ? '#e2e8f0' : '#0f172a' };
   const themedTagChip = { backgroundColor: isDark ? '#334155' : '#e0f2fe' };
   const themedTagChipText = { color: isDark ? '#e2e8f0' : '#0c4a6e' };
+  const themedCostChip = { backgroundColor: isDark ? '#134e4a' : '#ccfbf1' };
+  const themedCostChipText = { color: isDark ? '#5eead4' : '#0f766e' };
   const themedMediaBox = {
     borderColor: isDark ? '#334155' : '#e2e8f0',
     backgroundColor: isDark ? '#0f172a' : '#ffffff',
@@ -98,6 +101,16 @@ export function TimelineList({ entries, onEditEntry, onDeleteEntry, onPreviewMed
                     <Text style={[styles.tagChipText, themedTagChipText]}>#{tag}</Text>
                   </View>
                 ))}
+              </View>
+            ) : null}
+            {entry.cost ? (
+              <View style={styles.tagRow}>
+                <View style={[styles.costChip, themedCostChip]}>
+                  <Text style={[styles.costChipText, themedCostChipText]}>
+                    {t(`journey.costMode.${entry.cost.mode}`)} ¥
+                    {formatCostAmount(entry.cost.amount)}
+                  </Text>
+                </View>
               </View>
             ) : null}
             {entry.location ? (
@@ -246,6 +259,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#0c4a6e',
     fontWeight: '600',
+  },
+  costChip: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#ccfbf1',
+  },
+  costChipText: {
+    fontSize: 11,
+    color: '#0f766e',
+    fontWeight: '700',
   },
   mutedText: {
     color: '#64748b',

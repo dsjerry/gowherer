@@ -6,7 +6,14 @@ import { AudioPlayer } from '@/components/audio-player';
 import { MediaVideoCover } from '@/components/media-viewers';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Journey, JourneyKind, TimelineLocation, TimelineMedia } from '@/types/journey';
+import { JOURNEY_COST_MODES } from '@/lib/journey-cost';
+import {
+  Journey,
+  JourneyCostMode,
+  JourneyKind,
+  TimelineLocation,
+  TimelineMedia,
+} from '@/types/journey';
 import { EntryTemplate } from '@/types/template';
 
 interface Props {
@@ -53,6 +60,12 @@ interface Props {
   isRecording: boolean;
   onStartRecording: () => void;
   onStopRecording: () => void;
+
+  // Entry cost draft
+  draftCostMode: JourneyCostMode;
+  onDraftCostModeChange: (mode: JourneyCostMode) => void;
+  draftCostAmount: string;
+  onDraftCostAmountChange: (amount: string) => void;
 }
 
 function mediaPreviewUri(media: TimelineMedia) {
@@ -91,6 +104,10 @@ export function ActiveJourneyCard({
   isRecording,
   onStartRecording,
   onStopRecording,
+  draftCostMode,
+  onDraftCostModeChange,
+  draftCostAmount,
+  onDraftCostAmountChange,
 }: Props) {
   const { t } = useI18n();
   const colorScheme = useColorScheme();
@@ -141,6 +158,11 @@ export function ActiveJourneyCard({
     backgroundColor: isDark ? '#0f172a' : '#f8fafc',
   };
   const themedTemplateChipText = { color: isDark ? '#cbd5e1' : '#334155' };
+  const themedCostChipSelected = {
+    borderColor: '#0f766e',
+    backgroundColor: isDark ? '#134e4a' : '#ccfbf1',
+  };
+  const themedCostChipTextSelected = { color: isDark ? '#5eead4' : '#0f766e' };
   const themedMediaBox = {
     borderColor: isDark ? '#334155' : '#e2e8f0',
     backgroundColor: isDark ? '#0f172a' : '#ffffff',
@@ -240,6 +262,49 @@ export function ActiveJourneyCard({
         placeholderTextColor={themedPlaceholder}
         style={[styles.input, themedInput]}
       />
+
+      {/* Transport cost (optional, saved with this entry) */}
+      <View style={styles.costRow}>
+        <Text style={[styles.costLabel, themedMuted]}>{t('journey.cost.title')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.costModes}>
+          {JOURNEY_COST_MODES.map((item) => {
+            const selected = item === draftCostMode;
+            return (
+              <Pressable
+                key={item}
+                style={[styles.costChip, selected ? themedCostChipSelected : themedTemplateChip]}
+                onPress={() => onDraftCostModeChange(item)}
+              >
+                <Text
+                  style={[
+                    styles.costChipText,
+                    selected ? themedCostChipTextSelected : themedTemplateChipText,
+                  ]}
+                >
+                  {t(`journey.costMode.${item}`)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <TextInput
+          value={draftCostAmount}
+          onChangeText={onDraftCostAmountChange}
+          placeholder={t('journey.cost.amountPlaceholder')}
+          placeholderTextColor={themedPlaceholder}
+          style={[styles.costAmountInput, themedInput]}
+          keyboardType="decimal-pad"
+        />
+        {draftCostAmount ? (
+          <Pressable
+            onPress={() => onDraftCostAmountChange('')}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.remove')}
+          >
+            <MaterialIcons name="close" size={16} color={isDark ? '#94a3b8' : '#64748b'} />
+          </Pressable>
+        ) : null}
+      </View>
 
       {/* Location display */}
       <View style={styles.actionRow}>
@@ -494,6 +559,35 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 84,
     textAlignVertical: 'top',
+  },
+  costRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  costLabel: {
+    fontSize: 12,
+    flexShrink: 0,
+  },
+  costModes: {
+    flex: 1,
+    minWidth: 0,
+  },
+  costChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 6,
+  },
+  costChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  costAmountInput: {
+    width: 84,
+    paddingVertical: 6,
+    fontSize: 13,
   },
   actionRow: {
     flexDirection: 'row',

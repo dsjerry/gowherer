@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { JOURNEY_STORAGE_KEY } from '@/lib/storage-keys';
-import { Journey } from '@/types/journey';
+import { EntryCost, Journey, JourneyCostMode } from '@/types/journey';
 import { normalizeTrackLocation } from '@/lib/track-utils';
 
 /** Journeys created on or after this date may have GCJ-02 track points
@@ -39,6 +39,23 @@ function normalizeTags(tags: unknown): string[] {
         .filter(Boolean),
     ),
   );
+}
+
+const COST_MODES = new Set(['metro', 'rail', 'bus', 'taxi', 'flight', 'other']);
+
+function normalizeEntryCost(raw: unknown): EntryCost | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+  const { mode, amount } = raw as { mode?: unknown; amount?: unknown };
+  const normalizedAmount = Math.round(Number(amount) * 100) / 100;
+  if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+    return undefined;
+  }
+  return {
+    mode: typeof mode === 'string' && COST_MODES.has(mode) ? (mode as JourneyCostMode) : 'other',
+    amount: normalizedAmount,
+  };
 }
 
 function normalizeMediaItem(media: unknown) {
@@ -97,6 +114,7 @@ export function normalizeJourneyList(raw: unknown): Journey[] {
             media: Array.isArray(entry.media)
               ? entry.media.map((media: any) => normalizeMediaItem(media)).filter(Boolean)
               : [],
+            cost: normalizeEntryCost((entry as any)?.cost),
           }))
         : [],
       trackLocations: Array.isArray(item.trackLocations)

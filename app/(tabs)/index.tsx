@@ -40,6 +40,8 @@ import {
   saveEntryTemplateConfig,
 } from '@/lib/template-storage-i18n';
 import {
+  EntryCost,
+  JourneyCostMode,
   JourneyKind,
   MediaType,
   TimelineEntry,
@@ -131,6 +133,9 @@ export default function JourneyScreen() {
   const [entryTagsInput, setEntryTagsInput] = useState('');
   const [draftLocation, setDraftLocation] = useState<TimelineLocation>();
   const [draftMedia, setDraftMedia] = useState<TimelineMedia[]>([]);
+  // 交通费草稿：出行方式跨条目保留便于连续录入，金额随保存/重置清空
+  const [draftCostMode, setDraftCostMode] = useState<JourneyCostMode>('metro');
+  const [draftCostAmount, setDraftCostAmount] = useState('');
 
   // ---- New-journey form ---------------------------------------------------
   const [journeyTitle, setJourneyTitle] = useState('');
@@ -235,6 +240,7 @@ export default function JourneyScreen() {
     setEntryTagsInput('');
     setDraftLocation(undefined);
     setDraftMedia([]);
+    setDraftCostAmount('');
     if (recorderState.isRecording) {
       void audioRecorder.stop();
     }
@@ -246,6 +252,12 @@ export default function JourneyScreen() {
     setEntryTagsInput(entry.tags.join(', '));
     setDraftLocation(entry.location);
     setDraftMedia(entry.media);
+    if (entry.cost) {
+      setDraftCostMode(entry.cost.mode);
+      setDraftCostAmount(String(entry.cost.amount));
+    } else {
+      setDraftCostAmount('');
+    }
   }
 
   async function handleDeleteEntry(entryId: string) {
@@ -256,11 +268,30 @@ export default function JourneyScreen() {
     }
   }
 
+  /** 返回 undefined 表示未填写，null 表示填写无效（已弹窗提示） */
+  function buildDraftCost(): EntryCost | null | undefined {
+    const amountText = draftCostAmount.trim();
+    if (!amountText) {
+      return undefined;
+    }
+    const amount = Math.round(Number(amountText) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Alert.alert(
+        t('journey.cost.alertInvalidAmountTitle'),
+        t('journey.cost.alertInvalidAmountBody'),
+      );
+      return null;
+    }
+    return { mode: draftCostMode, amount };
+  }
+
   async function handleSaveEntry() {
     if (!activeJourney) return;
     const text = entryText.trim();
     const tags = parseTagsInput(entryTagsInput);
-    if (!text && draftMedia.length === 0 && !draftLocation && tags.length === 0) {
+    const cost = buildDraftCost();
+    if (cost === null) return;
+    if (!text && draftMedia.length === 0 && !draftLocation && tags.length === 0 && !cost) {
       Alert.alert(t('journey.recordEmptyTitle'), t('journey.recordEmptyBody'));
       return;
     }
@@ -281,6 +312,7 @@ export default function JourneyScreen() {
             original?.location?.capturedAt ?? createdAt,
           ),
           media: persistedMedia,
+          cost,
         };
         await updateEntry(activeJourney.id, entry);
       } else {
@@ -292,6 +324,7 @@ export default function JourneyScreen() {
           tags,
           location: buildManualTimelineLocation(draftLocation, createdAt),
           media: persistedMedia,
+          cost,
         };
         await addEntry(activeJourney.id, entry);
       }
@@ -534,6 +567,10 @@ export default function JourneyScreen() {
               isRecording={recorderState.isRecording}
               onStartRecording={startRecording}
               onStopRecording={stopRecording}
+              draftCostMode={draftCostMode}
+              onDraftCostModeChange={setDraftCostMode}
+              draftCostAmount={draftCostAmount}
+              onDraftCostAmountChange={setDraftCostAmount}
             />
 
             {/* Timeline */}
