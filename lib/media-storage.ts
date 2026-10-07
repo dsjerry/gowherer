@@ -46,7 +46,7 @@ async function ensureMediaDirectory() {
   return directory;
 }
 
-function isManagedMediaUri(uri: string) {
+export function isManagedMediaUri(uri: string) {
   try {
     return uri.startsWith(getMediaDirectoryUri());
   } catch {

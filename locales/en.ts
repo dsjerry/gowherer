@@ -58,6 +58,14 @@ const en = {
     mediaCleanupDoneBody: 'Deleted {count} files and freed {size}.',
     mediaCleanupFailedTitle: 'Cleanup failed',
     mediaCleanupFailedBody: 'Media cleanup failed. Please try again.',
+    mediaExportTitle: 'Export media backup',
+    mediaExportHint: 'Copy media files to the external dir for adb pull.',
+    mediaExportBusy: 'Exporting media files...',
+    mediaExportSuccessTitle: 'Media backup done',
+    mediaExportSuccessBody:
+      'Exported {count} files ({size}) to:\n{path}\n\nRun adb pull on your computer to retrieve them.',
+    mediaExportFailedTitle: 'Media backup failed',
+    mediaExportFailedBody: 'An error occurred while exporting media. Please try again.',
     aboutTitle: 'About',
     aboutIntro:
       'GoWherer (also known as “去哪儿”) records every journey moment on a timeline, where you can add notes, photos, videos, and locations freely.',
@@ -108,6 +116,11 @@ const en = {
     minutes: '{minutes} min',
     hours: '{hours} hr',
     hoursMinutes: '{hours} hr {minutes} min',
+  },
+  dataLoadError: {
+    title: 'Failed to load data',
+    body: 'Could not read journey data. Tap retry. If it keeps failing, export the debug log from Settings.',
+    retry: 'Retry',
   },
   journey: {
     kind: {

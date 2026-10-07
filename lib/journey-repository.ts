@@ -1,7 +1,15 @@
-import { Journey, JourneyKind, TimelineEntry, TimelineLocation } from '@/types/journey';
+import { Platform } from 'react-native';
+
+import {
+  appendTrackLocationsToDb,
+  ensureLegacyRecovered,
+  getJourneyDb,
+  loadJourneysFromDb,
+} from '@/lib/journey-db';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { logLocalError } from '@/lib/local-log';
 import { deleteMediaFiles, diffManagedMediaUris } from '@/lib/media-storage';
+import { Journey, JourneyKind, TimelineEntry, TimelineLocation } from '@/types/journey';
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -111,16 +119,30 @@ export async function appendJourneyTrackLocations(
     return loadJourneys();
   }
 
-  return enqueueJourneyMutation((journeys) =>
-    journeys.map((item) =>
-      item.id === journeyId
-        ? {
-            ...item,
-            trackLocations: [...item.trackLocations, ...locations],
-          }
-        : item,
-    ),
+  if (Platform.OS === 'web') {
+    return enqueueJourneyMutation((journeys) =>
+      journeys.map((item) =>
+        item.id === journeyId
+          ? { ...item, trackLocations: [...item.trackLocations, ...locations] }
+          : item,
+      ),
+    );
+  }
+
+  // 移动端走增量写入:轨迹逐点存独立表,不再全量重写旅程数据。
+  // 仍进入写队列,避免并发 append 计算 seq 时互相覆盖。
+  await ensureLegacyRecovered();
+  const run = async () => {
+    const db = await getJourneyDb();
+    await appendTrackLocationsToDb(db, journeyId, locations);
+    return loadJourneysFromDb(db);
+  };
+  const nextRun = writeQueue.then(run, run);
+  writeQueue = nextRun.then(
+    () => undefined,
+    () => undefined,
   );
+  return nextRun;
 }
 
 export async function overwriteJourneys(journeys: Journey[]) {

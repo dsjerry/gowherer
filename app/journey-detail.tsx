@@ -1,12 +1,15 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { Image } from 'expo-image';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { File, Paths } from 'expo-file-system';
+import { Image } from 'expo-image';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -20,12 +23,10 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import { captureRef } from 'react-native-view-shot';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 
 import { BottomSheetModal } from '@/components/bottom-sheet-modal';
+import { DataLoadError } from '@/components/data-load-error';
 import { JourneyReportView } from '@/components/journey-report-view';
 import { MapPlaceholder } from '@/components/map-placeholder';
 import { TrackMap } from '@/components/track-map';
@@ -45,6 +46,7 @@ import {
   kindLabel,
 } from '@/lib/journey-stats';
 import { loadJourneys } from '@/lib/journey-storage';
+import { logLocalError } from '@/lib/local-log';
 import {
   DEFAULT_REPORT_TEMPLATE,
   REPORT_TEMPLATES,
@@ -106,6 +108,8 @@ export default function JourneyDetailScreen() {
 
   const [journey, setJourney] = useState<Journey | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [segmentRange, setSegmentRange] = useState<{
     start: number | null;
     end: number | null;
@@ -178,17 +182,31 @@ export default function JourneyDetailScreen() {
     useCallback(() => {
       let active = true;
       (async () => {
-        const stored = await loadJourneys();
-        if (!active) {
-          return;
+        try {
+          const stored = await loadJourneys();
+          if (!active) {
+            return;
+          }
+          setJourney(stored.find((item) => item.id === id) ?? null);
+          setLoadError(false);
+        } catch (error) {
+          if (!active) {
+            return;
+          }
+          void logLocalError('journey-detail-load', error);
+          setLoadError(true);
+        } finally {
+          if (active) {
+            setHasLoaded(true);
+          }
         }
-        setJourney(stored.find((item) => item.id === id) ?? null);
-        setHasLoaded(true);
       })();
       return () => {
         active = false;
       };
-    }, [id]),
+      // reloadKey 仅用于触发 useFocusEffect 重新执行以实现重试。
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, reloadKey]),
   );
 
   // AMap 并发实例有配额：本页地图压在列表的地图之上。进页等 400ms（让列表
@@ -266,6 +284,19 @@ export default function JourneyDetailScreen() {
     return (
       <View style={[styles.center, { backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}>
         <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={[styles.center, { backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}>
+        <DataLoadError
+          onRetry={() => {
+            setHasLoaded(false);
+            setReloadKey((key) => key + 1);
+          }}
+        />
       </View>
     );
   }

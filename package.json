@@ -1,7 +1,7 @@
 {
   "name": "gowherer",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "2.0.10",
   "author": "dsjerry",
   "repository": "https://github.com/dsjerry/gowherer.git",
   "scripts": {
@@ -48,6 +48,7 @@
     "expo-router": "~55.0.16",
     "expo-sharing": "~55.0.21",
     "expo-splash-screen": "~55.0.22",
+    "expo-sqlite": "~55.0.20",
     "expo-status-bar": "~55.0.6",
     "expo-symbols": "~55.0.9",
     "expo-system-ui": "~55.0.19",

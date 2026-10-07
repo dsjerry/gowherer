@@ -22,6 +22,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActiveJourneyCard } from '@/components/active-journey-card';
+import { DataLoadError } from '@/components/data-load-error';
 import { JourneyCreateCard } from '@/components/journey-create-card';
 import { MediaPreviewModal } from '@/components/media-preview-modal';
 import { TemplateModal } from '@/components/template-modal';
@@ -111,6 +112,8 @@ export default function JourneyScreen() {
   // ---- Journey data -------------------------------------------------------
   const {
     loading,
+    loadError,
+    retryLoad,
     activeJourney,
     completedJourneysCount,
     addJourney,
@@ -498,6 +501,14 @@ export default function JourneyScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={[styles.pageWrap, { paddingTop: insets.top }]}>
+        <DataLoadError onRetry={() => void retryLoad()} />
       </View>
     );
   }

@@ -3,10 +3,11 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 import { ThemePreference } from '@/hooks/theme-preference';
 import { Locale, LocalePreference } from '@/lib/i18n';
-import { normalizeJourneyList } from '@/lib/journey-storage';
+import { normalizeJourneyList } from '@/lib/journey-normalize';
+import { overwriteJourneys } from '@/lib/journey-repository';
+import { loadJourneys } from '@/lib/journey-storage';
 import {
   getEntryTemplateStorageKey,
-  JOURNEY_STORAGE_KEY,
   LOCALE_PREFERENCE_KEY,
   THEME_PREFERENCE_KEY,
 } from '@/lib/storage-keys';
@@ -59,8 +60,7 @@ async function loadPreference<T extends string>(
 }
 
 export async function buildAppBackup(appVersion: string): Promise<AppBackupV1> {
-  const journeysRaw = await AsyncStorage.getItem(JOURNEY_STORAGE_KEY);
-  const journeys = journeysRaw ? normalizeJourneyList(JSON.parse(journeysRaw)) : [];
+  const journeys = await loadJourneys();
 
   const [localePreference, themePreference, zhTemplatesRaw, enTemplatesRaw] = await Promise.all([
     loadPreference(LOCALE_PREFERENCE_KEY, 'system', isLocalePreference),
@@ -165,8 +165,9 @@ export function parseBackupString(raw: string): AppBackupV1 {
 }
 
 export async function importBackup(backup: AppBackupV1): Promise<ImportResult> {
+  // 旅程走新存储全量替换;模板与偏好仍存 AsyncStorage(小值,无超限风险)。
+  await overwriteJourneys(backup.journeys);
   await Promise.all([
-    AsyncStorage.setItem(JOURNEY_STORAGE_KEY, JSON.stringify(backup.journeys)),
     AsyncStorage.setItem(
       getEntryTemplateStorageKey('zh'),
       JSON.stringify(backup.entryTemplates.zh),

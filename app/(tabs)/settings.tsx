@@ -22,6 +22,7 @@ import {
 } from '@/lib/data-backup';
 import { LocalePreference } from '@/lib/i18n';
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
+import { exportMediaBackup } from '@/lib/media-export';
 import { cleanupOldMediaCache, migrateMediaFiles } from '@/lib/media-migration';
 import { deleteOrphanMediaFiles, formatMediaBytes, scanMediaStorage } from '@/lib/media-storage';
 import { Journey } from '@/types/journey';
@@ -38,6 +39,7 @@ export default function SettingsScreen() {
   const [importingData, setImportingData] = useState(false);
   const [migratingMedia, setMigratingMedia] = useState(false);
   const [cleaningMedia, setCleaningMedia] = useState(false);
+  const [exportingMediaBackup, setExportingMediaBackup] = useState(false);
   const cleanupJourneysRef = useRef<Journey[] | null>(null);
 
   const theme = useMemo(
@@ -220,6 +222,29 @@ export default function SettingsScreen() {
     }
   }
 
+  async function handleExportMediaBackup() {
+    setExportingMediaBackup(true);
+    try {
+      const result = await exportMediaBackup();
+      Alert.alert(
+        t('settings.mediaExportSuccessTitle'),
+        t('settings.mediaExportSuccessBody', {
+          count: result.exportedCount,
+          size: formatMediaBytes(result.totalBytes),
+          path: result.destinationUri.replace('file://', ''),
+        }),
+      );
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      Alert.alert(
+        t('settings.mediaExportFailedTitle'),
+        `${t('settings.mediaExportFailedBody')}\n\n${errMsg}`,
+      );
+    } finally {
+      setExportingMediaBackup(false);
+    }
+  }
+
   async function confirmCleanupMedia() {
     const journeys = cleanupJourneysRef.current;
     cleanupJourneysRef.current = null;
@@ -339,7 +364,7 @@ export default function SettingsScreen() {
             <MaterialIcons name="storage" size={20} color={theme.muted.color} />
           </Pressable>
           <Pressable
-            style={[styles.listRowButton, styles.listItem]}
+            style={[styles.listRowButton, styles.listItem, styles.listItemBorder, theme.divider]}
             onPress={() => void handleCleanupMedia()}
             disabled={exportingData || importingData || migratingMedia || cleaningMedia}
           >
@@ -352,6 +377,29 @@ export default function SettingsScreen() {
               </Text>
             </View>
             <MaterialIcons name="cleaning-services" size={20} color={theme.muted.color} />
+          </Pressable>
+          <Pressable
+            style={[styles.listRowButton, styles.listItem]}
+            onPress={() => void handleExportMediaBackup()}
+            disabled={
+              exportingData ||
+              importingData ||
+              migratingMedia ||
+              cleaningMedia ||
+              exportingMediaBackup
+            }
+          >
+            <View style={styles.rowTextWrap}>
+              <Text style={[styles.listItemText, theme.rowText]}>
+                {t('settings.mediaExportTitle')}
+              </Text>
+              <Text style={[styles.rowHint, theme.rowHint]}>
+                {exportingMediaBackup
+                  ? t('settings.mediaExportBusy')
+                  : t('settings.mediaExportHint')}
+              </Text>
+            </View>
+            <MaterialIcons name="save-alt" size={20} color={theme.muted.color} />
           </Pressable>
         </View>
       </View>

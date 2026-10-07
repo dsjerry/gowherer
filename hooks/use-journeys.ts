@@ -9,21 +9,32 @@ import {
   replaceJourneyEntry,
 } from '@/lib/journey-repository';
 import { loadJourneys } from '@/lib/journey-storage';
-import { initLocalLogFile } from '@/lib/local-log';
+import { initLocalLogFile, logLocalError } from '@/lib/local-log';
 import { Journey, JourneyKind, TimelineEntry } from '@/types/journey';
 
 export function useJourneys() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(true);
 
   useEffect(() => {
     let active = true;
     (async () => {
       await initLocalLogFile();
-      const stored = await loadJourneys();
-      if (!active) return;
-      setJourneys(stored);
-      setLoading(false);
+      try {
+        const stored = await loadJourneys();
+        if (!active) return;
+        setJourneys(stored);
+        setLoadError(false);
+      } catch (error) {
+        if (!active) return;
+        void logLocalError('journeys-load', error);
+        setLoadError(true);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     })();
     return () => {
       active = false;
@@ -63,6 +74,21 @@ export function useJourneys() {
   async function refreshJourneys() {
     const stored = await loadJourneys();
     setJourneys(stored);
+    setLoadError(false);
+  }
+
+  async function retryLoad() {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const stored = await loadJourneys();
+      setJourneys(stored);
+    } catch (error) {
+      void logLocalError('journeys-load-retry', error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const activeJourney = useMemo(
@@ -79,6 +105,8 @@ export function useJourneys() {
     journeys,
     setJourneys,
     loading,
+    loadError,
+    retryLoad,
     updateJourneys,
     addJourney,
     completeJourney,

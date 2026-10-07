@@ -55,6 +55,14 @@ const zh = {
     mediaCleanupDoneBody: '已删除 {count} 个文件，释放 {size}。',
     mediaCleanupFailedTitle: '清理失败',
     mediaCleanupFailedBody: '媒体文件清理失败，请重试。',
+    mediaExportTitle: '媒体备份导出',
+    mediaExportHint: '把媒体文件复制到外部目录，供电脑 adb 拉取备份。',
+    mediaExportBusy: '正在导出媒体文件...',
+    mediaExportSuccessTitle: '媒体备份完成',
+    mediaExportSuccessBody:
+      '已导出 {count} 个文件（{size}）到：\n{path}\n\n在电脑上执行 adb pull 即可取回。',
+    mediaExportFailedTitle: '媒体备份失败',
+    mediaExportFailedBody: '导出媒体文件时出错，请重试。',
     aboutTitle: '关于',
     aboutIntro:
       'gowherer 又名 去哪儿，以时间线的形式来记录旅途的每一刻，在时间线上，你可以随意添加文案、图片、视频和定位。',
@@ -105,6 +113,11 @@ const zh = {
     minutes: '{minutes} 分钟',
     hours: '{hours} 小时',
     hoursMinutes: '{hours} 小时 {minutes} 分钟',
+  },
+  dataLoadError: {
+    title: '数据加载失败',
+    body: '旅程数据读取失败，请点击重试。若多次失败，请在设置页导出调试日志反馈。',
+    retry: '重试',
   },
   journey: {
     kind: {

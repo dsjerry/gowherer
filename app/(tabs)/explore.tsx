@@ -16,14 +16,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MapPlaceholder } from '@/components/map-placeholder';
 import { BottomSheetModal } from '@/components/bottom-sheet-modal';
+import { DataLoadError } from '@/components/data-load-error';
+import { MapPlaceholder } from '@/components/map-placeholder';
 import { TrackMap } from '@/components/track-map';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { deleteJourney as deleteJourneyById } from '@/lib/journey-repository';
 import { formatCostAmount, sumJourneyCosts } from '@/lib/journey-cost';
 import { exportJourneyPdf } from '@/lib/journey-pdf';
+import { deleteJourney as deleteJourneyById } from '@/lib/journey-repository';
 import {
   computeJourneyStats,
   formatDateTime,
@@ -33,6 +34,7 @@ import {
   kindLabel,
 } from '@/lib/journey-stats';
 import { loadJourneys } from '@/lib/journey-storage';
+import { logLocalError } from '@/lib/local-log';
 import { REVIEW_FILTERS_KEY } from '@/lib/storage-keys';
 import { Journey, JourneyKind, TimelineLocation } from '@/types/journey';
 
@@ -176,6 +178,7 @@ export default function JourneyHistoryScreen() {
   };
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<JourneyFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,8 +193,14 @@ export default function JourneyHistoryScreen() {
   const [tagFilterSheetVisible, setTagFilterSheetVisible] = useState(false);
 
   const reloadJourneys = useCallback(async () => {
-    const stored = await loadJourneys();
-    setJourneys(stored);
+    try {
+      const stored = await loadJourneys();
+      setJourneys(stored);
+      setLoadError(false);
+    } catch (error) {
+      void logLocalError('review-load', error);
+      setLoadError(true);
+    }
   }, []);
 
   // AMap 并发实例有配额（累积超额会让新旧地图一起黑屏）。配额只在「根栈压入
@@ -227,12 +236,24 @@ export default function JourneyHistoryScreen() {
     useCallback(() => {
       let active = true;
       (async () => {
-        const stored = await loadJourneys();
-        if (!active) {
-          return;
+        try {
+          const stored = await loadJourneys();
+          if (!active) {
+            return;
+          }
+          setJourneys(stored);
+          setLoadError(false);
+        } catch (error) {
+          if (!active) {
+            return;
+          }
+          void logLocalError('review-load', error);
+          setLoadError(true);
+        } finally {
+          if (active) {
+            setHasLoadedOnce(true);
+          }
         }
-        setJourneys(stored);
-        setHasLoadedOnce(true);
       })();
 
       return () => {
@@ -504,6 +525,13 @@ export default function JourneyHistoryScreen() {
   }
 
   if (!hasLoadedOnce) {
+    if (loadError) {
+      return (
+        <View style={[styles.center, { backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}>
+          <DataLoadError onRetry={reloadJourneys} />
+        </View>
+      );
+    }
     return (
       <View style={[styles.center, { backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}>
         <ActivityIndicator />

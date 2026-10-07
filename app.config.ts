@@ -23,7 +23,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
 
     android: {
       package: 'com.dsjerry.gowherer',
-      versionCode: 1003,
+      versionCode: 1004,
       predictiveBackGestureEnabled: false,
       adaptiveIcon: {
         backgroundColor: '#E6F4FE',
@@ -44,6 +44,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
       'expo-image',
       'expo-localization',
       'expo-sharing',
+      'expo-sqlite',
       'expo-video',
       'expo-web-browser',
       'expo-router',
