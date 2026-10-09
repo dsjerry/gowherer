@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AiInsightsSheet } from '@/components/ai-insights-sheet';
 import { BottomSheetModal } from '@/components/bottom-sheet-modal';
 import { DataLoadError } from '@/components/data-load-error';
 import { MapPlaceholder } from '@/components/map-placeholder';
@@ -187,6 +188,7 @@ export default function JourneyHistoryScreen() {
   const [costSheetVisible, setCostSheetVisible] = useState(false);
   const [actionsSheetJourneyId, setActionsSheetJourneyId] = useState<string | null>(null);
   const [actionsSheetVisible, setActionsSheetVisible] = useState(false);
+  const [aiInsightsSheetVisible, setAiInsightsSheetVisible] = useState(false);
   const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
   const [reviewHydrated, setReviewHydrated] = useState(false);
   const [kindFilterSheetVisible, setKindFilterSheetVisible] = useState(false);
@@ -563,6 +565,13 @@ export default function JourneyHistoryScreen() {
     >
       <View style={styles.pageHeader}>
         <Text style={[styles.title, themed.title]}>{t('review.title')}</Text>
+        <Pressable
+          onPress={() => setAiInsightsSheetVisible(true)}
+          hitSlop={8}
+          style={styles.headerAiButton}
+        >
+          <MaterialIcons name="auto-awesome" size={22} color={isDark ? '#e2e8f0' : '#0f172a'} />
+        </Pressable>
       </View>
       <Text style={[styles.subTitle, themed.subTitle]}>{t('review.subtitle')}</Text>
       <TextInput
@@ -928,6 +937,11 @@ export default function JourneyHistoryScreen() {
           ))}
         </ScrollView>
       </BottomSheetModal>
+
+      <AiInsightsSheet
+        visible={aiInsightsSheetVisible}
+        onClose={() => setAiInsightsSheetVisible(false)}
+      />
     </ScrollView>
   );
 }
@@ -948,6 +962,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
+  },
+  headerAiButton: {
+    paddingHorizontal: 4,
   },
   subTitle: {
     color: '#475569',

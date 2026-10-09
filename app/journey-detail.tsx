@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { captureRef } from 'react-native-view-shot';
 
+import { AiReviewSheet } from '@/components/ai-review-sheet';
 import { BottomSheetModal } from '@/components/bottom-sheet-modal';
 import { DataLoadError } from '@/components/data-load-error';
 import { JourneyReportView } from '@/components/journey-report-view';
@@ -117,6 +118,7 @@ export default function JourneyDetailScreen() {
   const [segmentPicker, setSegmentPicker] = useState<'start' | 'end' | null>(null);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
   const [costSheetVisible, setCostSheetVisible] = useState(false);
+  const [aiSheetVisible, setAiSheetVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [imageExporting, setImageExporting] = useState(false);
   const [selectedTemplate, setSelectedTemplate] =
@@ -435,7 +437,24 @@ export default function JourneyDetailScreen() {
 
   return (
     <View style={[styles.pageWrap, { backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}>
-      <Stack.Screen options={{ title: journey.title }} />
+      <Stack.Screen
+        options={{
+          title: journey.title,
+          headerRight: () => (
+            <Pressable
+              onPress={() => setAiSheetVisible(true)}
+              hitSlop={8}
+              style={styles.headerAiButton}
+            >
+              <MaterialIcons
+                name="auto-awesome"
+                size={22}
+                color={journey.aiReview ? '#0f766e' : isDark ? '#e2e8f0' : '#0f172a'}
+              />
+            </Pressable>
+          ),
+        }}
+      />
       <ScrollView
         ref={scrollViewRef}
         contentContainerStyle={styles.container}
@@ -966,6 +985,13 @@ export default function JourneyDetailScreen() {
         </Pressable>
       </BottomSheetModal>
 
+      <AiReviewSheet
+        visible={aiSheetVisible}
+        onClose={() => setAiSheetVisible(false)}
+        journey={journey}
+        onSaved={setJourney}
+      />
+
       {imageExporting && journey ? (
         <View style={styles.offscreen} pointerEvents="none">
           <View ref={reportWrapRef} collapsable={false} onLayout={() => setReportRendered(true)}>
@@ -985,6 +1011,9 @@ export default function JourneyDetailScreen() {
 const styles = StyleSheet.create({
   pageWrap: {
     flex: 1,
+  },
+  headerAiButton: {
+    paddingHorizontal: 4,
   },
   center: {
     flex: 1,

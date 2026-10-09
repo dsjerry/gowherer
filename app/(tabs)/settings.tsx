@@ -8,6 +8,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AiSettingsCard } from '@/components/ai-settings-card';
 import { ExternalLink } from '@/components/external-link';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useI18n } from '@/hooks/locale-preference';
@@ -403,6 +404,8 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
       </View>
+
+      <AiSettingsCard />
 
       <View style={[styles.card, theme.card, styles.aboutCard]}>
         <Text style={[styles.sectionTitle, theme.title]}>{t('settings.aboutTitle')}</Text>
