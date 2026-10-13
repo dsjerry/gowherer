@@ -98,8 +98,8 @@ export function AiInsightsSheet({ visible, onClose }: AiInsightsSheetProps) {
     text: { color: isDark ? '#e2e8f0' : '#0f172a' },
     hint: { color: isDark ? '#64748b' : '#94a3b8' },
     item: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#101b22' : '#f7f9f7',
+      borderColor: isDark ? '#293b42' : '#e3e9e5',
     },
     button: { backgroundColor: isDark ? '#134e4a' : '#ccfbf1' },
     buttonText: { color: isDark ? '#5eead4' : '#0f766e' },
@@ -180,11 +180,11 @@ const styles = StyleSheet.create({
     maxHeight: 380,
   },
   item: {
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 12,
+    padding: 14,
     paddingBottom: 20,
-    gap: 6,
+    gap: 7,
     marginBottom: 10,
   },
   itemMeta: {

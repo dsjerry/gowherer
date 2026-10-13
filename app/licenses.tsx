@@ -102,25 +102,25 @@ export default function LicensesScreen() {
 
   const theme = useMemo(
     () => ({
-      page: { backgroundColor: isDark ? '#0f172a' : '#f8fafc' },
+      page: { backgroundColor: isDark ? '#0b1220' : '#f3f5f3' },
       card: {
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
+        backgroundColor: isDark ? '#17232b' : '#ffffff',
+        borderColor: isDark ? '#293b42' : '#e3e9e5',
       },
       title: { color: isDark ? '#e2e8f0' : '#0f172a' },
       muted: { color: isDark ? '#94a3b8' : '#475569' },
       text: { color: isDark ? '#e2e8f0' : '#0f172a' },
       input: {
-        backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
+        backgroundColor: isDark ? '#101b22' : '#f7f9f7',
+        borderColor: isDark ? '#293b42' : '#e1e8e3',
       },
       chip: {
-        backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
+        backgroundColor: isDark ? '#17232b' : '#ffffff',
+        borderColor: isDark ? '#293b42' : '#e1e8e3',
       },
       chipActive: {
-        backgroundColor: isDark ? '#134e4a' : '#ccfbf1',
-        borderColor: isDark ? '#5eead4' : '#0f766e',
+        backgroundColor: isDark ? '#143a34' : '#e5f2eb',
+        borderColor: isDark ? '#276153' : '#cfe5d7',
       },
       chipTextActive: {
         color: isDark ? '#5eead4' : '#0f766e',
@@ -227,17 +227,22 @@ export default function LicensesScreen() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
   },
   separator: {
-    height: 8,
+    height: 10,
   },
   card: {
-    borderRadius: 14,
+    borderRadius: 21,
     borderWidth: 1,
-    padding: 14,
-    gap: 10,
-    marginBottom: 12,
+    padding: 17,
+    gap: 11,
+    marginBottom: 14,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 2,
   },
   sectionTitle: {
     fontSize: 17,

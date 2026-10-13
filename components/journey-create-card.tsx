@@ -1,3 +1,4 @@
+import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useI18n } from '@/hooks/locale-preference';
@@ -29,27 +30,41 @@ export function JourneyCreateCard({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
+  const accent = isDark ? '#5eead4' : '#0f766e';
   const themedCard = {
-    backgroundColor: isDark ? '#1e293b' : '#ffffff',
-    borderColor: isDark ? '#334155' : '#e2e8f0',
+    backgroundColor: isDark ? '#17232b' : '#ffffff',
+    borderColor: isDark ? '#293b42' : '#e3e9e5',
   };
-  const themedSectionTitle = { color: isDark ? '#e2e8f0' : '#0f172a' };
+  const themedSectionTitle = { color: isDark ? '#e2e8f0' : '#10231f' };
+  const themedHint = { color: isDark ? '#94a3b8' : '#75827d' };
+  const themedSegment = {
+    backgroundColor: isDark ? '#0f1920' : '#f1f4f2',
+  };
   const themedKindButton = {
-    backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
-    borderColor: isDark ? '#334155' : '#cbd5e1',
+    backgroundColor: isDark ? '#1b2a31' : '#ffffff',
+    borderColor: isDark ? '#32444a' : '#e0e7e2',
   };
-  const themedKindButtonText = { color: isDark ? '#cbd5e1' : '#0f172a' };
+  const themedKindButtonText = { color: isDark ? '#cbd5e1' : '#34453f' };
   const themedInput = {
-    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-    borderColor: isDark ? '#334155' : '#cbd5e1',
-    color: isDark ? '#e2e8f0' : '#0f172a',
+    backgroundColor: isDark ? '#101b22' : '#f7f9f7',
+    borderColor: isDark ? '#2b3d43' : '#e1e8e3',
   };
-  const themedPlaceholder = isDark ? '#94a3b8' : '#64748b';
+  const themedInputText = { color: isDark ? '#e2e8f0' : '#10231f' };
+  const themedPlaceholder = isDark ? '#84959b' : '#87938e';
 
   return (
     <View style={[styles.card, themedCard]}>
-      <Text style={[styles.sectionTitle, themedSectionTitle]}>{t('journey.startNew')}</Text>
-      <View style={styles.kindRow}>
+      <View style={styles.cardIntro}>
+        <View style={[styles.introIcon, { backgroundColor: isDark ? '#173c3a' : '#e4f2ec' }]}>
+          <MaterialIcons name="explore" size={22} color={accent} />
+        </View>
+        <View style={styles.introCopy}>
+          <Text style={[styles.sectionTitle, themedSectionTitle]}>{t('journey.startNew')}</Text>
+          <Text style={[styles.sectionHint, themedHint]}>{t('journey.createJourneyHint')}</Text>
+        </View>
+      </View>
+
+      <View style={[styles.kindSegment, themedSegment]}>
         <Pressable
           style={[
             styles.kindButton,
@@ -57,7 +72,13 @@ export function JourneyCreateCard({
             journeyKind === 'travel' && styles.kindButtonActive,
           ]}
           onPress={() => onChangeKind('travel')}
+          accessibilityRole="button"
         >
+          <MaterialIcons
+            name="luggage"
+            size={17}
+            color={journeyKind === 'travel' ? '#ffffff' : isDark ? '#aab9bf' : '#65736d'}
+          />
           <Text
             style={[
               styles.kindButtonText,
@@ -75,7 +96,13 @@ export function JourneyCreateCard({
             journeyKind === 'commute' && styles.kindButtonActive,
           ]}
           onPress={() => onChangeKind('commute')}
+          accessibilityRole="button"
         >
+          <MaterialIcons
+            name="train"
+            size={17}
+            color={journeyKind === 'commute' ? '#ffffff' : isDark ? '#aab9bf' : '#65736d'}
+          />
           <Text
             style={[
               styles.kindButtonText,
@@ -87,24 +114,33 @@ export function JourneyCreateCard({
           </Text>
         </Pressable>
       </View>
-      <TextInput
-        value={journeyTitle}
-        onChangeText={onChangeTitle}
-        placeholder={t('journey.journeyTitlePlaceholder')}
-        placeholderTextColor={themedPlaceholder}
-        style={[styles.input, themedInput]}
-      />
-      <TextInput
-        value={journeyTagsInput}
-        onChangeText={onChangeTagsInput}
-        placeholder={t('journey.journeyTagsPlaceholder')}
-        placeholderTextColor={themedPlaceholder}
-        style={[styles.input, themedInput]}
-      />
+
+      <View style={[styles.inputShell, themedInput]}>
+        <MaterialIcons name="edit-location-alt" size={18} color={isDark ? '#8da19f' : '#7b8d84'} />
+        <TextInput
+          value={journeyTitle}
+          onChangeText={onChangeTitle}
+          placeholder={t('journey.journeyTitlePlaceholder')}
+          placeholderTextColor={themedPlaceholder}
+          style={[styles.input, themedInputText]}
+          returnKeyType="done"
+        />
+      </View>
+      <View style={[styles.inputShell, themedInput]}>
+        <MaterialIcons name="sell" size={18} color={isDark ? '#8da19f' : '#7b8d84'} />
+        <TextInput
+          value={journeyTagsInput}
+          onChangeText={onChangeTagsInput}
+          placeholder={t('journey.journeyTagsPlaceholder')}
+          placeholderTextColor={themedPlaceholder}
+          style={[styles.input, themedInputText]}
+        />
+      </View>
       <Pressable style={styles.primaryButton} onPress={onCreateJourney} disabled={creating}>
         <Text style={styles.primaryButtonText}>
           {creating ? t('journey.creatingJourney') : t('journey.createJourney')}
         </Text>
+        {!creating ? <MaterialIcons name="arrow-forward" size={18} color="#ffffff" /> : null}
       </Pressable>
     </View>
   );
@@ -113,58 +149,111 @@ export function JourneyCreateCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 22,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 10,
+    borderColor: '#e3e9e5',
+    gap: 13,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.025,
+    shadowRadius: 7,
+    elevation: 1,
+  },
+  cardIntro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  introIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introCopy: {
+    flex: 1,
+    gap: 3,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: '#10231f',
   },
-  kindRow: {
+  sectionHint: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  kindSegment: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 6,
+    borderRadius: 14,
+    padding: 4,
   },
   kindButton: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    flex: 1,
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderRadius: 11,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: 'transparent',
   },
   kindButtonActive: {
     backgroundColor: '#0f766e',
     borderColor: '#0f766e',
+    shadowColor: '#0f766e',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 2,
   },
   kindButtonText: {
-    color: '#0f172a',
-    fontWeight: '600',
+    color: '#34453f',
+    fontSize: 13,
+    fontWeight: '700',
   },
   kindButtonTextActive: {
     color: '#ffffff',
   },
-  input: {
+  inputShell: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderColor: '#e1e8e3',
+    borderRadius: 13,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    backgroundColor: '#f8fafc',
+  },
+  input: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 11,
+    fontSize: 14,
   },
   primaryButton: {
-    backgroundColor: '#0f766e',
-    borderRadius: 12,
-    paddingVertical: 11,
+    minHeight: 50,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0f766e',
+    borderRadius: 14,
+    paddingVertical: 13,
+    shadowColor: '#0f766e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.17,
+    shadowRadius: 8,
+    elevation: 2,
   },
   primaryButtonText: {
     color: '#ffffff',
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

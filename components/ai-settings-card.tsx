@@ -41,20 +41,20 @@ export function AiSettingsCard() {
 
   const theme = {
     card: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#17232b' : '#ffffff',
+      borderColor: isDark ? '#293b42' : '#e3e9e5',
     },
     title: { color: isDark ? '#e2e8f0' : '#0f172a' },
     muted: { color: isDark ? '#94a3b8' : '#475569' },
     rowText: { color: isDark ? '#e2e8f0' : '#0f172a' },
     hint: { color: isDark ? '#64748b' : '#94a3b8' },
     input: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#cbd5e1',
-      color: isDark ? '#e2e8f0' : '#0f172a',
+      backgroundColor: isDark ? '#101b22' : '#f7f9f7',
+      borderColor: isDark ? '#2b3d43' : '#e1e8e3',
+      color: isDark ? '#e2e8f0' : '#10231f',
     },
-    list: { borderColor: isDark ? '#334155' : '#e2e8f0' },
-    listItemBorder: { borderBottomColor: isDark ? '#334155' : '#e2e8f0' },
+    list: { borderColor: isDark ? '#293b42' : '#e3e9e5' },
+    listItemBorder: { borderBottomColor: isDark ? '#293b42' : '#e8ede9' },
     accent: { color: '#0f766e' },
     button: { backgroundColor: isDark ? '#134e4a' : '#ccfbf1' },
     buttonText: { color: isDark ? '#5eead4' : '#0f766e' },
@@ -293,10 +293,15 @@ export function AiSettingsCard() {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 14,
+    borderRadius: 21,
     borderWidth: 1,
-    padding: 14,
-    gap: 10,
+    padding: 17,
+    gap: 11,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.025,
+    shadowRadius: 7,
+    elevation: 1,
   },
   sectionTitle: {
     fontSize: 17,
@@ -316,7 +321,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   providerValue: {
@@ -333,7 +338,7 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   input: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -346,7 +351,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
   },
@@ -355,7 +360,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   providerList: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
     maxHeight: 420,
@@ -387,7 +392,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fetchButton: {
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',

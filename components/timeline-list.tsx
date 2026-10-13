@@ -1,3 +1,4 @@
+import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -45,8 +46,8 @@ export function TimelineList({ entries, onEditEntry, onDeleteEntry, onPreviewMed
   const themedLine = { backgroundColor: isDark ? '#475569' : '#cbd5e1' };
   const themedTime = { color: isDark ? '#94a3b8' : '#64748b' };
   const themedText = { color: isDark ? '#e2e8f0' : '#0f172a' };
-  const themedTagChip = { backgroundColor: isDark ? '#334155' : '#e0f2fe' };
-  const themedTagChipText = { color: isDark ? '#e2e8f0' : '#0c4a6e' };
+  const themedTagChip = { backgroundColor: isDark ? '#26383a' : '#edf3ef' };
+  const themedTagChipText = { color: isDark ? '#cbd9d2' : '#587067' };
   const themedCostChip = { backgroundColor: isDark ? '#134e4a' : '#ccfbf1' };
   const themedCostChipText = { color: isDark ? '#5eead4' : '#0f766e' };
   const themedMediaBox = {
@@ -57,7 +58,24 @@ export function TimelineList({ entries, onEditEntry, onDeleteEntry, onPreviewMed
 
   return (
     <View style={[styles.card, themedCard]}>
-      <Text style={[styles.sectionTitle, themedSectionTitle]}>{t('journey.timelineTitle')}</Text>
+      <View style={styles.timelineHeading}>
+        <View style={styles.timelineHeadingTitle}>
+          <View
+            style={[
+              styles.timelineHeadingIcon,
+              { backgroundColor: isDark ? '#173c3a' : '#e4f2ec' },
+            ]}
+          >
+            <MaterialIcons name="timeline" size={18} color={isDark ? '#5eead4' : '#0f766e'} />
+          </View>
+          <Text style={[styles.sectionTitle, themedSectionTitle]}>
+            {t('journey.timelineTitle')}
+          </Text>
+        </View>
+        <View style={[styles.timelineCount, { backgroundColor: isDark ? '#26363a' : '#f0f4f1' }]}>
+          <Text style={[styles.timelineCountText, themedMuted]}>{entries.length}</Text>
+        </View>
+      </View>
       {entries.map((entry, index) => (
         <View key={entry.id} style={styles.timelineItem}>
           <View style={[styles.timelineDot, themedDot]} />
@@ -67,11 +85,18 @@ export function TimelineList({ entries, onEditEntry, onDeleteEntry, onPreviewMed
                 {formatDateTime(entry.createdAt)}
               </Text>
               <View style={styles.inlineRow}>
-                <Pressable onPress={() => onEditEntry(entry)}>
-                  <Text style={styles.linkText}>{t('common.edit')}</Text>
-                </Pressable>
-                <Text style={[styles.mutedText, themedMuted]}> · </Text>
                 <Pressable
+                  style={styles.entryAction}
+                  onPress={() => onEditEntry(entry)}
+                  accessibilityRole="button"
+                >
+                  <MaterialIcons name="edit" size={13} color={isDark ? '#5eead4' : '#0f766e'} />
+                  <Text style={[styles.linkText, { color: isDark ? '#5eead4' : '#0f766e' }]}>
+                    {t('common.edit')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.entryAction}
                   onPress={() =>
                     Alert.alert(
                       t('journey.alertDeleteEntryTitle'),
@@ -86,8 +111,16 @@ export function TimelineList({ entries, onEditEntry, onDeleteEntry, onPreviewMed
                       ],
                     )
                   }
+                  accessibilityRole="button"
                 >
-                  <Text style={styles.deleteText}>{t('common.delete')}</Text>
+                  <MaterialIcons
+                    name="delete-outline"
+                    size={14}
+                    color={isDark ? '#f87171' : '#c65a52'}
+                  />
+                  <Text style={[styles.deleteText, { color: isDark ? '#f87171' : '#c65a52' }]}>
+                    {t('common.delete')}
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -179,16 +212,51 @@ export function TimelineList({ entries, onEditEntry, onDeleteEntry, onPreviewMed
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 22,
+    padding: 17,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 10,
+    borderColor: '#e3e9e5',
+    gap: 12,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.025,
+    shadowRadius: 7,
+    elevation: 1,
+  },
+  timelineHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  timelineHeadingTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  timelineHeadingIcon: {
+    width: 31,
+    height: 31,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timelineCount: {
+    minWidth: 26,
+    height: 26,
+    paddingHorizontal: 7,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timelineCountText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#10231f',
   },
   timelineItem: {
     position: 'relative',
@@ -226,18 +294,24 @@ const styles = StyleSheet.create({
   },
   inlineRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+    alignItems: 'center',
+    gap: 11,
+  },
+  entryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 3,
   },
   linkText: {
-    color: '#0369a1',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#0f766e',
+    fontSize: 11,
+    fontWeight: '700',
   },
   deleteText: {
-    color: '#b91c1c',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#c65a52',
+    fontSize: 11,
+    fontWeight: '700',
   },
   timelineText: {
     fontSize: 15,

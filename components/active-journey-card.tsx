@@ -133,12 +133,21 @@ export function ActiveJourneyCard({
   const themedSectionTitle = { color: isDark ? '#e2e8f0' : '#0f172a' };
   const themedMuted = { color: isDark ? '#94a3b8' : '#64748b' };
   const themedGhostButton = {
-    borderColor: isDark ? '#f59e0b' : '#f59e0b',
-    backgroundColor: isDark ? '#1f2937' : '#ffffff',
+    borderColor: isDark ? '#8b5a3c' : '#e8c3ae',
+    backgroundColor: isDark ? '#2c2521' : '#fff8f3',
   };
   const themedGhostButtonText = {
-    color: isDark ? '#fbbf24' : '#b45309',
+    color: isDark ? '#f0b48f' : '#a84f2b',
   };
+  const themedTrackingPanel = {
+    backgroundColor: isDark ? '#12242a' : '#f0f6f3',
+    borderColor: isDark ? '#284044' : '#e1ebe5',
+  };
+  const themedLocationPanel = {
+    backgroundColor: isDark ? '#101b22' : '#f7f9f7',
+    borderColor: isDark ? '#2b3d43' : '#e1e8e3',
+  };
+  const themedSectionDivider = { backgroundColor: isDark ? '#33444a' : '#e8ede9' };
   const themedInput = {
     backgroundColor: isDark ? '#0f172a' : '#f8fafc',
     borderColor: isDark ? '#334155' : '#cbd5e1',
@@ -172,30 +181,45 @@ export function ActiveJourneyCard({
 
   return (
     <View style={[styles.card, themedCard]}>
-      {/* Card header */}
       <View style={styles.cardHeader}>
         <View style={styles.headerInfo}>
+          <View style={styles.journeyMetaRow}>
+            <View style={[styles.kindBadge, { backgroundColor: isDark ? '#173c3a' : '#e4f2ec' }]}>
+              <Text style={[styles.kindBadgeText, { color: isDark ? '#5eead4' : '#0f766e' }]}>
+                {kindLabel(activeJourney.kind)}
+              </Text>
+            </View>
+            <Text style={[styles.mutedText, themedMuted]}>
+              {formatDateTime(activeJourney.createdAt)}
+            </Text>
+          </View>
           <Text style={[styles.sectionTitle, themedSectionTitle]}>{activeJourney.title}</Text>
           <Text style={[styles.mutedText, themedMuted]}>
-            {t('journey.currentJourneyMeta', {
-              kind: kindLabel(activeJourney.kind),
-              date: formatDateTime(activeJourney.createdAt),
-              count: activeJourney.entries.length,
-            })}
+            {t('journey.entryCount', { count: activeJourney.entries.length })}
           </Text>
         </View>
         <Pressable style={[styles.ghostButton, themedGhostButton]} onPress={onEndJourney}>
+          <MaterialIcons name="flag" size={15} color={themedGhostButtonText.color} />
           <Text style={[styles.ghostButtonText, themedGhostButtonText]}>
             {t('journey.endJourney')}
           </Text>
         </Pressable>
       </View>
 
-      {/* Location tracking */}
-      <View style={styles.trackingRow}>
-        <Text style={[styles.trackingLabel, themedSectionTitle]}>
-          {t('journey.locationTracking')}
-        </Text>
+      <View style={[styles.trackingPanel, themedTrackingPanel]}>
+        <View style={styles.trackingInfo}>
+          <MaterialIcons name="my-location" size={18} color={isDark ? '#5eead4' : '#0f766e'} />
+          <View style={styles.trackingCopy}>
+            <Text style={[styles.trackingLabel, themedSectionTitle]}>
+              {t('journey.locationTracking')}
+            </Text>
+            {locationTracking && activeJourney.trackLocations.length > 0 ? (
+              <Text style={[styles.trackingHint, themedMuted]}>
+                {t('journey.trackingPoints', { count: activeJourney.trackLocations.length })}
+              </Text>
+            ) : null}
+          </View>
+        </View>
         <Switch
           value={locationTracking}
           onValueChange={onLocationTrackingChange}
@@ -204,20 +228,18 @@ export function ActiveJourneyCard({
           thumbColor="#ffffff"
         />
       </View>
-      {locationTracking && activeJourney.trackLocations.length > 0 ? (
-        <Text style={[styles.mutedText, themedMuted]}>
-          {t('journey.trackingPoints', {
-            count: activeJourney.trackLocations.length,
+
+      <View style={[styles.sectionDivider, themedSectionDivider]} />
+      <View style={styles.editorHeading}>
+        <View style={[styles.editorIcon, { backgroundColor: isDark ? '#173c3a' : '#e4f2ec' }]}>
+          <MaterialIcons name="edit-note" size={18} color={isDark ? '#5eead4' : '#0f766e'} />
+        </View>
+        <Text style={[styles.sectionTitle, themedSectionTitle]}>
+          {t('journey.recordEditorTitle', {
+            mode: editingEntryId ? t('journey.modeEdit') : t('journey.modeCreate'),
           })}
         </Text>
-      ) : null}
-
-      {/* Entry editor */}
-      <Text style={[styles.sectionTitle, themedSectionTitle]}>
-        {t('journey.recordEditorTitle', {
-          mode: editingEntryId ? t('journey.modeEdit') : t('journey.modeCreate'),
-        })}
-      </Text>
+      </View>
 
       {/* Template shortcuts */}
       <View style={styles.templateWrap}>
@@ -263,9 +285,12 @@ export function ActiveJourneyCard({
         style={[styles.input, themedInput]}
       />
 
-      {/* Transport cost (optional, saved with this entry) */}
-      <View style={styles.costRow}>
-        <Text style={[styles.costLabel, themedMuted]}>{t('journey.cost.title')}</Text>
+      <View style={styles.costSection}>
+        <View style={styles.costSectionHeader}>
+          <MaterialIcons name="payments" size={16} color={isDark ? '#94a3b8' : '#718078'} />
+          <Text style={[styles.costLabel, themedMuted]}>{t('journey.cost.title')}</Text>
+          <Text style={[styles.costOptional, themedMuted]}>{t('common.optional')}</Text>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.costModes}>
           {JOURNEY_COST_MODES.map((item) => {
             const selected = item === draftCostMode;
@@ -287,33 +312,36 @@ export function ActiveJourneyCard({
             );
           })}
         </ScrollView>
-        <TextInput
-          value={draftCostAmount}
-          onChangeText={onDraftCostAmountChange}
-          placeholder={t('journey.cost.amountPlaceholder')}
-          placeholderTextColor={themedPlaceholder}
-          style={[styles.costAmountInput, themedInput]}
-          keyboardType="decimal-pad"
-        />
-        {draftCostAmount ? (
-          <Pressable
-            onPress={() => onDraftCostAmountChange('')}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.remove')}
-          >
-            <MaterialIcons name="close" size={16} color={isDark ? '#94a3b8' : '#64748b'} />
-          </Pressable>
-        ) : null}
+        <View style={[styles.costAmountRow, themedInput]}>
+          <MaterialIcons name="currency-yen" size={17} color={isDark ? '#8da19f' : '#7b8d84'} />
+          <TextInput
+            value={draftCostAmount}
+            onChangeText={onDraftCostAmountChange}
+            placeholder={t('journey.cost.amountPlaceholder')}
+            placeholderTextColor={themedPlaceholder}
+            style={[styles.costAmountInput, { color: isDark ? '#e2e8f0' : '#0f172a' }]}
+            keyboardType="decimal-pad"
+          />
+          {draftCostAmount ? (
+            <Pressable
+              onPress={() => onDraftCostAmountChange('')}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.remove')}
+            >
+              <MaterialIcons name="close" size={16} color={isDark ? '#94a3b8' : '#64748b'} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
-      {/* Location display */}
-      <View style={styles.actionRow}>
+      <View style={[styles.locationPanel, themedLocationPanel]}>
+        <MaterialIcons name="place" size={18} color={isDark ? '#5eead4' : '#0f766e'} />
         <View style={styles.locationTextContainer}>
-          <Text style={[styles.locationText, themedLocationText]}>
-            {t('journey.locationLabel')}
+          <Text style={[styles.locationLabel, themedMuted]}>{t('journey.locationLabel')}</Text>
+          <Text style={[styles.locationText, themedLocationText]} numberOfLines={2}>
             {draftLocation
               ? `${draftLocation.placeName ? `${draftLocation.placeName} · ` : ''}${draftLocation.latitude.toFixed(5)}, ${draftLocation.longitude.toFixed(5)}`
-              : '-'}
+              : t('common.notAdded')}
           </Text>
         </View>
         {draftLocation ? (
@@ -473,11 +501,16 @@ export function ActiveJourneyCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 22,
+    padding: 17,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 10,
+    borderColor: '#e3e9e5',
+    gap: 12,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.025,
+    shadowRadius: 7,
+    elevation: 1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -488,37 +521,87 @@ const styles = StyleSheet.create({
   headerInfo: {
     flex: 1,
     minWidth: 0,
+    gap: 4,
+  },
+  journeyMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  kindBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  kindBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: '#10231f',
   },
   mutedText: {
-    color: '#64748b',
-    fontSize: 12,
+    color: '#718078',
+    fontSize: 11,
   },
   ghostButton: {
-    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 11,
     borderWidth: 1,
-    borderColor: '#f59e0b',
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   ghostButtonText: {
-    color: '#b45309',
-    fontWeight: '600',
-    fontSize: 12,
+    fontWeight: '700',
+    fontSize: 11,
   },
-  trackingRow: {
+  trackingPanel: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingLeft: 12,
+    paddingRight: 6,
+    paddingVertical: 7,
+  },
+  trackingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    flex: 1,
+  },
+  trackingCopy: {
+    flex: 1,
+    gap: 2,
   },
   trackingLabel: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  trackingHint: {
+    fontSize: 10,
+  },
+  sectionDivider: {
+    height: 1,
+    marginVertical: 1,
+  },
+  editorHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editorIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   templateWrap: {
     gap: 6,
@@ -560,46 +643,75 @@ const styles = StyleSheet.create({
     minHeight: 84,
     textAlignVertical: 'top',
   },
-  costRow: {
+  costSection: {
+    gap: 8,
+  },
+  costSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
   costLabel: {
     fontSize: 12,
-    flexShrink: 0,
+    fontWeight: '700',
+  },
+  costOptional: {
+    fontSize: 10,
+    marginLeft: 'auto',
   },
   costModes: {
-    flex: 1,
-    minWidth: 0,
+    flexGrow: 0,
+    minHeight: 34,
   },
   costChip: {
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
     marginRight: 6,
   },
   costChipText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  costAmountRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e1e8e3',
+    borderRadius: 12,
+    paddingHorizontal: 10,
   },
   costAmountInput: {
-    width: 84,
-    paddingVertical: 6,
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 9,
     fontSize: 13,
   },
-  actionRow: {
+  locationPanel: {
+    minHeight: 54,
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
   },
   locationTextContainer: {
     flex: 1,
     minWidth: 0,
+    gap: 2,
+  },
+  locationLabel: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   locationText: {
     color: '#334155',
-    fontSize: 13,
+    fontSize: 12,
     flexShrink: 1,
   },
   inlineAction: {
@@ -607,7 +719,7 @@ const styles = StyleSheet.create({
     paddingTop: 1,
   },
   linkText: {
-    color: '#0369a1',
+    color: '#0f766e',
     fontSize: 12,
     fontWeight: '600',
   },

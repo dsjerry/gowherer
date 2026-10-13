@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -106,15 +106,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   panel: {
-    maxHeight: '70%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    maxHeight: '84%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 24,
+    paddingTop: 12,
+    paddingBottom: 28,
   },
   panelDark: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#17232b',
   },
   panelLight: {
     backgroundColor: '#ffffff',

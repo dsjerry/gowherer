@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, {
   runOnJS,
@@ -51,12 +52,13 @@ import { logLocalError } from '@/lib/local-log';
 import {
   DEFAULT_REPORT_TEMPLATE,
   REPORT_TEMPLATES,
+  REPORT_TEMPLATE_META,
   ReportTemplateId,
 } from '@/lib/report-templates';
 import { Journey, TimelineMedia } from '@/types/journey';
 
 const MAP_PREVIEW_HEIGHT = 220;
-/** 长图导出的逻辑宽度（pt），实际像素 = 宽度 × 屏幕像素密度 */
+/** 长图导出的逻辑宽度上限（pt），实际取窗口宽度与之的较小值，避免超出窗口被裁剪 */
 const REPORT_VIEW_WIDTH = 400;
 const MAP_RESIZE_DURATION = 260;
 
@@ -103,6 +105,8 @@ function AudioPlayer({ uri, label }: { uri: string; label: string }) {
 
 export default function JourneyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { width: windowWidth } = useWindowDimensions();
+  const reportWidth = Math.min(REPORT_VIEW_WIDTH, windowWidth);
   const { t, locale } = useI18n();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -363,8 +367,8 @@ export default function JourneyDetailScreen() {
 
   const themed = {
     card: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#17232b' : '#ffffff',
+      borderColor: isDark ? '#293b42' : '#e3e9e5',
     },
     journeyTitle: {
       color: isDark ? '#e2e8f0' : '#0f172a',
@@ -373,12 +377,12 @@ export default function JourneyDetailScreen() {
       color: isDark ? '#94a3b8' : '#64748b',
     },
     statsWrap: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#101b22' : '#f5f7f5',
+      borderColor: isDark ? '#293b42' : '#e8ede9',
     },
     statItem: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#17232b' : '#ffffff',
+      borderColor: isDark ? '#293b42' : '#edf0ed',
     },
     statLabel: {
       color: isDark ? '#94a3b8' : '#64748b',
@@ -390,10 +394,10 @@ export default function JourneyDetailScreen() {
       color: isDark ? '#cbd5e1' : '#334155',
     },
     tagChip: {
-      backgroundColor: isDark ? '#334155' : '#e0f2fe',
+      backgroundColor: isDark ? '#26383a' : '#edf3ef',
     },
     tagChipText: {
-      color: isDark ? '#e2e8f0' : '#0c4a6e',
+      color: isDark ? '#cbd9d2' : '#587067',
     },
     costChip: {
       backgroundColor: isDark ? '#134e4a' : '#ccfbf1',
@@ -436,7 +440,7 @@ export default function JourneyDetailScreen() {
   };
 
   return (
-    <View style={[styles.pageWrap, { backgroundColor: isDark ? '#0f172a' : '#f8fafc' }]}>
+    <View style={[styles.pageWrap, { backgroundColor: isDark ? '#0b1220' : '#f3f5f3' }]}>
       <Stack.Screen
         options={{
           title: journey.title,
@@ -457,6 +461,7 @@ export default function JourneyDetailScreen() {
       />
       <ScrollView
         ref={scrollViewRef}
+        style={{ backgroundColor: isDark ? '#0b1220' : '#f3f5f3' }}
         contentContainerStyle={styles.container}
         scrollEnabled={!enlarged}
         onLayout={(event) => {
@@ -942,19 +947,28 @@ export default function JourneyDetailScreen() {
       >
         {REPORT_TEMPLATES.map((id) => {
           const selected = id === selectedTemplate;
-          const nameKey = id === 'classic' ? 'review.templateClassic' : 'review.templateCompact';
-          const descKey =
-            id === 'classic' ? 'review.templateClassicDesc' : 'review.templateCompactDesc';
+          const { nameKey, descKey } = REPORT_TEMPLATE_META[id];
+          const swatch =
+            id === 'classic'
+              ? { backgroundColor: '#eef4ed', accent: '#347568' }
+              : id === 'compact'
+                ? { backgroundColor: '#edf2ff', accent: '#315fe8' }
+                : { backgroundColor: '#1c2a3b', accent: '#c9a86a' };
           return (
             <Pressable
               key={id}
               style={[
                 styles.actionSheetItem,
                 { borderBottomColor: isDark ? '#334155' : '#e2e8f0' },
+                selected && { backgroundColor: isDark ? '#1e293b' : '#f8fafc' },
               ]}
               onPress={() => setSelectedTemplate(id)}
               accessibilityRole="button"
             >
+              <View style={[styles.templateSwatch, { backgroundColor: swatch.backgroundColor }]}>
+                <View style={[styles.templateSwatchAccent, { backgroundColor: swatch.accent }]} />
+                <View style={styles.templateSwatchLines} />
+              </View>
               <View style={styles.templateRowMain}>
                 <Text
                   style={[
@@ -973,7 +987,17 @@ export default function JourneyDetailScreen() {
           );
         })}
         <Pressable
-          style={styles.templateConfirmButton}
+          style={[
+            styles.templateConfirmButton,
+            {
+              backgroundColor:
+                selectedTemplate === 'compact'
+                  ? '#315fe8'
+                  : selectedTemplate === 'premium'
+                    ? '#1c2a3b'
+                    : '#347568',
+            },
+          ]}
           onPress={handleTemplateConfirm}
           disabled={exporting || imageExporting}
           accessibilityRole="button"
@@ -999,7 +1023,7 @@ export default function JourneyDetailScreen() {
               journey={journey}
               template={selectedTemplate}
               t={t}
-              width={REPORT_VIEW_WIDTH}
+              width={reportWidth}
             />
           </View>
         </View>
@@ -1021,15 +1045,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   container: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 36,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    gap: 14,
+    paddingBottom: 40,
   },
   card: {
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 22,
+    padding: 17,
     borderWidth: 1,
-    gap: 8,
+    gap: 10,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 2,
   },
   headerInfo: {
     gap: 4,
@@ -1058,6 +1088,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b',
     borderColor: '#334155',
   },
+  templateSwatch: {
+    width: 42,
+    height: 38,
+    borderRadius: 9,
+    padding: 6,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  templateSwatchAccent: {
+    width: 8,
+    height: 25,
+    borderRadius: 4,
+  },
+  templateSwatchLines: {
+    flex: 1,
+    height: 17,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+  },
   templateRowMain: {
     flex: 1,
     minWidth: 0,
@@ -1084,7 +1134,8 @@ const styles = StyleSheet.create({
   offscreen: {
     position: 'absolute',
     top: 0,
-    left: -99999,
+    left: 0,
+    zIndex: -1,
   },
   statsWrap: {
     borderRadius: 10,

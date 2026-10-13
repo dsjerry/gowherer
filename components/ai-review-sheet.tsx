@@ -84,8 +84,8 @@ export function AiReviewSheet({ visible, onClose, journey, onSaved }: AiReviewSh
     muted: { color: isDark ? '#94a3b8' : '#64748b' },
     hint: { color: isDark ? '#64748b' : '#94a3b8' },
     contentBox: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#101b22' : '#f7f9f7',
+      borderColor: isDark ? '#293b42' : '#e3e9e5',
     },
     button: { backgroundColor: isDark ? '#134e4a' : '#ccfbf1' },
     buttonText: { color: isDark ? '#5eead4' : '#0f766e' },
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   contentBox: {
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     maxHeight: 320,
   },

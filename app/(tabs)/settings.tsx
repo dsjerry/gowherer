@@ -45,16 +45,16 @@ export default function SettingsScreen() {
 
   const theme = useMemo(
     () => ({
-      page: { backgroundColor: isDark ? '#0f172a' : '#f8fafc' },
+      page: { backgroundColor: isDark ? '#0b1220' : '#f3f5f3' },
       card: {
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
+        backgroundColor: isDark ? '#17232b' : '#ffffff',
+        borderColor: isDark ? '#293b42' : '#e3e9e5',
       },
       title: { color: isDark ? '#e2e8f0' : '#0f172a' },
       muted: { color: isDark ? '#94a3b8' : '#475569' },
       rowText: { color: isDark ? '#e2e8f0' : '#0f172a' },
       rowHint: { color: isDark ? '#94a3b8' : '#64748b' },
-      divider: { borderColor: isDark ? '#334155' : '#e2e8f0' },
+      divider: { borderColor: isDark ? '#293b42' : '#e8ede9' },
       accent: { color: '#0f766e' },
     }),
     [isDark],
@@ -273,7 +273,7 @@ export default function SettingsScreen() {
       style={theme.page}
       contentContainerStyle={[
         styles.page,
-        { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 },
+        { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 104 },
       ]}
     >
       <Text style={[styles.title, theme.title]}>{t('settings.title')}</Text>
@@ -450,18 +450,24 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   page: {
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: 18,
+    gap: 14,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 29,
+    fontWeight: '800',
+    letterSpacing: -0.6,
   },
   card: {
-    borderRadius: 14,
+    borderRadius: 21,
     borderWidth: 1,
-    padding: 14,
-    gap: 10,
+    padding: 17,
+    gap: 11,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.025,
+    shadowRadius: 7,
+    elevation: 1,
   },
   row: {
     flexDirection: 'row',
@@ -489,7 +495,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   list: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
   },
