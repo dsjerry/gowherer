@@ -9,7 +9,13 @@ import {
 import { loadJourneys, saveJourneys } from '@/lib/journey-storage';
 import { logLocalError } from '@/lib/local-log';
 import { deleteMediaFiles, diffManagedMediaUris } from '@/lib/media-storage';
-import { Journey, JourneyKind, TimelineEntry, TimelineLocation } from '@/types/journey';
+import {
+  Journey,
+  JourneyAiReview,
+  JourneyKind,
+  TimelineEntry,
+  TimelineLocation,
+} from '@/types/journey';
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -150,6 +156,12 @@ export async function overwriteJourneys(journeys: Journey[]) {
     cleanupRemovedMedia(current, journeys);
     return journeys;
   });
+}
+
+export async function saveJourneyAiReview(journeyId: string, review: JourneyAiReview) {
+  return enqueueJourneyMutation((journeys) =>
+    journeys.map((item) => (item.id === journeyId ? { ...item, aiReview: review } : item)),
+  );
 }
 
 export async function deleteJourney(journeyId: string) {

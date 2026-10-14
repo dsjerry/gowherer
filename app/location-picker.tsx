@@ -103,17 +103,17 @@ export default function LocationPickerScreen() {
     Constants.expoConfig?.extra?.geocoding?.amapWebKey ?? process.env.EXPO_PUBLIC_AMAP_WEB_KEY;
 
   const theme = {
-    page: { backgroundColor: isDark ? '#0f172a' : '#f8fafc' },
+    page: { backgroundColor: isDark ? '#0b1220' : '#f3f5f3' },
     card: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#17232b' : '#ffffff',
+      borderColor: isDark ? '#293b42' : '#e3e9e5',
     },
     title: { color: isDark ? '#e2e8f0' : '#0f172a' },
     muted: { color: isDark ? '#94a3b8' : '#475569' },
     coord: { color: isDark ? '#cbd5e1' : '#334155' },
     item: {
-      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      backgroundColor: isDark ? '#101b22' : '#f7f9f7',
+      borderColor: isDark ? '#293b42' : '#e3e9e5',
     },
     itemTitle: { color: isDark ? '#e2e8f0' : '#0f172a' },
     itemSub: { color: isDark ? '#94a3b8' : '#64748b' },
@@ -423,8 +423,8 @@ export default function LocationPickerScreen() {
           style={[
             styles.searchInput,
             {
-              backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-              borderColor: isDark ? '#334155' : '#cbd5e1',
+              backgroundColor: isDark ? '#101b22' : '#f7f9f7',
+              borderColor: isDark ? '#293b42' : '#e1e8e3',
               color: isDark ? '#e2e8f0' : '#0f172a',
             },
           ]}
@@ -479,23 +479,33 @@ export default function LocationPickerScreen() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    gap: 12,
   },
   mapSection: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 10,
-    gap: 8,
+    borderRadius: 22,
+    padding: 13,
+    gap: 9,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 1,
   },
   listSection: {
     flex: 2,
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 10,
-    gap: 8,
+    borderRadius: 22,
+    padding: 13,
+    gap: 9,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 1,
   },
   mapHeader: {
     flexDirection: 'row',
@@ -563,10 +573,10 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   placeItem: {
-    borderRadius: 10,
+    borderRadius: 13,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     gap: 4,
   },
   placeTitle: {
@@ -584,10 +594,10 @@ const styles = StyleSheet.create({
   confirmButton: {
     marginTop: 'auto',
     backgroundColor: '#0f766e',
-    borderRadius: 10,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 11,
+    paddingVertical: 13,
   },
   confirmButtonText: {
     color: '#ffffff',

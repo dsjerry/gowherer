@@ -43,6 +43,14 @@ export type TimelineEntry = {
   cost?: EntryCost;
 };
 
+/** AI 分析生成的回顾内容（回顾详情页发起，结果随旅程持久化） */
+export type JourneyAiReview = {
+  content: string;
+  /** 生成时使用的模型标识，如 'deepseek-chat' */
+  model: string;
+  createdAt: string;
+};
+
 export type Journey = {
   id: string;
   title: string;
@@ -54,4 +62,6 @@ export type Journey = {
   entries: TimelineEntry[];
   /** Continuously recorded GPS track points while tracking is enabled */
   trackLocations: TimelineLocation[];
+  /** AI 生成的回顾分析（可重新生成覆盖） */
+  aiReview?: JourneyAiReview;
 };

@@ -84,10 +84,10 @@ export default function PermissionsScreen() {
 
   const theme = useMemo(
     () => ({
-      page: { backgroundColor: isDark ? '#0f172a' : '#f8fafc' },
+      page: { backgroundColor: isDark ? '#0b1220' : '#f3f5f3' },
       card: {
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
+        backgroundColor: isDark ? '#17232b' : '#ffffff',
+        borderColor: isDark ? '#293b42' : '#e3e9e5',
       },
       title: { color: isDark ? '#e2e8f0' : '#0f172a' },
       muted: { color: isDark ? '#94a3b8' : '#475569' },
@@ -107,6 +107,28 @@ export default function PermissionsScreen() {
     return t('settings.permissionUnknown');
   };
 
+  const resolveBadgeTheme = (value: PermissionStatusKey) => {
+    if (value === STATUS_GRANTED) {
+      return {
+        backgroundColor: isDark ? '#143a34' : '#e5f2eb',
+        borderColor: isDark ? '#276153' : '#cfe5d7',
+        color: isDark ? '#78d3b0' : '#31755d',
+      };
+    }
+    if (value === STATUS_DENIED) {
+      return {
+        backgroundColor: isDark ? '#3a2528' : '#fbefec',
+        borderColor: isDark ? '#684044' : '#f0d6cf',
+        color: isDark ? '#f0a69c' : '#a84f43',
+      };
+    }
+    return {
+      backgroundColor: isDark ? '#26333a' : '#f0f3f1',
+      borderColor: isDark ? '#3b4a50' : '#dfe6e1',
+      color: isDark ? '#a6b5b5' : '#718078',
+    };
+  };
+
   return (
     <View style={[styles.page, theme.page, { paddingTop: 12 }]}>
       <Stack.Screen options={{ title: t('settings.permissionsTitle') }} />
@@ -118,8 +140,19 @@ export default function PermissionsScreen() {
             <Text style={[styles.permissionLabel, theme.text]}>
               {t('settings.permissionLocation')}
             </Text>
-            <View style={[styles.permissionBadge, styles.permissionBadgeBase, theme.divider]}>
-              <Text style={[styles.permissionBadgeText, theme.muted]}>
+            <View
+              style={[
+                styles.permissionBadge,
+                styles.permissionBadgeBase,
+                resolveBadgeTheme(status.location),
+              ]}
+            >
+              <Text
+                style={[
+                  styles.permissionBadgeText,
+                  { color: resolveBadgeTheme(status.location).color },
+                ]}
+              >
                 {resolveLabel(status.location)}
               </Text>
             </View>
@@ -128,8 +161,19 @@ export default function PermissionsScreen() {
             <Text style={[styles.permissionLabel, theme.text]}>
               {t('settings.permissionBackgroundLocation')}
             </Text>
-            <View style={[styles.permissionBadge, styles.permissionBadgeBase, theme.divider]}>
-              <Text style={[styles.permissionBadgeText, theme.muted]}>
+            <View
+              style={[
+                styles.permissionBadge,
+                styles.permissionBadgeBase,
+                resolveBadgeTheme(status.backgroundLocation),
+              ]}
+            >
+              <Text
+                style={[
+                  styles.permissionBadgeText,
+                  { color: resolveBadgeTheme(status.backgroundLocation).color },
+                ]}
+              >
                 {resolveLabel(status.backgroundLocation)}
               </Text>
             </View>
@@ -138,8 +182,19 @@ export default function PermissionsScreen() {
             <Text style={[styles.permissionLabel, theme.text]}>
               {t('settings.permissionMedia')}
             </Text>
-            <View style={[styles.permissionBadge, styles.permissionBadgeBase, theme.divider]}>
-              <Text style={[styles.permissionBadgeText, theme.muted]}>
+            <View
+              style={[
+                styles.permissionBadge,
+                styles.permissionBadgeBase,
+                resolveBadgeTheme(status.media),
+              ]}
+            >
+              <Text
+                style={[
+                  styles.permissionBadgeText,
+                  { color: resolveBadgeTheme(status.media).color },
+                ]}
+              >
                 {resolveLabel(status.media)}
               </Text>
             </View>
@@ -148,8 +203,19 @@ export default function PermissionsScreen() {
             <Text style={[styles.permissionLabel, theme.text]}>
               {t('settings.permissionCamera')}
             </Text>
-            <View style={[styles.permissionBadge, styles.permissionBadgeBase, theme.divider]}>
-              <Text style={[styles.permissionBadgeText, theme.muted]}>
+            <View
+              style={[
+                styles.permissionBadge,
+                styles.permissionBadgeBase,
+                resolveBadgeTheme(status.camera),
+              ]}
+            >
+              <Text
+                style={[
+                  styles.permissionBadgeText,
+                  { color: resolveBadgeTheme(status.camera).color },
+                ]}
+              >
                 {resolveLabel(status.camera)}
               </Text>
             </View>
@@ -167,14 +233,19 @@ export default function PermissionsScreen() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: 18,
+    gap: 14,
   },
   card: {
-    borderRadius: 14,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 14,
-    gap: 12,
+    padding: 18,
+    gap: 13,
+    shadowColor: '#1a382f',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 2,
   },
   sectionTitle: {
     fontSize: 17,
@@ -214,8 +285,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#0f766e',
-    borderRadius: 999,
-    paddingVertical: 10,
+    borderRadius: 14,
+    paddingVertical: 12,
   },
   settingsButtonText: {
     color: '#ffffff',

@@ -20,7 +20,13 @@ export const LicenseDependencyRow = memo(function LicenseDependencyRow({
 
   return (
     <Pressable
-      style={[styles.row, { borderColor: isDark ? '#334155' : '#e2e8f0' }]}
+      style={[
+        styles.row,
+        {
+          backgroundColor: isDark ? '#17232b' : '#ffffff',
+          borderColor: isDark ? '#293b42' : '#e3e9e5',
+        },
+      ]}
       onPress={() => onToggle(item.name)}
     >
       <View style={styles.header}>
@@ -59,10 +65,10 @@ export const LicenseDependencyRow = memo(function LicenseDependencyRow({
 const styles = StyleSheet.create({
   row: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 4,
+    borderRadius: 14,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    gap: 6,
   },
   header: {
     flexDirection: 'row',

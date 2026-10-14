@@ -515,17 +515,30 @@ export default function JourneyScreen() {
 
   return (
     <View style={styles.pageWrap}>
-      <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + 12 }]}>
-        {/* Page header */}
+      <ScrollView
+        style={{ backgroundColor: isDark ? '#0b1220' : '#f3f5f3' }}
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 104 },
+        ]}
+      >
         <View style={styles.pageHeader}>
           <Text style={[styles.pageTitle, pageTitleColor]}>{t('journey.screenTitle')}</Text>
         </View>
-        <Text style={[styles.pageSubTitle, pageSubTitleColor]}>
-          {t('journey.screenSummary', {
-            count: completedJourneysCount,
-            status: activeJourney ? t('journey.statusActive') : t('journey.statusInactive'),
-          })}
-        </Text>
+        <View style={[styles.statusPill, { backgroundColor: isDark ? '#102b2b' : '#e5f1ed' }]}>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: activeJourney ? '#0f766e' : isDark ? '#64748b' : '#94a3b8' },
+            ]}
+          />
+          <Text style={[styles.pageSubTitle, pageSubTitleColor]}>
+            {t('journey.screenSummary', {
+              count: completedJourneysCount,
+              status: activeJourney ? t('journey.statusActive') : t('journey.statusInactive'),
+            })}
+          </Text>
+        </View>
 
         {/* Create or Active journey card */}
         {!activeJourney ? (
@@ -623,9 +636,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 36,
+    paddingHorizontal: 18,
+    gap: 14,
+    paddingBottom: 40,
   },
   center: {
     flex: 1,
@@ -633,18 +646,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pageTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 29,
+    fontWeight: '800',
+    letterSpacing: -0.6,
     color: '#0f172a',
   },
   pageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    gap: 8,
+    paddingVertical: 2,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    marginTop: -4,
+    marginBottom: 2,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   pageSubTitle: {
     color: '#475569',
-    marginBottom: 4,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

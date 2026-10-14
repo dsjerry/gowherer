@@ -18,9 +18,9 @@ import {
   TFunction,
 } from '@/lib/journey-stats';
 import { logLocalError } from '@/lib/local-log';
-import { simplifyTrackLocations } from '@/lib/track-utils';
-import { toGcj02 } from '@/lib/reverse-geocode';
 import { DEFAULT_REPORT_TEMPLATE, type ReportTemplateId } from '@/lib/report-templates';
+import { toGcj02 } from '@/lib/reverse-geocode';
+import { simplifyTrackLocations } from '@/lib/track-utils';
 import { Journey, TimelineLocation, TimelineMedia } from '@/types/journey';
 
 function escapeHtml(text: string) {
@@ -319,24 +319,38 @@ type ReportDesign = {
   textDim: string;
   withCover: boolean;
   entryCard: boolean;
+  /** premium：深色实底封面（白字 + 封面内白色统计卡） */
+  deepCover?: boolean;
+  /** premium：柔和底色圆角卡片条目 */
+  entrySoft?: boolean;
 };
 
 const REPORT_DESIGNS: Record<ReportTemplateId, ReportDesign> = {
   classic: {
-    accent: '#0f766e',
-    accentSoftBg: '#f0fdfa',
-    textMain: '#0f172a',
-    textDim: '#64748b',
+    accent: '#347568',
+    accentSoftBg: '#eef4ed',
+    textMain: '#20332e',
+    textDim: '#75827c',
     withCover: true,
     entryCard: true,
   },
   compact: {
-    accent: '#1d4ed8',
-    accentSoftBg: '#eff6ff',
-    textMain: '#111827',
-    textDim: '#6b7280',
+    accent: '#315fe8',
+    accentSoftBg: '#edf2ff',
+    textMain: '#18243d',
+    textDim: '#78839a',
     withCover: false,
     entryCard: false,
+  },
+  premium: {
+    accent: '#9b7535',
+    accentSoftBg: '#f7f2e8',
+    textMain: '#1c2a3b',
+    textDim: '#718096',
+    withCover: true,
+    entryCard: false,
+    deepCover: true,
+    entrySoft: true,
   },
 };
 
@@ -363,14 +377,23 @@ async function journeyToHtml(
         .join('')}</div>`
     : '';
 
+  const deepTagsHtml = journey.tags.length
+    ? `<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;">${journey.tags
+        .map(
+          (tag) =>
+            `<span style="background:rgba(255,255,255,0.16);color:#ffffff;padding:3px 10px;border-radius:12px;font-size:12px;">#${escapeHtml(tag)}</span>`,
+        )
+        .join('')}</div>`
+    : '';
+
   const statBlock = (value: string, label: string) =>
-    `<div style="text-align:center;">
-      <div style="font-size:24px;font-weight:700;color:${design.accent};">${value}</div>
-      <div style="font-size:11px;color:${design.textDim};margin-top:2px;">${escapeHtml(label)}</div>
+    `<div style="flex:1 1 28%;min-width:90px;text-align:left;background:${design.deepCover ? '#f6f3ec' : '#ffffff'};border:1px solid ${design.deepCover ? '#ebe5d8' : '#e5eae4'};border-radius:12px;padding:12px 14px;box-sizing:border-box;">
+      <div style="font-size:21px;font-weight:700;color:${design.accent};letter-spacing:-0.4px;">${value}</div>
+      <div style="font-size:10px;color:${design.textDim};margin-top:4px;">${escapeHtml(label)}</div>
     </div>`;
 
   const statsHtml = `
-    <div style="display:flex;gap:20px;margin-top:20px;flex-wrap:wrap;">
+    <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;">
       ${statBlock(stats.distanceKm.toFixed(2), 'km')}
       ${statBlock(formatDuration(stats.durationMs, t), t('review.statsDuration'))}
       ${statBlock(stats.avgSpeedKmh.toFixed(1), 'km/h')}
@@ -379,10 +402,12 @@ async function journeyToHtml(
     </div>`;
 
   const headerBand = `
-    <section style="padding:36px 24px 20px;border-bottom:2px solid ${design.accent};">
-      <div style="font-size:12px;color:${design.accent};letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">${escapeHtml(kindLabel(journey.kind, t))}</div>
-      <h1 style="margin:0;font-size:28px;color:${design.textMain};font-weight:700;">${escapeHtml(journey.title)}</h1>
-      <p style="margin:8px 0 0;color:${design.textDim};font-size:13px;">
+    <section style="padding:30px 24px 24px;background:${design.accentSoftBg};border-bottom:4px solid ${design.accent};">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:${design.accent};letter-spacing:2px;font-weight:700;text-transform:uppercase;">
+        <span>${escapeHtml(kindLabel(journey.kind, t))}</span><span>${escapeHtml(t('review.templateCompactKicker'))}</span>
+      </div>
+      <h1 style="margin:18px 0 0;font-size:34px;color:${design.textMain};font-weight:800;letter-spacing:-1px;">${escapeHtml(journey.title)}</h1>
+      <p style="margin:8px 0 0;color:${design.textDim};font-size:12px;">
         ${formatDateTime(journey.createdAt)} \u2014 ${journey.endedAt ? formatDateTime(journey.endedAt) : ''}
         \u00b7 ${escapeHtml(t('review.html.totalEntries', { count: journey.entries.length }))}
       </p>
@@ -391,24 +416,47 @@ async function journeyToHtml(
     </section>`;
 
   const cover = `
-    <section style="min-height:90vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:40px 20px;background:linear-gradient(180deg,${design.accentSoftBg} 0%,#ffffff 100%);">
-      <div style="font-size:13px;color:${design.accent};letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">${escapeHtml(kindLabel(journey.kind, t))}</div>
-      <h1 style="margin:0;font-size:36px;color:${design.textMain};font-weight:700;">${escapeHtml(journey.title)}</h1>
-      <p style="margin:12px 0 0;color:${design.textDim};font-size:14px;">
+    <section style="min-height:90vh;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;text-align:left;padding:42px 30px;background:${design.accentSoftBg};border-top:10px solid ${design.accent};">
+      <div style="font-size:11px;color:${design.accent};letter-spacing:2.5px;text-transform:uppercase;font-weight:700;">${escapeHtml(kindLabel(journey.kind, t))} &nbsp; / &nbsp; ${escapeHtml(t('review.templateClassicKicker'))}</div>
+      <h1 style="margin:18px 0 0;font-size:40px;line-height:1.12;color:${design.textMain};font-weight:700;font-family:Georgia,serif;">${escapeHtml(journey.title)}</h1>
+      <p style="margin:12px 0 0;color:${design.textDim};font-size:13px;">
         ${formatDateTime(journey.createdAt)} \u2014 ${journey.endedAt ? formatDateTime(journey.endedAt) : ''}
       </p>
       ${tagsHtml}
       ${statsHtml}
-      <p style="margin:16px 0 0;color:${design.textDim};font-size:13px;">${escapeHtml(
+      <p style="margin:14px 0 0;color:${design.textDim};font-size:11px;letter-spacing:0.4px;">${escapeHtml(
         t('review.html.totalEntries', { count: journey.entries.length }),
       )}</p>
       ${
         trackImageUri
-          ? `<img src="${trackImageUri}" alt="${escapeHtml(t('review.html.trackAlt'))}" style="width:90%;max-width:780px;margin-top:24px;border:1px solid #e2e8f0;border-radius:12px;" />`
-          : `<div style="margin-top:24px;padding:14px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:${design.textDim};font-size:13px;">${escapeHtml(
+          ? `<img src="${trackImageUri}" alt="${escapeHtml(t('review.html.trackAlt'))}" style="width:100%;max-width:780px;margin-top:20px;border:1px solid rgba(52,117,104,0.14);border-radius:14px;background:#ffffff;padding:6px;box-sizing:border-box;" />`
+          : `<div style="width:100%;box-sizing:border-box;margin-top:20px;padding:16px 20px;background:rgba(255,255,255,0.72);border:1px solid rgba(52,117,104,0.14);border-radius:14px;color:${design.textDim};font-size:12px;">${escapeHtml(
               t('review.html.trackEmpty'),
             )}</div>`
       }
+    </section>
+    <div style="page-break-after:always;"></div>
+  `;
+
+  const deepCover = `
+    <section style="min-height:90vh;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:48px 32px;background:#1c2a3b;">
+      <span style="background:rgba(201,168,106,0.16);border:1px solid rgba(201,168,106,0.45);color:#e0c58f;padding:5px 13px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:2px;">${escapeHtml(kindLabel(journey.kind, t))}</span>
+      <h1 style="margin:16px 0 0;font-size:38px;color:#ffffff;font-weight:700;">${escapeHtml(journey.title)}</h1>
+      <p style="margin:10px 0 0;color:rgba(255,255,255,0.78);font-size:14px;">
+        ${formatDateTime(journey.createdAt)} \u2014 ${journey.endedAt ? formatDateTime(journey.endedAt) : ''}
+      </p>
+      ${deepTagsHtml}
+      <div style="margin-top:28px;width:100%;background:#ffffff;border-radius:16px;padding:20px;border:1px solid rgba(201,168,106,0.28);box-sizing:border-box;">
+        <div style="font-size:9px;letter-spacing:1.8px;font-weight:700;color:#8a938e;text-align:center;margin-bottom:12px;">${escapeHtml(t('review.templatePremiumStats'))}</div>
+        ${statsHtml}
+        ${
+          trackImageUri
+            ? `<img src="${trackImageUri}" alt="${escapeHtml(t('review.html.trackAlt'))}" style="width:100%;margin-top:16px;border:1px solid #e2e8f0;border-radius:12px;box-sizing:border-box;" />`
+            : `<div style="margin-top:16px;padding:14px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:${design.textDim};font-size:13px;">${escapeHtml(
+                t('review.html.trackEmpty'),
+              )}</div>`
+        }
+      </div>
     </section>
     <div style="page-break-after:always;"></div>
   `;
@@ -437,12 +485,14 @@ async function journeyToHtml(
         : '';
 
       const cardStyle = design.entryCard
-        ? `margin-bottom:20px;padding:16px 20px;background:#ffffff;border-left:3px solid ${design.accent};border-radius:0 8px 8px 0;box-shadow:0 1px 3px rgba(0,0,0,0.06);`
-        : `margin-bottom:18px;padding:12px 4px;border-bottom:1px solid #e2e8f0;`;
+        ? `margin-bottom:20px;padding:18px 20px;background:#ffffff;border:1px solid #e4ebe5;border-left:4px solid ${design.accent};border-radius:4px 14px 14px 4px;box-shadow:0 4px 14px rgba(32,51,46,0.05);`
+        : design.entrySoft
+          ? `margin-bottom:20px;padding:18px 20px;background:#ffffff;border:1px solid #e8e5de;border-radius:14px;box-shadow:0 5px 16px rgba(28,42,59,0.05);`
+          : `margin-bottom:14px;padding:15px 16px;background:#ffffff;border:1px solid #e7ebf5;border-radius:12px;`;
 
       return `<div style="${cardStyle}">
         <div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:28px;height:28px;border-radius:50%;background:${design.accent};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;">${index + 1}</div>
+          <div style="width:28px;height:28px;border-radius:50%;background:${design.entrySoft ? '#1c2a3b' : design.accent};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${index + 1}</div>
           <div style="font-size:12px;color:${design.textDim};">${formatDateTime(entry.createdAt)}</div>
           ${costHtml}
         </div>
@@ -501,7 +551,7 @@ async function journeyToHtml(
   <html>
     <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
     <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;margin:0;padding:0;background:#ffffff;color:${design.textMain};">
-      ${design.withCover ? cover : headerBand}
+      ${design.deepCover ? deepCover : design.withCover ? cover : headerBand}
       <section style="padding:30px 24px;">
         <h2 style="margin:0 0 20px;color:${design.textMain};font-size:22px;font-weight:700;border-bottom:2px solid ${design.accent};padding-bottom:8px;">${escapeHtml(t('review.html.title'))}</h2>
         ${items || `<div style="color:${design.textDim};text-align:center;padding:40px;">${escapeHtml(t('review.html.emptyText'))}</div>`}

@@ -6,6 +6,8 @@ export const THEME_PREFERENCE_KEY = 'gowherer:theme-preference:v1';
 export const REVIEW_COLLAPSED_KEY = 'gowherer:review-collapsed:v1';
 export const REVIEW_FILTERS_KEY = 'gowherer:review-filters:v1';
 export const GEOCODE_CACHE_KEY = 'gowherer:geocode-cache:v1';
+export const AI_SETTINGS_KEY = 'gowherer:ai-settings:v1';
+export const AI_INSIGHTS_KEY = 'gowherer:ai-insights:v1';
 
 const ENTRY_TEMPLATE_STORAGE_KEY = 'gowherer:entry-templates:v1';
 
