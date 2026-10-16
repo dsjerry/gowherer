@@ -33,6 +33,54 @@ GoWherer 是一个基于 Expo React Native 的旅程时间线应用（旅行/通
 - 触感反馈
 - 本地日志系统
 
+## 界面预览
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/home-light.jpg" width="230" alt="首页 · 创建旅程" /><br /><sub>首页 · 创建旅程</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/going-light.jpg" width="230" alt="进行中 · 新增记录" /><br /><sub
+        >进行中 · 新增记录</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/list-light.jpg" width="230" alt="旅程回顾列表" /><br /><sub>旅程回顾列表</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/detail-light.jpg" width="230" alt="旅程详情时间线" /><br /><sub
+        >旅程详情时间线</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/export-light.jpg" width="230" alt="导出模板选择" /><br /><sub
+        >导出模板选择</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/ai-light.jpg" width="230" alt="AI 分析" /><br /><sub>AI 分析</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/setting-light.jpg" width="230" alt="设置页" /><br /><sub>设置页</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/home-dark.jpg" width="230" alt="深色模式 · 首页" /><br /><sub
+        >深色模式 · 首页</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/list-dark.jpg" width="230" alt="深色模式 · 回顾列表" /><br /><sub
+        >深色模式 · 回顾列表</sub
+      >
+    </td>
+  </tr>
+</table>
+
 ## 技术栈
 
 - Expo SDK 55
