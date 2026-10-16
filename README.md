@@ -33,6 +33,58 @@ GoWherer is an Expo React Native app for recording and reviewing journey timelin
 - Haptic feedback
 - Local logging system
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/home-light.jpg" width="230" alt="Home · Create Journey" /><br /><sub
+        >Home · Create Journey</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/going-light.jpg" width="230" alt="In Progress · Add Entry" /><br /><sub
+        >In Progress · Add Entry</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/list-light.jpg" width="230" alt="Journey Review List" /><br /><sub
+        >Journey Review List</sub
+      >
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/detail-light.jpg" width="230" alt="Journey Detail Timeline" /><br /><sub
+        >Journey Detail Timeline</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/export-light.jpg" width="230" alt="Export Template Picker" /><br /><sub
+        >Export Template Picker</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/ai-light.jpg" width="230" alt="AI Analysis" /><br /><sub>AI Analysis</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/setting-light.jpg" width="230" alt="Settings" /><br /><sub>Settings</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/home-dark.jpg" width="230" alt="Dark Mode · Home" /><br /><sub
+        >Dark Mode · Home</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/list-dark.jpg" width="230" alt="Dark Mode · Review List" /><br /><sub
+        >Dark Mode · Review List</sub
+      >
+    </td>
+  </tr>
+</table>
+
 ## Tech Stack
 
 - Expo SDK 55
