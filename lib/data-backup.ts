@@ -2,6 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { ThemePreference } from '@/hooks/theme-preference';
+import {
+  loadCityWalkPlans,
+  normalizeCityWalkPlanList,
+  replaceCityWalkPlans,
+} from '@/lib/city-walk-storage';
 import { Locale, LocalePreference } from '@/lib/i18n';
 import { normalizeJourneyList } from '@/lib/journey-normalize';
 import { overwriteJourneys } from '@/lib/journey-repository';
@@ -16,6 +21,7 @@ import {
   normalizeTemplateConfig,
 } from '@/lib/template-storage-i18n';
 import { Journey } from '@/types/journey';
+import { CityWalkPlan } from '@/types/city-walk';
 import { EntryTemplateConfig } from '@/types/template';
 
 export type AppBackupV1 = {
@@ -31,6 +37,8 @@ export type AppBackupV1 = {
   };
   journeys: Journey[];
   entryTemplates: Record<Locale, EntryTemplateConfig>;
+  /** 旧版备份没有该字段，导入时按空列表处理 */
+  cityWalkPlans?: CityWalkPlan[];
 };
 
 type ImportResult = {
@@ -60,7 +68,7 @@ async function loadPreference<T extends string>(
 }
 
 export async function buildAppBackup(appVersion: string): Promise<AppBackupV1> {
-  const journeys = await loadJourneys();
+  const [journeys, cityWalkPlans] = await Promise.all([loadJourneys(), loadCityWalkPlans()]);
 
   const [localePreference, themePreference, zhTemplatesRaw, enTemplatesRaw] = await Promise.all([
     loadPreference(LOCALE_PREFERENCE_KEY, 'system', isLocalePreference),
@@ -84,6 +92,7 @@ export async function buildAppBackup(appVersion: string): Promise<AppBackupV1> {
       theme: themePreference,
     },
     journeys,
+    cityWalkPlans,
     entryTemplates: {
       zh: zhTemplatesRaw
         ? normalizeTemplateConfig(JSON.parse(zhTemplatesRaw), zhFallback)
@@ -157,6 +166,7 @@ export function parseBackupString(raw: string): AppBackupV1 {
       theme: themePreference,
     },
     journeys: normalizeJourneyList(parsed.journeys),
+    cityWalkPlans: normalizeCityWalkPlanList(parsed.cityWalkPlans),
     entryTemplates: {
       zh: normalizeTemplateConfig(parsed.entryTemplates.zh, getDefaultEntryTemplateConfig('zh')),
       en: normalizeTemplateConfig(parsed.entryTemplates.en, getDefaultEntryTemplateConfig('en')),
@@ -167,6 +177,7 @@ export function parseBackupString(raw: string): AppBackupV1 {
 export async function importBackup(backup: AppBackupV1): Promise<ImportResult> {
   // 旅程走新存储全量替换;模板与偏好仍存 AsyncStorage(小值,无超限风险)。
   await overwriteJourneys(backup.journeys);
+  await replaceCityWalkPlans(backup.cityWalkPlans ?? []);
   await Promise.all([
     AsyncStorage.setItem(
       getEntryTemplateStorageKey('zh'),

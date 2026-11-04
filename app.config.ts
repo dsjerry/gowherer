@@ -6,6 +6,8 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
   const amapAndroidApiKey = process.env.AMAP_ANDROID_API_KEY;
   const amapAndroidDebugKey = process.env.AMAP_ANDROID_DEBUG_KEY;
   const amapWebKey = process.env.EXPO_PUBLIC_AMAP_WEB_KEY;
+  // 可选的 City Walk 后端代理地址；不配置时客户端直接调用高德 Web 服务
+  const cityWalkApiBaseUrl = process.env.EXPO_PUBLIC_CITY_WALK_API_BASE_URL;
 
   return {
     name: 'gowherer',
@@ -110,6 +112,9 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
       },
       amap: {
         androidApiKey: amapAndroidApiKey,
+      },
+      cityWalk: {
+        apiBaseUrl: cityWalkApiBaseUrl,
       },
     },
   };
