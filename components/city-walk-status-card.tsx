@@ -1,6 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getCityWalkTheme } from '@/components/city-walk-theme';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getCityWalkErrorI18nKey } from '@/lib/city-walk-error';
@@ -32,19 +33,22 @@ export function CityWalkStatusCard({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const cardStyle = {
-    backgroundColor: isDark ? '#17232b' : '#ffffff',
-    borderColor: isDark ? '#293b42' : '#e3e9e5',
-  };
-  const titleStyle = { color: isDark ? '#e2e8f0' : '#10231f' };
-  const hintStyle = { color: isDark ? '#94a3b8' : '#75827d' };
+  const theme = getCityWalkTheme(isDark);
+  const cardStyle = { backgroundColor: theme.surface, borderColor: theme.line };
+  const titleStyle = { color: theme.text };
+  const hintStyle = { color: theme.muted };
 
   if (error) {
     return (
       <View style={[styles.card, cardStyle]}>
         <View style={styles.headerRow}>
-          <MaterialIcons name="error-outline" size={20} color={isDark ? '#fca5a5' : '#dc2626'} />
-          <Text style={[styles.title, titleStyle]}>{t('cityWalk.errorTitle')}</Text>
+          <View style={[styles.headerIcon, { backgroundColor: isDark ? '#51332c' : '#fff0e9' }]}>
+            <MaterialIcons name="error-outline" size={23} color={isDark ? '#ffb79a' : '#b95d37'} />
+          </View>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.overline, { color: theme.accent }]}>CITY WALK</Text>
+            <Text style={[styles.title, titleStyle]}>{t('cityWalk.errorTitle')}</Text>
+          </View>
         </View>
         <Text style={[styles.hint, hintStyle]}>{t(getCityWalkErrorI18nKey(error.code))}</Text>
         {error.code === 'ai-not-configured' ? (
@@ -57,7 +61,7 @@ export function CityWalkStatusCard({
         ) : null}
         <View style={styles.actions}>
           <Pressable
-            style={[styles.secondaryButton, { borderColor: isDark ? '#32444a' : '#e0e7e2' }]}
+            style={[styles.secondaryButton, { borderColor: theme.line }]}
             onPress={onBackToConfig}
             accessibilityRole="button"
           >
@@ -67,7 +71,7 @@ export function CityWalkStatusCard({
           </Pressable>
           {error.code === 'ai-not-configured' ? (
             <Pressable
-              style={[styles.secondaryButton, { borderColor: isDark ? '#32444a' : '#e0e7e2' }]}
+              style={[styles.secondaryButton, { borderColor: theme.line }]}
               onPress={onOpenSettings}
               accessibilityRole="button"
             >
@@ -97,21 +101,44 @@ export function CityWalkStatusCard({
   return (
     <View style={[styles.card, cardStyle]}>
       <View style={styles.headerRow}>
-        <ActivityIndicator size="small" />
-        <Text style={[styles.title, titleStyle]}>{t('cityWalk.generatingLabel')}</Text>
+        <View style={[styles.headerIcon, { backgroundColor: theme.accentSoft }]}>
+          <ActivityIndicator size="small" color={theme.accent} />
+        </View>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.overline, { color: theme.accent }]}>PLANNING YOUR WALK</Text>
+          <Text style={[styles.title, titleStyle]}>{t('cityWalk.generatingLabel')}</Text>
+        </View>
+      </View>
+      <View style={styles.progressTrack}>
+        {STAGE_ORDER.map((item, index) => (
+          <View
+            key={item}
+            style={[
+              styles.progressSegment,
+              { backgroundColor: index <= currentIndex ? theme.accent : theme.line },
+            ]}
+          />
+        ))}
       </View>
       {STAGE_ORDER.map((item, index) => {
         const done = index < currentIndex;
         const active = index === currentIndex;
         return (
           <View key={item} style={styles.stageRow}>
-            <MaterialIcons
-              name={done ? 'check-circle' : active ? 'radio-button-checked' : 'radio-button-off'}
-              size={16}
-              color={
-                done || active ? (isDark ? '#5eead4' : '#0f766e') : isDark ? '#475569' : '#cbd5e1'
-              }
-            />
+            <View
+              style={[
+                styles.stageBadge,
+                { backgroundColor: done || active ? theme.accentSoft : theme.subtle },
+              ]}
+            >
+              {done ? (
+                <MaterialIcons name="check" size={15} color={theme.accent} />
+              ) : (
+                <Text
+                  style={[styles.stageNumber, { color: active ? theme.accent : theme.muted }]}
+                >{`0${index + 1}`}</Text>
+              )}
+            </View>
             <Text
               style={[
                 styles.stageText,
@@ -129,7 +156,7 @@ export function CityWalkStatusCard({
       })}
       <Text style={[styles.hint, hintStyle]}>{t('cityWalk.generatingHint')}</Text>
       <Pressable
-        style={[styles.secondaryButton, { borderColor: isDark ? '#32444a' : '#e0e7e2' }]}
+        style={[styles.secondaryButton, { borderColor: theme.line }]}
         onPress={onCancel}
         accessibilityRole="button"
       >
@@ -141,18 +168,34 @@ export function CityWalkStatusCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 24,
+    borderRadius: 22,
     padding: 20,
     borderWidth: 1,
-    gap: 13,
+    gap: 16,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 13,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCopy: {
+    flex: 1,
+    gap: 5,
+  },
+  overline: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.1,
   },
   title: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '800',
   },
   hint: {
@@ -167,7 +210,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    minHeight: 26,
+    minHeight: 36,
+  },
+  progressTrack: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  progressSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  stageBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stageNumber: {
+    fontSize: 10,
+    fontWeight: '800',
   },
   stageText: {
     fontSize: 13,
@@ -198,7 +261,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#0f766e',
+    backgroundColor: '#176b58',
     borderRadius: 15,
   },
   primaryButtonText: {

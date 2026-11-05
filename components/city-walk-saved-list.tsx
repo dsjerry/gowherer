@@ -1,6 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getCityWalkTheme } from '@/components/city-walk-theme';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { formatCityWalkDistance } from '@/lib/city-walk-format';
@@ -18,72 +19,81 @@ export function CityWalkSavedList({ plans, currentPlanId, onOpen, onDelete }: Pr
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const cardStyle = {
-    backgroundColor: isDark ? '#17232b' : '#ffffff',
-    borderColor: isDark ? '#293b42' : '#e3e9e5',
-  };
-  const titleStyle = { color: isDark ? '#e2e8f0' : '#10231f' };
-  const hintStyle = { color: isDark ? '#94a3b8' : '#75827d' };
-  const itemStyle = {
-    backgroundColor: isDark ? '#101b22' : '#f7f9f7',
-    borderColor: isDark ? '#293b42' : '#e0e7e2',
-  };
+  const theme = getCityWalkTheme(isDark);
+  const titleStyle = { color: theme.text };
+  const hintStyle = { color: theme.muted };
 
   return (
-    <View style={[styles.card, cardStyle]}>
+    <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderTitle}>
-          <View style={[styles.sectionIcon, { backgroundColor: isDark ? '#173c3a' : '#e4f2ec' }]}>
-            <MaterialIcons name="bookmark" size={16} color={isDark ? '#5eead4' : '#0f766e'} />
-          </View>
+          <Text style={[styles.overline, { color: theme.accent }]}>YOUR COLLECTION</Text>
           <Text style={[styles.sectionTitle, titleStyle]}>{t('cityWalk.savedTitle')}</Text>
+          <Text style={[styles.sectionHint, hintStyle]}>{t('cityWalk.savedHint')}</Text>
         </View>
         {plans.length > 0 ? (
-          <View style={[styles.countBadge, { backgroundColor: isDark ? '#26383a' : '#edf3ef' }]}>
-            <Text style={[styles.countBadgeText, { color: isDark ? '#cbd9d2' : '#587067' }]}>
-              {plans.length}
-            </Text>
+          <View style={[styles.countBadge, { backgroundColor: theme.accentSoft }]}>
+            <Text style={[styles.countBadgeText, { color: theme.accent }]}>{plans.length}</Text>
           </View>
         ) : null}
       </View>
       {plans.length === 0 ? (
-        <View style={styles.emptyState}>
-          <MaterialIcons name="map" size={20} color={isDark ? '#73868a' : '#8a9a92'} />
+        <View
+          style={[styles.emptyState, { backgroundColor: theme.surface, borderColor: theme.line }]}
+        >
+          <View style={[styles.itemIcon, { backgroundColor: theme.subtle }]}>
+            <MaterialIcons name="bookmark-border" size={22} color={theme.muted} />
+          </View>
           <Text style={[styles.empty, hintStyle]}>{t('cityWalk.savedEmpty')}</Text>
         </View>
       ) : (
         plans.map((plan) => {
           const isCurrent = plan.id === currentPlanId;
           return (
-            <View key={plan.id} style={[styles.item, itemStyle, isCurrent && styles.itemCurrent]}>
+            <View
+              key={plan.id}
+              style={[
+                styles.item,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: isCurrent ? theme.accent : theme.line,
+                },
+              ]}
+            >
               <Pressable
                 style={styles.itemMain}
                 onPress={() => onOpen(plan)}
                 accessibilityRole="button"
               >
-                <Text style={[styles.itemTitle, titleStyle]} numberOfLines={1}>
-                  {plan.title || t('cityWalk.defaultPlanTitle', { count: plan.stops.length })}
-                </Text>
-                <Text style={[styles.itemMeta, hintStyle]} numberOfLines={1}>
-                  {[
-                    t('cityWalk.savedMeta', {
-                      count: plan.stops.length,
-                      distance: formatCityWalkDistance(plan.totalDistanceMeters),
-                      minutes: plan.estimatedTotalMinutes,
-                    }),
-                    plan.linkedJourneyId ? t('cityWalk.linkedJourney') : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
+                <View style={[styles.itemIcon, { backgroundColor: theme.accentSoft }]}>
+                  <MaterialIcons name="route" size={22} color={theme.accent} />
+                </View>
+                <View style={styles.itemCopy}>
+                  <Text style={[styles.itemTitle, titleStyle]} numberOfLines={2}>
+                    {plan.title || t('cityWalk.defaultPlanTitle', { count: plan.stops.length })}
+                  </Text>
+                  <Text style={[styles.itemMeta, hintStyle]} numberOfLines={2}>
+                    {[
+                      t('cityWalk.savedMeta', {
+                        count: plan.stops.length,
+                        distance: formatCityWalkDistance(plan.totalDistanceMeters),
+                        minutes: plan.estimatedTotalMinutes,
+                      }),
+                      plan.linkedJourneyId ? t('cityWalk.linkedJourney') : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                </View>
               </Pressable>
               <Pressable
                 onPress={() => onDelete(plan.id)}
                 hitSlop={8}
+                style={styles.deleteButton}
                 accessibilityRole="button"
                 accessibilityLabel={t('cityWalk.delete')}
               >
-                <MaterialIcons name="delete-outline" size={18} color="#94a3b8" />
+                <MaterialIcons name="delete-outline" size={19} color={theme.muted} />
               </Pressable>
             </View>
           );
@@ -94,11 +104,9 @@ export function CityWalkSavedList({ plans, currentPlanId, onOpen, onDelete }: Pr
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    gap: 12,
+  section: {
+    gap: 10,
+    paddingTop: 4,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -106,20 +114,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionHeaderTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 9,
   },
-  sectionIcon: {
-    width: 31,
-    height: 31,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+  overline: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.3,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  sectionHint: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   countBadge: {
     minWidth: 27,
@@ -137,10 +146,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    paddingHorizontal: 12,
-    paddingVertical: 13,
-    borderRadius: 14,
-    backgroundColor: 'rgba(128,150,138,0.08)',
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
   },
   empty: {
     flex: 1,
@@ -152,23 +160,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  itemCurrent: {
-    borderColor: '#0f766e',
-    borderWidth: 1.5,
+    borderRadius: 18,
+    padding: 12,
   },
   itemMain: {
     flex: 1,
-    gap: 3,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  itemIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemCopy: {
+    flex: 1,
+    gap: 4,
   },
   itemTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   itemMeta: {
     fontSize: 11,
+    lineHeight: 16,
+  },
+  deleteButton: {
+    width: 36,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

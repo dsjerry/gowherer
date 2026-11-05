@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -18,6 +18,7 @@ import { CityWalkConfigCard } from '@/components/city-walk-config-card';
 import { CityWalkPlanView } from '@/components/city-walk-plan-view';
 import { CityWalkSavedList } from '@/components/city-walk-saved-list';
 import { CityWalkStatusCard } from '@/components/city-walk-status-card';
+import { getCityWalkTheme } from '@/components/city-walk-theme';
 import { useCityWalk } from '@/hooks/use-city-walk';
 import { useI18n } from '@/hooks/locale-preference';
 import { usePlaceSearch } from '@/hooks/use-place-search';
@@ -70,19 +71,7 @@ export default function CityWalkScreen() {
     deleteSavedPlan,
   } = cityWalk;
 
-  const theme = useMemo(
-    () => ({
-      page: { backgroundColor: isDark ? '#0b1220' : '#f3f5f3' },
-      title: { color: isDark ? '#e2e8f0' : '#0f172a' },
-      subtitle: { color: isDark ? '#94a3b8' : '#475569' },
-      backButton: {
-        backgroundColor: isDark ? '#173c3a' : '#e4f2ec',
-        borderColor: isDark ? '#24534a' : '#d4e8dd',
-      },
-      backIcon: { color: isDark ? '#8ce2c0' : '#0f766e' },
-    }),
-    [isDark],
-  );
+  const theme = useMemo(() => getCityWalkTheme(isDark), [isDark]);
 
   // 从地图选点页返回时接收起点（一次性）
   useFocusEffect(
@@ -200,11 +189,11 @@ export default function CityWalkScreen() {
   const showStatus = phase === 'generating' || phase === 'error';
 
   return (
-    <View style={[styles.page, theme.page]}>
-      <Stack.Screen options={{ headerShown: false }} />
+    <View style={[styles.page, { backgroundColor: theme.page }]}>
       <ScrollView
         ref={scrollRef}
         scrollEnabled={!mapEnlarged}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.container,
           { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 28 },
@@ -212,19 +201,19 @@ export default function CityWalkScreen() {
       >
         <View style={styles.header}>
           <Pressable
-            style={[styles.backButton, theme.backButton]}
+            style={[styles.backButton, { backgroundColor: theme.surface, borderColor: theme.line }]}
             onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel={t('cityWalk.back')}
           >
-            <MaterialIcons name="arrow-back" size={19} color={theme.backIcon.color} />
+            <MaterialIcons name="arrow-back" size={21} color={theme.text} />
           </Pressable>
           <View style={styles.headerCopy}>
-            <Text style={[styles.pageTitle, theme.title]}>{t('cityWalk.screenTitle')}</Text>
-            <Text style={[styles.pageSubtitle, theme.subtitle]}>
-              {t('cityWalk.screenSubtitle')}
+            <Text style={[styles.pageTitle, { color: theme.text }]}>
+              {t('cityWalk.screenTitle')}
             </Text>
           </View>
+          <Text style={[styles.headerMark, { color: theme.muted }]}>CITY WALK / 01</Text>
         </View>
 
         {showStatus ? (
@@ -287,34 +276,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    paddingHorizontal: 18,
-    gap: 16,
+    paddingHorizontal: 20,
+    gap: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
-    paddingBottom: 2,
+    gap: 12,
+    paddingBottom: 4,
   },
   backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerCopy: {
     flex: 1,
-    gap: 2,
   },
   pageTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.7,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
-  pageSubtitle: {
-    fontSize: 12,
-    lineHeight: 17,
+  headerMark: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
 });

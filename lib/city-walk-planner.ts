@@ -1,5 +1,4 @@
-import { generateText, jsonSchema, Output } from 'ai';
-import type { JSONSchema7 } from 'ai';
+import { generateText, Output } from 'ai';
 
 import { createAiModel } from '@/lib/ai-client';
 import { isAiConfigured } from '@/lib/ai-settings';
@@ -39,10 +38,10 @@ const MAX_STAY_SHARE = 0.6;
 const BUDGET_TOLERANCE = 1.05;
 
 /**
- * 会话级记忆：某些 OpenAI 兼容供应商不支持结构化输出（或直接拒绝请求），
+ * 会话级记忆：某些 OpenAI 兼容供应商不支持 JSON 模式（或直接拒绝请求），
  * 记录 `baseUrl|model` 后，后续生成直接走文本 JSON 路径，省掉一次必然失败的请求。
  */
-const unsupportedStructuredOutput = new Set<string>();
+const unsupportedJsonMode = new Set<string>();
 
 /** 把模型/供应商错误压成一行可读诊断信息（用于日志与错误详情） */
 function describeAiError(error: unknown, depth = 0): string {
@@ -217,29 +216,6 @@ export function buildCityWalkPrompt(params: {
   );
 }
 
-const planDraftSchema: JSONSchema7 = {
-  type: 'object',
-  properties: {
-    title: { type: 'string' },
-    summary: { type: 'string' },
-    stops: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          poiId: { type: 'string' },
-          suggestedStayMinutes: { type: 'number' },
-          reason: { type: 'string' },
-        },
-        required: ['poiId', 'suggestedStayMinutes', 'reason'],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ['title', 'stops'],
-  additionalProperties: false,
-};
-
 function clampStayMinutes(value: unknown) {
   const parsed = Math.round(Number(value));
   if (!Number.isFinite(parsed)) {
@@ -349,7 +325,7 @@ function extractJsonObject(text: string): unknown {
 
 /**
  * 让模型在候选 POI 里挑选并排序。
- * 优先用结构化输出（`Output.object`）；供应商不支持或输出不合法时退回「只输出 JSON」的文本解析。
+ * 优先用 JSON 模式并在本地校验候选地点；供应商不支持时退回纯文本 JSON。
  */
 export async function requestCityWalkPlanDraft(params: {
   settings: AiSettings;
@@ -372,17 +348,13 @@ export async function requestCityWalkPlanDraft(params: {
   const model = createAiModel(settings);
   const outputKey = `${settings.baseUrl}|${settings.model}`;
 
-  // 同一进程内记住「该模型的结构化输出不可用」，避免每次生成都白跑一次失败请求
-  if (!unsupportedStructuredOutput.has(outputKey)) {
+  // 同一进程内记住「该模型的 JSON 模式不可用」，避免每次生成都白跑一次失败请求
+  if (!unsupportedJsonMode.has(outputKey)) {
     try {
       const { output, finishReason } = await generateText({
         model,
         prompt,
-        output: Output.object({
-          schema: jsonSchema<CityWalkPlanDraft>(planDraftSchema),
-          name: 'city_walk_plan',
-          description: 'City walk stops chosen from the provided candidates',
-        }),
+        output: Output.json(),
         maxRetries: 1,
         abortSignal: signal,
       });
@@ -390,8 +362,8 @@ export async function requestCityWalkPlanDraft(params: {
         return validateCityWalkPlanDraft(output, { candidateSet, preferences });
       }
       // 没有解析结果（常见于 finishReason=length）：降级到文本 JSON，不标记为不支持
-      void logLocalError('city-walk', new Error('structured output is empty'), {
-        stage: 'structured-output',
+      void logLocalError('city-walk', new Error('JSON output is empty'), {
+        stage: 'json-mode',
         finishReason,
         model: outputKey,
       });
@@ -403,9 +375,9 @@ export async function requestCityWalkPlanDraft(params: {
       if (error instanceof CityWalkError) {
         throw error;
       }
-      unsupportedStructuredOutput.add(outputKey);
+      unsupportedJsonMode.add(outputKey);
       void logLocalError('city-walk', error, {
-        stage: 'structured-output',
+        stage: 'json-mode',
         diagnosis: describeAiError(error),
         model: outputKey,
       });

@@ -45,6 +45,8 @@ export function getCityWalkErrorI18nKey(code: CityWalkErrorCode) {
       return 'cityWalk.error.noCandidates';
     case 'amap-error':
       return 'cityWalk.error.amap';
+    case 'amap-rate-limited':
+      return 'cityWalk.error.amapRateLimited';
     case 'network':
       return 'cityWalk.error.network';
     case 'location-denied':

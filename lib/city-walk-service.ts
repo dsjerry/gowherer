@@ -26,6 +26,8 @@ import {
 
 const AMAP_HOST = 'https://restapi.amap.com';
 const AMAP_TIMEOUT_MS = 12000;
+const AMAP_REQUEST_INTERVAL_MS = 1100;
+const AMAP_RATE_LIMIT_RETRIES = 2;
 /** 自建后端代理的单次请求上限；后端还要再调高德，留出更宽的时间 */
 const BACKEND_TIMEOUT_MS = 20000;
 const MAX_INTEREST_QUERIES = 4;
@@ -68,6 +70,68 @@ type AmapWalkingResponse = {
     paths?: AmapWalkingPath[];
   };
 };
+
+type AmapStatus = { status?: string; info?: string; infocode?: string };
+
+let lastAmapRequestAt = 0;
+let amapRequestQueue: Promise<void> = Promise.resolve();
+
+function waitForDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(new CityWalkError('cancelled'));
+  }
+  if (ms <= 0) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(new CityWalkError('cancelled'));
+    };
+    signal?.addEventListener('abort', onAbort);
+  });
+}
+
+/** 同一进程内给高德直连请求限速，避免串行请求仍在同一秒内触发 QPS 限制。 */
+function waitForAmapSlot(signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(new CityWalkError('cancelled'));
+  }
+  const slot = amapRequestQueue.then(async () => {
+    await waitForDelay(
+      Math.max(0, lastAmapRequestAt + AMAP_REQUEST_INTERVAL_MS - Date.now()),
+      signal,
+    );
+    lastAmapRequestAt = Date.now();
+  });
+  amapRequestQueue = slot.catch(() => undefined);
+
+  if (!signal) {
+    return slot;
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener('abort', onAbort);
+      reject(new CityWalkError('cancelled'));
+    };
+    signal.addEventListener('abort', onAbort);
+    slot.then(
+      () => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
+}
 
 /**
  * 兴趣主题 -> 高德 POI 类型码 / 关键词。
@@ -185,6 +249,9 @@ async function fetchJson(
   url: string,
   options: { signal?: AbortSignal; timeoutMs: number; init?: RequestInit },
 ) {
+  if (options.signal?.aborted) {
+    throw new CityWalkError('cancelled');
+  }
   const controller = new AbortController();
   const parentSignal = options.signal;
   const onParentAbort = () => controller.abort();
@@ -211,6 +278,26 @@ async function fetchJson(
   } finally {
     clearTimeout(timer);
     parentSignal?.removeEventListener('abort', onParentAbort);
+  }
+}
+
+async function fetchAmapJson<T extends AmapStatus>(url: string, signal?: AbortSignal): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    await waitForAmapSlot(signal);
+    const payload = (await fetchJson(url, { signal, timeoutMs: AMAP_TIMEOUT_MS })) as T;
+    const rateLimited =
+      payload.status !== '1' &&
+      (String(payload.infocode) === '10021' || payload.info === 'CUQPS_HAS_EXCEEDED_THE_LIMIT');
+    if (!rateLimited) {
+      return payload;
+    }
+    if (attempt >= AMAP_RATE_LIMIT_RETRIES) {
+      throw new CityWalkError(
+        'amap-rate-limited',
+        `info=${payload.info ?? 'N/A'} infocode=${payload.infocode ?? 'N/A'}`,
+      );
+    }
+    await waitForDelay(1000 * 2 ** attempt, signal);
   }
 }
 
@@ -253,10 +340,7 @@ async function fetchAmapInterests(params: {
     radiusMeters: params.preferences.radiusMeters,
     query: params.query,
   });
-  const payload = (await fetchJson(url, {
-    signal: params.signal,
-    timeoutMs: AMAP_TIMEOUT_MS,
-  })) as AmapPlaceAroundResponse;
+  const payload = await fetchAmapJson<AmapPlaceAroundResponse>(url, params.signal);
 
   if (payload.status !== '1') {
     throw new CityWalkError(
@@ -539,10 +623,10 @@ export async function queryWalkingLeg(
     destination: `${to.longitude},${to.latitude}`,
     output: 'JSON',
   });
-  const payload = (await fetchJson(`${AMAP_HOST}/v3/direction/walking?${searchParams.toString()}`, {
-    signal: options?.signal,
-    timeoutMs: AMAP_TIMEOUT_MS,
-  })) as AmapWalkingResponse;
+  const payload = await fetchAmapJson<AmapWalkingResponse>(
+    `${AMAP_HOST}/v3/direction/walking?${searchParams.toString()}`,
+    options?.signal,
+  );
 
   if (payload.status !== '1') {
     throw new CityWalkError(

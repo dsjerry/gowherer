@@ -2,6 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CityWalkMap } from '@/components/city-walk-map';
+import { getCityWalkTheme } from '@/components/city-walk-theme';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { formatCityWalkDistance, formatCityWalkMinutes } from '@/lib/city-walk-format';
@@ -35,58 +36,53 @@ export function CityWalkPlanView({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const cardStyle = {
-    backgroundColor: isDark ? '#17232b' : '#ffffff',
-    borderColor: isDark ? '#293b42' : '#e3e9e5',
-  };
-  const titleStyle = { color: isDark ? '#e2e8f0' : '#10231f' };
-  const hintStyle = { color: isDark ? '#94a3b8' : '#75827d' };
-  const itemStyle = {
-    backgroundColor: isDark ? '#101b22' : '#f7f9f7',
-    borderColor: isDark ? '#293b42' : '#e0e7e2',
-  };
+  const theme = getCityWalkTheme(isDark);
+  const cardStyle = { backgroundColor: theme.surface, borderColor: theme.line };
+  const titleStyle = { color: theme.text };
+  const hintStyle = { color: theme.muted };
+  const itemStyle = { backgroundColor: theme.subtle, borderColor: theme.line };
   const disabled = busy !== null;
 
   return (
     <View style={styles.section}>
       <View style={[styles.card, cardStyle]}>
+        <CityWalkMap
+          plan={plan}
+          expandedHeight={expandedMapHeight}
+          onEnlargedChange={onMapEnlargedChange}
+        />
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
+            <Text style={[styles.overline, { color: theme.accent }]}>
+              {t('cityWalk.routeOverview')}
+            </Text>
             <Text style={[styles.title, titleStyle]}>
               {plan.title || t('cityWalk.defaultPlanTitle', { count: plan.stops.length })}
             </Text>
             {plan.summary ? <Text style={[styles.summary, hintStyle]}>{plan.summary}</Text> : null}
           </View>
           {plan.aiModel ? (
-            <View style={[styles.aiBadge, { backgroundColor: isDark ? '#173c3a' : '#e4f2ec' }]}>
-              <MaterialIcons name="auto-awesome" size={11} color={isDark ? '#5eead4' : '#0f766e'} />
-              <Text style={[styles.aiBadgeText, { color: isDark ? '#5eead4' : '#0f766e' }]}>
-                AI
-              </Text>
+            <View style={[styles.aiBadge, { backgroundColor: theme.accentSoft }]}>
+              <MaterialIcons name="auto-awesome" size={11} color={theme.accent} />
+              <Text style={[styles.aiBadgeText, { color: theme.accent }]}>AI</Text>
             </View>
           ) : null}
         </View>
 
-        <CityWalkMap
-          plan={plan}
-          expandedHeight={expandedMapHeight}
-          onEnlargedChange={onMapEnlargedChange}
-        />
-
         <View style={styles.statsRow}>
-          <View style={[styles.statCell, itemStyle]}>
+          <View style={styles.statCell}>
             <Text style={[styles.statLabel, hintStyle]}>{t('cityWalk.totalDistance')}</Text>
             <Text style={[styles.statValue, titleStyle]}>
               {formatCityWalkDistance(plan.totalDistanceMeters)}
             </Text>
           </View>
-          <View style={[styles.statCell, itemStyle]}>
+          <View style={[styles.statCell, styles.statDivider, { borderColor: theme.line }]}>
             <Text style={[styles.statLabel, hintStyle]}>{t('cityWalk.walkingTime')}</Text>
             <Text style={[styles.statValue, titleStyle]}>
               {formatCityWalkMinutes(plan.walkingDurationSeconds / 60)}
             </Text>
           </View>
-          <View style={[styles.statCell, itemStyle]}>
+          <View style={[styles.statCell, styles.statDivider, { borderColor: theme.line }]}>
             <Text style={[styles.statLabel, hintStyle]}>{t('cityWalk.totalTime')}</Text>
             <Text style={[styles.statValue, titleStyle]}>
               {formatCityWalkMinutes(plan.estimatedTotalMinutes)}
@@ -122,30 +118,45 @@ export function CityWalkPlanView({
       <View style={[styles.card, cardStyle]}>
         <View style={styles.stopsHeading}>
           <View style={styles.stopsHeadingTitle}>
-            <View
-              style={[styles.stopsHeadingIcon, { backgroundColor: isDark ? '#173c3a' : '#e4f2ec' }]}
-            >
-              <MaterialIcons name="route" size={17} color={isDark ? '#5eead4' : '#0f766e'} />
-            </View>
-            <Text style={[styles.sectionTitle, titleStyle]}>{t('cityWalk.stopsTitle')}</Text>
+            <Text style={[styles.overline, { color: theme.accent }]}>THE WALK</Text>
+            <Text style={[styles.sectionTitle, titleStyle]}>{t('cityWalk.routeItinerary')}</Text>
           </View>
-          <View style={[styles.stopsCount, { backgroundColor: isDark ? '#26383a' : '#edf3ef' }]}>
-            <Text style={[styles.stopsCountText, { color: isDark ? '#cbd9d2' : '#587067' }]}>
-              {plan.stops.length}
+          <View style={[styles.stopsCount, { backgroundColor: theme.accentSoft }]}>
+            <Text style={[styles.stopsCountText, { color: theme.accent }]}>
+              {t('cityWalk.stopCountValue', { count: plan.stops.length })}
             </Text>
           </View>
         </View>
-        {plan.stops.map((stop) => (
-          <View key={stop.poi.poiId} style={[styles.stopCard, itemStyle]}>
+        <View style={styles.originRow}>
+          <View style={[styles.originBadge, { backgroundColor: theme.accentSoft }]}>
+            <MaterialIcons name="near-me" size={15} color={theme.accent} />
+          </View>
+          <View style={styles.stopCopy}>
+            <Text style={[styles.originLabel, hintStyle]}>{t('cityWalk.originLabel')}</Text>
+            <Text style={[styles.originName, titleStyle]} numberOfLines={2}>
+              {plan.origin.label ?? t('cityWalk.originUnnamed')}
+            </Text>
+          </View>
+        </View>
+        {plan.stops.map((stop, index) => (
+          <View key={stop.poi.poiId} style={styles.stopCard}>
+            <View
+              pointerEvents="none"
+              style={[
+                styles.routeLine,
+                { backgroundColor: theme.line },
+                index === plan.stops.length - 1 && styles.routeLineLast,
+              ]}
+            />
             <View style={styles.stopHeader}>
-              <View style={styles.orderBadge}>
+              <View style={[styles.orderBadge, { backgroundColor: theme.hero }]}>
                 <Text style={styles.orderBadgeText}>{stop.order}</Text>
               </View>
               <View style={styles.stopCopy}>
                 <Text style={[styles.stopName, titleStyle]} numberOfLines={2}>
                   {stop.poi.name}
                 </Text>
-                <Text style={[styles.stopMeta, hintStyle]} numberOfLines={1}>
+                <Text style={[styles.stopMeta, hintStyle]} numberOfLines={2}>
                   {[
                     stop.poi.category,
                     stop.poi.address,
@@ -160,43 +171,50 @@ export function CityWalkPlanView({
                 </Text>
               </View>
               <Pressable
-                style={[
-                  styles.removeStopButton,
-                  { backgroundColor: isDark ? '#26333a' : '#f0f3f1' },
-                ]}
+                style={[styles.removeStopButton, { backgroundColor: theme.subtle }]}
                 onPress={() => onRemoveStop(stop.poi.poiId)}
                 disabled={disabled}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel={t('cityWalk.removeStop')}
               >
-                <MaterialIcons
-                  name="delete-outline"
-                  size={18}
-                  color={isDark ? '#a6b5b5' : '#718078'}
-                />
+                <MaterialIcons name="delete-outline" size={18} color={theme.muted} />
               </Pressable>
             </View>
-            <View style={[styles.stopFooter, { borderTopColor: isDark ? '#293b42' : '#e8ede9' }]}>
-              <View style={[styles.stayPill, { backgroundColor: isDark ? '#173c3a' : '#e4f2ec' }]}>
-                <MaterialIcons
-                  name="hourglass-empty"
-                  size={11}
-                  color={isDark ? '#5eead4' : '#0f766e'}
-                />
-                <Text style={[styles.stayPillText, { color: isDark ? '#5eead4' : '#0f766e' }]}>
+            <View style={styles.stopFooter}>
+              <View style={[styles.stayPill, { backgroundColor: theme.accentSoft }]}>
+                <MaterialIcons name="hourglass-empty" size={11} color={theme.accent} />
+                <Text style={[styles.stayPillText, { color: theme.accent }]}>
                   {t('cityWalk.stayMinutes', { minutes: stop.suggestedStayMinutes })}
                 </Text>
               </View>
               {stop.reason ? (
-                <Text style={[styles.reason, hintStyle]} numberOfLines={2}>
+                <Text style={[styles.reason, hintStyle]}>
                   {t('cityWalk.aiReason')}: {stop.reason}
                 </Text>
               ) : null}
             </View>
           </View>
         ))}
+      </View>
 
+      <View style={styles.actionArea}>
+        <Pressable
+          style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}
+          onPress={onStartWalk}
+          disabled={disabled}
+          accessibilityRole="button"
+        >
+          {busy === 'starting' ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <MaterialIcons name="directions-walk" size={20} color="#ffffff" />
+          )}
+          <Text style={styles.primaryButtonText}>
+            {busy === 'starting' ? t('cityWalk.starting') : t('cityWalk.startWalk')}
+          </Text>
+          <MaterialIcons name="arrow-forward" size={19} color="#ffffff" />
+        </Pressable>
         <View style={styles.actions}>
           <Pressable
             style={[styles.secondaryButton, itemStyle]}
@@ -204,7 +222,7 @@ export function CityWalkPlanView({
             disabled={disabled}
             accessibilityRole="button"
           >
-            <MaterialIcons name="tune" size={16} color={isDark ? '#cbd5e1' : '#34453f'} />
+            <MaterialIcons name="tune" size={16} color={theme.text} />
             <Text style={[styles.secondaryButtonText, titleStyle]}>
               {t('cityWalk.adjustPreferences')}
             </Text>
@@ -221,7 +239,7 @@ export function CityWalkPlanView({
               <MaterialIcons
                 name={isSaved ? 'bookmark' : 'bookmark-border'}
                 size={16}
-                color={isDark ? '#cbd5e1' : '#34453f'}
+                color={theme.text}
               />
             )}
             <Text style={[styles.secondaryButtonText, titleStyle]}>
@@ -233,22 +251,6 @@ export function CityWalkPlanView({
             </Text>
           </Pressable>
         </View>
-
-        <Pressable
-          style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}
-          onPress={onStartWalk}
-          disabled={disabled}
-          accessibilityRole="button"
-        >
-          {busy === 'starting' ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <MaterialIcons name="play-arrow" size={20} color="#ffffff" />
-          )}
-          <Text style={styles.primaryButtonText}>
-            {busy === 'starting' ? t('cityWalk.starting') : t('cityWalk.startWalk')}
-          </Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -256,13 +258,13 @@ export function CityWalkPlanView({
 
 const styles = StyleSheet.create({
   section: {
-    gap: 14,
+    gap: 16,
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 22,
     padding: 18,
     borderWidth: 1,
-    gap: 14,
+    gap: 16,
   },
   headerRow: {
     flexDirection: 'row',
@@ -271,16 +273,22 @@ const styles = StyleSheet.create({
   },
   headerCopy: {
     flex: 1,
-    gap: 4,
+    gap: 7,
+  },
+  overline: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.3,
   },
   title: {
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: '800',
-    letterSpacing: -0.45,
+    lineHeight: 30,
+    letterSpacing: -0.5,
   },
   summary: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
   },
   aiBadge: {
     flexDirection: 'row',
@@ -296,27 +304,24 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 8,
+    paddingVertical: 2,
   },
   statCell: {
     flex: 1,
     minWidth: 0,
-    minHeight: 66,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 15,
-    borderColor: '#e0e7e2',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    gap: 5,
+    paddingHorizontal: 9,
+    gap: 6,
+  },
+  statDivider: {
+    borderLeftWidth: 1,
   },
   statLabel: {
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 15,
   },
   statValue: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
   },
   notice: {
     flexDirection: 'row',
@@ -337,62 +342,76 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
   stopsHeading: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 1,
+    marginBottom: 4,
   },
   stopsHeadingTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-  stopsHeadingIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
   },
   stopsCount: {
-    minWidth: 28,
-    height: 28,
-    borderRadius: 14,
+    minHeight: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
   },
   stopsCountText: {
     fontSize: 11,
     fontWeight: '700',
   },
   stopCard: {
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
-    gap: 10,
+    position: 'relative',
+    gap: 8,
+  },
+  routeLine: {
+    position: 'absolute',
+    left: 16,
+    top: -20,
+    bottom: -20,
+    width: 1,
+  },
+  routeLineLast: {
+    bottom: undefined,
+    height: 38,
+  },
+  originRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  originBadge: {
+    width: 33,
+    height: 33,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  originLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  originName: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   stopHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
+    alignItems: 'flex-start',
+    gap: 12,
   },
   orderBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#0f766e',
+    width: 33,
+    height: 33,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0f766e',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 1,
   },
   orderBadgeText: {
     color: '#ffffff',
@@ -404,24 +423,25 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   stopName: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '800',
   },
   stopMeta: {
     fontSize: 11,
     lineHeight: 16,
   },
   removeStopButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stopFooter: {
-    borderTopWidth: 1,
-    paddingTop: 9,
-    gap: 6,
+    marginLeft: 45,
+    paddingBottom: 5,
+    gap: 8,
   },
   stayPill: {
     alignSelf: 'flex-start',
@@ -437,8 +457,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   reason: {
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 19,
+  },
+  actionArea: {
+    gap: 10,
   },
   actions: {
     flexDirection: 'row',
@@ -446,7 +469,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -459,18 +482,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   primaryButton: {
-    minHeight: 54,
+    minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0f766e',
+    backgroundColor: '#176b58',
     borderRadius: 16,
-    shadowColor: '#0f766e',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 7,
-    elevation: 1,
   },
   primaryButtonDisabled: {
     opacity: 0.5,

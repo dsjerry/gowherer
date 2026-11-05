@@ -124,6 +124,7 @@ export type CityWalkErrorCode =
   | 'missing-web-key'
   | 'no-candidates'
   | 'amap-error'
+  | 'amap-rate-limited'
   | 'network'
   | 'location-denied'
   | 'location-failed'

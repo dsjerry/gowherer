@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { MapView, Marker, Polyline, type MapViewRef } from 'expo-gaode-map';
 
+import { getCityWalkTheme } from '@/components/city-walk-theme';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CityWalkPlan } from '@/types/city-walk';
@@ -48,6 +49,7 @@ export function CityWalkMap({ plan, expandedHeight, onEnlargedChange }: Props) {
   const { t } = useI18n();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const theme = getCityWalkTheme(isDark);
 
   const routePoints = useMemo(() => {
     const points: { latitude: number; longitude: number }[] = [];
@@ -164,9 +166,9 @@ export function CityWalkMap({ plan, expandedHeight, onEnlargedChange }: Props) {
       style={[
         styles.mapWrap,
         {
-          borderColor: isDark ? '#293b42' : '#e3e9e5',
+          borderColor: theme.line,
           // 地图首帧绘制前用主题底色占位，避免闪白/闪黑
-          backgroundColor: isDark ? '#101b22' : '#eef2f0',
+          backgroundColor: theme.subtle,
         },
         animatedMapStyle,
       ]}
@@ -219,7 +221,7 @@ export function CityWalkMap({ plan, expandedHeight, onEnlargedChange }: Props) {
           { backgroundColor: isDark ? 'rgba(15,23,42,0.82)' : 'rgba(255,255,255,0.86)' },
         ]}
       >
-        <MaterialIcons name="directions-walk" size={13} color="#0f766e" />
+        <MaterialIcons name="directions-walk" size={13} color={theme.accent} />
         <Text style={[styles.mapLegendText, { color: isDark ? '#cbd5e1' : '#475569' }]}>
           {t('cityWalk.plannedRouteNote')}
         </Text>
@@ -246,7 +248,7 @@ export function CityWalkMap({ plan, expandedHeight, onEnlargedChange }: Props) {
 
 const styles = StyleSheet.create({
   mapWrap: {
-    borderRadius: 20,
+    borderRadius: 17,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -258,7 +260,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#0f766e',
+    backgroundColor: '#176b58',
     borderWidth: 2,
     borderColor: '#ffffff',
     alignItems: 'center',
