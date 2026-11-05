@@ -9,7 +9,7 @@ import {
 import { ExpoGaodeMapModule } from 'expo-gaode-map';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,6 +22,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActiveJourneyCard } from '@/components/active-journey-card';
+import { CityWalkEntryCard } from '@/components/city-walk-entry-card';
 import { DataLoadError } from '@/components/data-load-error';
 import { JourneyCreateCard } from '@/components/journey-create-card';
 import { MediaPreviewModal } from '@/components/media-preview-modal';
@@ -177,6 +178,22 @@ export default function JourneyScreen() {
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
   const [previewMedia, setPreviewMedia] = useState<TimelineMedia | null>(null);
+
+  // ---- Sync data when the tab regains focus -------------------------------
+  // Other screens (journey detail, city walk) write journeys while this tab
+  // stays mounted, so returning here must re-read storage instead of showing
+  // the state captured at mount.
+  const hasFocusedOnceRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        // 首次聚焦由 useJourneys 的挂载加载负责，避免重复读取
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+      void refreshJourneys();
+    }, [refreshJourneys]),
+  );
 
   // ---- Pending location from picker page ----------------------------------
   useFocusEffect(
@@ -539,6 +556,9 @@ export default function JourneyScreen() {
             })}
           </Text>
         </View>
+
+        {/* City Walk entry */}
+        <CityWalkEntryCard onPress={() => router.push('/city-walk')} />
 
         {/* Create or Active journey card */}
         {!activeJourney ? (

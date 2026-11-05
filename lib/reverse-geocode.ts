@@ -139,6 +139,11 @@ function getGeocodingConfig(): GeocodingConfig {
   };
 }
 
+/** 供其它高德 Web 服务调用方复用同一份 Key 配置（不记录、不打印 Key 原文） */
+export function getAmapWebKey(): string | undefined {
+  return getGeocodingConfig().amapWebKey;
+}
+
 function isOutOfChina(latitude: number, longitude: number) {
   return longitude < 72.004 || longitude > 137.8347 || latitude < 0.8293 || latitude > 55.8271;
 }

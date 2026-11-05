@@ -8,6 +8,7 @@ Last updated: 2026-04-11
 - `docs/PROJECT_KNOWLEDGE_BASE.md` (full project knowledge base)
 - `docs/ONBOARDING.md` (beginner setup and first-run guide)
 - `docs/TROUBLESHOOTING.md` (symptom-root cause-fix quick reference)
+- `docs/CITY_WALK_PLAN.md` (City Walk product plan, architecture, API and delivery phases; client-side MVP implemented — see its section 15)
 
 ## Project Overview
 
@@ -434,3 +435,60 @@ Latest updates (2026-03-08):
 
 ### TODO / Follow-ups
 - ~~Register a dedicated AMap Android key for package `com.dsjerry.gowherer.debug`~~ Done (2026-10-03): key set via `AMAP_ANDROID_DEBUG_KEY` in local `.env`; plugin now refreshes the gradle block on every prebuild (marker-based replace instead of skip) so prop changes take effect.
+
+## Work Log (2026-11-03)
+
+### Completed — City Walk MVP (per `docs/CITY_WALK_PLAN.md`)
+
+- Data model: `types/city-walk.ts` (`CityWalkPlan` / `CityWalkStop` / `CityWalkLeg` / `CityWalkCandidate` / preferences / error codes). Planned routes are GCJ-02 and never written into `Journey.trackLocations`.
+- Map service adapter `lib/city-walk-service.ts`:
+  - interest → AMap POI type/keyword mapping, `/v3/place/around` per interest, round-robin merge (max 24 candidates), radius filter + generic fallback search.
+  - `/v3/direction/walking` per leg; step polylines concatenated with duplicate-point removal; hard 12s timeout via AbortController.
+  - Backend proxy path (`POST /v1/city-walk/candidates`, `POST /v1/city-walk/routes`) activated by `EXPO_PUBLIC_CITY_WALK_API_BASE_URL`; unset means direct AMap calls with the existing `EXPO_PUBLIC_AMAP_WEB_KEY`.
+- AI planner `lib/city-walk-planner.ts`: locale-aware prompt (candidate text treated as untrusted data), structured output via `generateText` + `Output.object` + `jsonSchema` with a plain-text JSON fallback, poiId whitelist validation, dedupe/stop-cap/stay-duration clamping, stay-budget fitting, prefix trimming when walking time exceeds the time budget (one extra return-leg request for loops), `overBudget` flag.
+- Storage `lib/city-walk-storage.ts` (`gowherer:city-walk-plans:v1`, max 20, defensive normalization); deleting a journey clears `linkedJourneyId` via `lib/journey-repository.ts`.
+- Hook/UI: `hooks/use-city-walk.ts` (stage machine, cancel/timeout/recalc/save/start), `hooks/use-place-search.ts` (debounced place search), `app/city-walk.tsx` + `components/city-walk-{config-card,status-card,plan-view,map,map.web,saved-list,entry-card}.tsx`.
+- Entry point on the journey tab; origin via current location / map picker (new `target=city-walk` + `initialSys=gcj02` channel in `app/location-picker.tsx`, `lib/pending-location.ts`) / place search.
+- Refactor: extracted `lib/ai-client.ts` (`createAiModel`, `modelFetch`) out of `lib/ai-review.ts`; exported `getAmapWebKey()` from `lib/reverse-geocode.ts`.
+- i18n: new `cityWalk` namespace in `locales/zh.ts` / `locales/en.ts`.
+- Verified locally: Prettier clean, ESLint clean for new files (only pre-existing `addLocalizationListener` error and 4 warnings remain), `tsc --noEmit` reports no errors in new/changed files (repo still has pre-existing type errors elsewhere).
+
+### TODO / Follow-ups
+- No test runner in the repo yet: unit tests for draft validation, budget trimming and storage normalization are still missing.
+- On-device verification needed for the numbered stop markers (AMap `Marker` with `children`), map rendering inside the scroll view, and the picker round-trip.
+- Deploy the backend proxy to keep the AMap Web Service key off the client (the current build reuses the already-public `EXPO_PUBLIC_AMAP_WEB_KEY`).
+- Let users push a stop into the journey timeline on arrival; show the linked plan on the journey detail page.
+
+### Review pass (same day)
+
+- Data backup gap fixed: `lib/data-backup.ts` now exports/imports `cityWalkPlans` (optional field, old backups still parse), reusing `normalizeCityWalkPlanList`/`replaceCityWalkPlans`; settings import-confirm copy mentions city walk plans.
+- Map camera: `initialCameraPosition` only applies once, so removing a stop left the old framing. `components/city-walk-map.tsx` now refits via `fitToCoordinates` on `onLoad` and whenever the route bounds change (guarded when the ref lacks the method), and the legend follows the theme.
+- Backend proxy calls now use the same timeout/abort helper as the AMap calls (`BACKEND_TIMEOUT_MS`), and both paths cap the number of interest queries consistently.
+- Dead surface removed: `CityWalkConfigCard.generating` prop, `useCityWalk` `updatePreferences`/`resetAll`/`locale`/`linkedJourneyId`, duplicated `formatDistance`/`formatMinutes` (now `lib/city-walk-format.ts`), duplicate `cityWalk.minutesValue` key (reuses `duration.minutes`).
+- UI/a11y: four chip groups collapsed into one `OptionChip` with `accessibilityState.selected`, save button shows a spinner while writing, `ai-not-configured` errors offer "Open settings", location failures use a location-specific alert title.
+
+### Map enlarge (2026-11-04)
+
+City Walk preview map now enlarges like the journey detail page:
+
+- `components/city-walk-map.tsx` owns the enlarge affordance: 32dp round button at the map's bottom-right (`open-in-full` / `close-fullscreen`), preview height 240dp, target `expandedHeight` passed in by the screen (~50% of window height, min 300dp), 260ms `withTiming` height animation via reanimated.
+- Height animation only resizes the container — the `MapView` is never remounted, because AMap renders a new instance black while others are alive.
+- While enlarged, `scrollGesturesEnabled`/`zoomGesturesEnabled` are on and the screen's `ScrollView` gets `scrollEnabled={false}`; enlarging scrolls the page to the top so the collapse button stays reachable. Leaving the preview phase resets the state.
+- `fitToCoordinates` runs after `onLoad`, after the enlarge animation, after the collapse animation and whenever the route bounds change, so the whole route stays framed.
+- Legend is inset from the button (`right: 52`); the web fallback keeps its summary box and ignores the enlarge props.
+
+### Journey tab refresh (2026-11-04)
+
+Starting a city walk created an active journey, but returning to the journey tab still showed the "create journey" state: the tab screen only read storage on mount, and pushing another screen (`/city-walk`, `/journey-detail`) never remounts it.
+
+- `hooks/use-journeys.ts`: exposed functions are now `useCallback`-stable (required so a focus effect can depend on `refreshJourneys` without re-running after its own `setJourneys`), and `refreshJourneys` gained error handling instead of rejecting unhandled.
+- `app/(tabs)/index.tsx`: added a `useFocusEffect` that re-reads journeys when the tab regains focus (skipping the first focus, which the mount load already covers). This also fixes stale data after edits/deletes made on other screens; the explore tab already did this.
+
+### Runtime fix (2026-11-04)
+
+On-device generation failed with only `AI SDK Warning: Deprecated: "generateObject"` plus two unusable `ERROR null` lines.
+
+- Migrated to the non-deprecated structured-output API: `generateText({ output: Output.object({ schema: jsonSchema(...) }) })`, reading the parsed value from `result.output` (`generateObject` is only a deprecation shim in `ai@7`).
+- `lib/local-log.ts` no longer prints the whole JSON payload (name/message/full stack + model text) as one console line — with long stacks/model output RN rendered it as a meaningless `ERROR null`. Console now gets a single sanitized line (`name: message [status=… | body=…]`); the full stack/data still goes to `gowherer-debug.log`. Added exported `collapseLogText()`.
+- Structured-output failures are now diagnosed: `describeAiError()` extracts `statusCode`, `responseBody`, `finishReason`, `NoObjectGeneratedError.text` and the `cause` chain, logged as `diagnosis` and surfaced through `CityWalkError.detail` (shown in the in-app error card).
+- Provider compatibility: remember `baseUrl|model` in-process once structured output fails so later generations skip the doomed request; prompts now always contain the literal lowercase `json` (required by DeepSeek-style `json_object` mode); an empty structured output (e.g. `finishReason=length`) falls back to the text path instead of failing.

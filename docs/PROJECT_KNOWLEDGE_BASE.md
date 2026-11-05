@@ -8,6 +8,7 @@ Related docs:
 - `docs/TROUBLESHOOTING.md`
 - `docs/KNOWLEDGE_POINTS.md`
 - `docs/PROJECT_STATE.md`
+- `docs/CITY_WALK_PLAN.md` (City Walk product plan, architecture and technical references; client-side MVP implemented, see its section 15)
 
 ## 1. 项目定位
 

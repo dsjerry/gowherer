@@ -17,10 +17,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "licenses:generate": "node ./scripts/generate-licenses.js",
-    "prestart": "npm run licenses:generate",
-    "preandroid": "npm run licenses:generate",
-    "preios": "npm run licenses:generate",
-    "preweb": "npm run licenses:generate"
+    "prestart": "node ./scripts/generate-licenses.js",
+    "preandroid": "node ./scripts/generate-licenses.js",
+    "preios": "node ./scripts/generate-licenses.js",
+    "preweb": "node ./scripts/generate-licenses.js"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.67",

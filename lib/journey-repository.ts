@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 
+import { clearCityWalkPlanLinkForJourney } from '@/lib/city-walk-storage';
 import {
   appendTrackLocationsToDb,
   ensureLegacyRecovered,
@@ -165,9 +166,16 @@ export async function saveJourneyAiReview(journeyId: string, review: JourneyAiRe
 }
 
 export async function deleteJourney(journeyId: string) {
-  return enqueueJourneyMutation((journeys) => {
+  const updatedJourneys = await enqueueJourneyMutation((journeys) => {
     const next = journeys.filter((journey) => journey.id !== journeyId);
     cleanupRemovedMedia(journeys, next);
     return next;
   });
+  // City Walk 方案若关联了这条旅程，删除后解除关联，避免死链接
+  try {
+    await clearCityWalkPlanLinkForJourney(journeyId);
+  } catch (error) {
+    void logLocalError('city-walk', error, { stage: 'clear-plan-link', journeyId });
+  }
+  return updatedJourneys;
 }

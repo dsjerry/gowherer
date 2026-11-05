@@ -21,7 +21,7 @@ import {
   getBestCurrentTimelineLocation,
   requestForegroundLocationAccess,
 } from '@/lib/current-location';
-import { setPendingLocation } from '@/lib/pending-location';
+import { PendingLocationChannel, setPendingLocation } from '@/lib/pending-location';
 import {
   NearbyPlace,
   queryNearbyPlaces,
@@ -77,8 +77,13 @@ export default function LocationPickerScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t } = useI18n();
-  const params = useLocalSearchParams<{ initial?: string }>();
+  const params = useLocalSearchParams<{ initial?: string; target?: string; initialSys?: string }>();
   const initialLocation = useMemo(() => parseInitialLocation(params.initial), [params.initial]);
+  // 起点用途决定结果回传给哪个页面（旅程条目草稿 / 城市漫步起点）
+  const targetChannel: PendingLocationChannel =
+    params.target === 'city-walk' ? 'city-walk' : 'journey';
+  // 城市漫步的起点是 GCJ-02，不能按 WGS-84 再转换一次
+  const initialCoordSystem: 'wgs84' | 'gcj02' = params.initialSys === 'gcj02' ? 'gcj02' : 'wgs84';
   const pendingCameraTargetRef = useRef<AMapLatLng | null>(null);
   const selectionRequestIdRef = useRef(0);
   const autoLocateTriggeredRef = useRef(false);
@@ -306,7 +311,7 @@ export default function LocationPickerScreen() {
             latitude: initialLocation.latitude,
             longitude: initialLocation.longitude,
           },
-          'wgs84',
+          initialCoordSystem,
           initialLocation.placeName,
         );
         return () => {
@@ -322,7 +327,7 @@ export default function LocationPickerScreen() {
         mapRef.current = null;
         selectionRequestIdRef.current += 1;
       };
-    }, [initialLocation, locateCurrent, selectPoint]),
+    }, [initialCoordSystem, initialLocation, locateCurrent, selectPoint]),
   );
 
   async function confirmLocation() {
@@ -332,12 +337,15 @@ export default function LocationPickerScreen() {
     }
     setSaving(true);
     try {
-      await setPendingLocation({
-        latitude: selectedWgs.latitude,
-        longitude: selectedWgs.longitude,
-        placeName: placeName.trim() || undefined,
-        coordSystem: 'wgs84',
-      });
+      await setPendingLocation(
+        {
+          latitude: selectedWgs.latitude,
+          longitude: selectedWgs.longitude,
+          placeName: placeName.trim() || undefined,
+          coordSystem: 'wgs84',
+        },
+        targetChannel,
+      );
       // Unmount AMap first, then navigate back, to avoid native crash during concurrent teardown.
       setMapVisible(false);
       screenActiveRef.current = false;

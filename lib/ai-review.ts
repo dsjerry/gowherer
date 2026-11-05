@@ -1,26 +1,11 @@
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateText } from 'ai';
-import { fetch as expoFetch } from 'expo/fetch';
 
-import { getAiProviderPreset } from '@/lib/ai-providers';
+import { createAiModel, modelFetch } from '@/lib/ai-client';
 import { AiSettings, isAiConfigured } from '@/lib/ai-settings';
 import { Locale } from '@/lib/i18n';
 import { sumJourneyCosts } from '@/lib/journey-cost';
 import { computeJourneyStats, formatDateTime } from '@/lib/journey-stats';
 import { Journey } from '@/types/journey';
-
-/** RN 的全局 fetch 不支持流式读取，统一走 expo/fetch（WinterCG 兼容实现） */
-const modelFetch = expoFetch as unknown as typeof fetch;
-
-function createAiModel(settings: AiSettings) {
-  const provider = createOpenAICompatible({
-    name: getAiProviderPreset(settings.providerId).id,
-    baseURL: settings.baseUrl,
-    apiKey: settings.apiKey || undefined,
-    fetch: modelFetch,
-  });
-  return provider(settings.model);
-}
 
 const MAX_MATERIAL_ENTRIES = 200;
 const MAX_MATERIAL_JOURNEYS = 300;
