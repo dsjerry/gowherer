@@ -1,0 +1,231 @@
+# GoWherer
+
+[简体中文](./README.md) | [English](./README.en.md)
+
+GoWherer is an Expo React Native app for recording and reviewing journey timelines (travel/commute). It focuses on fast capture, clear recap, and shareable output.
+
+## Features
+
+- Journey start/end flow
+- Timeline entries with text, location, photos, videos, and audio
+- Camera capture and media library import
+- Audio recording with playback
+- Entry edit/delete
+- Journey history with type filter and keyword/tag search
+- Reverse geocoding (lat/lng to place name)
+- Localization with system/English/Chinese preference
+- Settings screen for language and theme
+- Journey/entry tags and recap keyword/tag filters
+- Journey templates (Departure, Arrival, Rest, Checkpoint) with travel/commute modes
+- Template management (add/edit/delete custom templates)
+- Journey stats card:
+  - Distance
+  - Duration
+  - Average speed
+  - Location point count
+- Route visualization (native map + web fallback)
+- Android AMap SDK place picker (tap map/POI to select location)
+- Background GPS tracking with track smoothing
+- PDF export with route preview image and stats
+- Manual light/dark mode toggle with local persistence
+- Media file migration (cache → app-managed directory)
+- Data backup and import/restore
+- Haptic feedback
+- Local logging system
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/home-city-walk.jpg" width="230" alt="Home · City Walk Entry" /><br /><sub
+        >Home · City Walk Entry</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/city-walk-setup.jpg" width="230" alt="City Walk · Route Setup" /><br /><sub
+        >City Walk · Route Setup</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/city-walk-generating.jpg" width="230" alt="City Walk · Generation Progress" /><br /><sub
+        >City Walk · Generation Progress</sub
+      >
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/city-walk-route.jpg" width="230" alt="City Walk · Route Preview" /><br /><sub
+        >City Walk · Route Preview</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/list-light.jpg" width="230" alt="Journey Review List" /><br /><sub
+        >Journey Review List</sub
+      >
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/ai-light.jpg" width="230" alt="AI Analysis" /><br /><sub>AI Analysis</sub>
+    </td>
+  </tr>
+</table>
+
+## Tech Stack
+
+- Expo SDK 55
+- React Native 0.83.6
+- React 19.2.0
+- Expo Router
+- AsyncStorage
+- `expo-gaode-map` (AMap SDK wrapper)
+- `expo-task-manager` (background tasks)
+- `react-native-maps`
+- `expo-localization`
+- `expo-image-picker`, `expo-location`, `expo-video`, `expo-print`, `expo-sharing`
+
+## Getting Started
+
+### Requirements
+
+- Node.js 20+
+- npm
+- Expo environment for Android/iOS/Web
+
+### Install
+
+```bash
+npm install
+```
+
+### Run
+
+```bash
+npm run start
+```
+
+Or run platform-specific commands:
+
+```bash
+npm run android
+npm run ios
+npm run web
+```
+
+## Scripts
+
+- `npm run start` - start Expo dev server
+- `npm run android` - run on Android target
+- `npm run ios` - run on iOS target
+- `npm run web` - run web target
+- `npm run lint` - run lint checks
+- `npm run reset-project` - reset starter layout script
+
+## Project Structure
+
+- `app/(tabs)/index.tsx` - active journey creation/management
+- `app/(tabs)/explore.tsx` - history, recap, and PDF export
+- `app/(tabs)/settings.tsx` - app settings (theme and language)
+- `lib/journey-storage.ts` - local persistence logic
+- `lib/background-location.ts` - background GPS tracking
+- `lib/media-migration.ts` - media file migration
+- `lib/media-storage.ts` - media persistence storage
+- `lib/track-utils.ts` - track processing and smoothing
+- `lib/reverse-geocode.ts` - geocoding and coordinate conversion
+- `lib/i18n.ts` - i18n core logic
+- `lib/local-log.ts` - local logging system
+- `types/journey.ts` - core data types
+- `components/track-map.tsx` - native route map
+- `components/track-map.web.tsx` - web route map fallback
+- `.github/workflows/eas-build.yml` - EAS CI workflow
+- `app.config.ts` - Expo app config
+
+## Environment Variables (`app.config.ts`)
+
+`app.config.ts` reads the following variables:
+
+- `EAS_PROJECT_ID`
+  - Purpose: Injects `extra.eas.projectId` for EAS project binding.
+  - Required: Optional (workflow can fall back to `app.config.ts` default projectId).
+  - GitHub Actions: use `Repository Variable` (`vars.EAS_PROJECT_ID`) or `Repository Secret` (`secrets.EAS_PROJECT_ID`).
+- `APP_VERSION`
+  - Purpose: Sets app marketing version (`expo.version`) at build time (for example `1.2.3`).
+  - Required: No.
+  - Default: `1.0.0` when not set.
+  - GitHub Actions: set via manual dispatch input `app_version`.
+- `EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER`
+  - Purpose: Selects reverse geocoding provider (`amap` or `system`).
+  - Required: No.
+  - Default: `amap` when not set.
+  - GitHub Actions: optional `Repository Variable` (`vars.EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER`).
+- `EXPO_PUBLIC_AMAP_WEB_KEY`
+  - Purpose: AMap reverse geocoding Web API key (used when provider is `amap`).
+  - Required: Required only when provider is `amap`.
+  - GitHub Actions: configure as `Repository Secret` (`secrets.EXPO_PUBLIC_AMAP_WEB_KEY`).
+- `AMAP_ANDROID_API_KEY`
+  - Purpose: AMap Android native SDK key (used by in-app AMap place picker).
+  - Required: Required for Android map place picker.
+  - Default: falls back to key configured in `app.config.ts` when env is not set.
+- `AMAP_ANDROID_DEBUG_KEY` (optional, local development only)
+  - Purpose: AMap Android key for debug builds. The debug package is `com.dsjerry.gowherer.debug`; request a dedicated key in the AMap console with the SHA1 of `android/app/debug.keystore`. When unset, debug builds fall back to `AMAP_ANDROID_API_KEY` (AMap validation fails and maps render blank).
+  - Required: No (only affects map rendering in local `expo run:android` builds).
+
+Native module note: AMap SDK features require a custom Dev Client or EAS build. They are not available in Expo Go.
+
+Security note: `EXPO_PUBLIC_*` values are bundled to the client. Treat them as non-sensitive publishable keys and apply provider-side restrictions (package/SHA1/domain) when supported.
+
+### Coordinate System Note (AMap)
+
+When provider is `amap`, the app converts coordinates from `WGS84` (from `expo-location`) to `GCJ-02` before calling AMap reverse geocoding. This conversion is applied only for mainland China coordinates; outside China, original coordinates are used.
+
+## EAS Build and CI
+
+This project is configured for EAS builds with GitHub Actions manual dispatch (`platform`: `android`/`ios`/`all`, `profile`: `preview`/`production`).
+
+Version behavior:
+
+- App version (`expo.version`) can be set by workflow input `app_version` (for example `1.3.0`).
+- CI writes `app_version` into project `.env` as `APP_VERSION` before triggering `eas build`, ensuring cloud build uses the same version value.
+- Build numbers (`android.versionCode` / `ios.buildNumber`) auto-increment in both `preview` and `production` profiles via EAS remote versioning.
+- Build outputs are stored in EAS, uploaded as GitHub workflow artifacts, and also published to GitHub Releases.
+- Release tag format: `eas-build-<profile>-<run_number>`.
+- Optional release notes: `release_notes` input supports multi-line text and is written into the GitHub Release.
+
+Required GitHub configuration:
+
+- `EXPO_TOKEN`
+- Variable or Secret: `EAS_PROJECT_ID` (optional, recommended)
+- Variable: `EXPO_PUBLIC_REVERSE_GEOCODE_PROVIDER` (optional)
+- Secret: `EXPO_PUBLIC_AMAP_WEB_KEY` (required when provider=`amap`)
+- Secret: `AMAP_ANDROID_API_KEY` (required for Android AMap picker)
+
+### Known Android CI issue
+
+If Android keystore is not provisioned yet, non-interactive CI build may fail with:
+
+`Generating a new Keystore is not supported in --non-interactive mode`
+
+Run once locally (interactive) to provision credentials:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest credentials -p android
+```
+
+Then rerun the GitHub Action.
+
+## Roadmap
+
+- P1:
+  - Smart route analysis (stay points / segment summary)
+  - PDF template and cover customization
+  - Journey share card generation
+- P2:
+  - Cloud sync
+  - Cross-device restore/browsing
+  - Collaboration mode
+  - Privacy controls for coordinate masking
+  - Geofence reminders and optional background auto logging
+
+## License
+
+MIT License. See [LICENSE](./LICENSE).
