@@ -87,6 +87,26 @@ export async function loadJourneysFromDb(db: SQLite.SQLiteDatabase): Promise<Jou
   });
 }
 
+/** 只读取单条旅程的轨迹点，供实时轨迹展示使用，避免整库加载。 */
+export async function loadTrackLocationsFromDb(
+  db: SQLite.SQLiteDatabase,
+  journeyId: string,
+): Promise<TimelineLocation[]> {
+  const rows = await db.getAllAsync<TrackRow>(
+    'SELECT journey_id, data FROM track_locations WHERE journey_id = ? ORDER BY seq',
+    journeyId,
+  );
+  const locations: TimelineLocation[] = [];
+  for (const row of rows) {
+    try {
+      locations.push(JSON.parse(row.data) as TimelineLocation);
+    } catch {
+      // 单点损坏时跳过,不影响其余数据。
+    }
+  }
+  return locations;
+}
+
 export async function saveJourneysToDb(db: SQLite.SQLiteDatabase, journeys: Journey[]) {
   await db.withTransactionAsync(async () => {
     const countRows = await db.getAllAsync<{ journey_id: string; count: number }>(

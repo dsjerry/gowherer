@@ -298,6 +298,14 @@ export async function deleteCityWalkPlan(planId: string): Promise<CityWalkPlan[]
   return writePlans(plans.filter((item) => item.id !== planId));
 }
 
+/** 找到「开始漫步」时关联到某条旅程的方案，供旅程记录页展示路线 */
+export async function findCityWalkPlanForJourney(
+  journeyId: string,
+): Promise<CityWalkPlan | undefined> {
+  const plans = await readPlans();
+  return plans.find((plan) => plan.linkedJourneyId === journeyId);
+}
+
 /**
  * 旅程被删除时解除关联，避免「已保存方案」指向不存在的旅程。
  * 只处理已持久化的方案，内存中的未保存方案由 UI 自行处理。

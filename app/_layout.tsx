@@ -50,6 +50,14 @@ function RootNavigator() {
             animation: Platform.OS === 'android' ? 'fade_from_bottom' : 'default',
           }}
         />
+        <Stack.Screen
+          name="walk-map"
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: getCityWalkTheme(isDark).page },
+            animation: Platform.OS === 'android' ? 'fade_from_bottom' : 'default',
+          }}
+        />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />

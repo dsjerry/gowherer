@@ -7,30 +7,32 @@ import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { formatCityWalkDistance, formatCityWalkMinutes } from '@/lib/city-walk-format';
 import { CityWalkBusyKind, CityWalkPlan } from '@/types/city-walk';
+import { TimelineLocation } from '@/types/journey';
 
 type Props = {
   plan: CityWalkPlan;
   busy: CityWalkBusyKind;
   isSaved: boolean;
-  /** 地图放大后的目标高度 */
-  expandedMapHeight: number;
-  onMapEnlargedChange: (enlarged: boolean) => void;
+  /** 打开全屏地图（可自由拖动 / 缩放） */
+  onOpenMap: () => void;
   onRemoveStop: (poiId: string) => void;
   onAdjustPreferences: () => void;
   onSave: () => void;
   onStartWalk: () => void;
+  /** 「开始漫步」后关联旅程记录的实际 GPS 轨迹 */
+  walkedTrack?: TimelineLocation[];
 };
 
 export function CityWalkPlanView({
   plan,
   busy,
   isSaved,
-  expandedMapHeight,
-  onMapEnlargedChange,
+  onOpenMap,
   onRemoveStop,
   onAdjustPreferences,
   onSave,
   onStartWalk,
+  walkedTrack,
 }: Props) {
   const { t } = useI18n();
   const colorScheme = useColorScheme();
@@ -46,11 +48,7 @@ export function CityWalkPlanView({
   return (
     <View style={styles.section}>
       <View style={[styles.card, cardStyle]}>
-        <CityWalkMap
-          plan={plan}
-          expandedHeight={expandedMapHeight}
-          onEnlargedChange={onMapEnlargedChange}
-        />
+        <CityWalkMap plan={plan} walkedTrack={walkedTrack} onOpenFullscreen={onOpenMap} />
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
             <Text style={[styles.overline, { color: theme.accent }]}>

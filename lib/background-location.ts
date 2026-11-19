@@ -60,6 +60,8 @@ export async function startLocationTracking(
     notificationTitle: string;
     notificationBody: string;
     journeyKind?: 'travel' | 'commute';
+    /** 未授予后台定位权限时可传 false，仅在前台持续记录 */
+    allowBackground?: boolean;
   },
 ) {
   if (Platform.OS === 'web') {
@@ -76,7 +78,7 @@ export async function startLocationTracking(
 
   await AsyncStorage.setItem(TRACKING_JOURNEY_ID_KEY, journeyId);
 
-  ExpoGaodeMapModule.setAllowsBackgroundLocationUpdates(true);
+  ExpoGaodeMapModule.setAllowsBackgroundLocationUpdates(_options.allowBackground ?? true);
   ExpoGaodeMapModule.start();
 
   locationListener = ExpoGaodeMapModule.addLocationListener((location) => {
@@ -97,7 +99,22 @@ export async function stopLocationTracking() {
   await AsyncStorage.removeItem(TRACKING_JOURNEY_ID_KEY);
 }
 
-export async function syncBufferedTrackLocations(journeyId: string) {
+/** 同一旅程的同步串行化：多个页面同时轮询时避免重复读取同一批缓冲点 */
+const syncInFlight = new Map<string, Promise<number>>();
+
+export async function syncBufferedTrackLocations(journeyId: string): Promise<number> {
+  const inFlight = syncInFlight.get(journeyId);
+  if (inFlight) {
+    return inFlight;
+  }
+  const run = flushBufferedTrackLocations(journeyId).finally(() => {
+    syncInFlight.delete(journeyId);
+  });
+  syncInFlight.set(journeyId, run);
+  return run;
+}
+
+async function flushBufferedTrackLocations(journeyId: string) {
   const allKeys = await AsyncStorage.getAllKeys();
   const prefix = `${TRACKING_BATCH_PREFIX}:${journeyId}:`;
   const batchKeys = allKeys.filter((key) => key.startsWith(prefix));
