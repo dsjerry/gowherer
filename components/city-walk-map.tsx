@@ -1,9 +1,24 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { ExpoGaodeMapModule, MapView, Marker, Polyline, type MapViewRef } from 'expo-gaode-map';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type NativeSyntheticEvent,
+} from 'react-native';
+import {
+  ExpoGaodeMapModule,
+  MapView,
+  Marker,
+  Polyline,
+  type CameraEvent,
+  type MapViewRef,
+} from 'expo-gaode-map';
 
 import { getCityWalkTheme } from '@/components/city-walk-theme';
+import { CityWalkUserMarker, type CityWalkUserLocation } from '@/components/city-walk-user-marker';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { toGcj02 } from '@/lib/reverse-geocode';
@@ -41,9 +56,7 @@ function toAmapCoordinate(location: TimelineLocation) {
 }
 
 export function useCityWalkUserLocation(enabled = true) {
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
-    null,
-  );
+  const [userLocation, setUserLocation] = useState<CityWalkUserLocation | null>(null);
 
   useEffect(() => {
     if (!enabled || Platform.OS === 'web') {
@@ -76,6 +89,22 @@ export function useCityWalkUserLocation(enabled = true) {
   }, [enabled]);
 
   return userLocation;
+}
+
+/** 缩放级别变化小于该值时不更新，避免每个相机事件都重绘覆盖物 */
+const ZOOM_UPDATE_EPSILON = 0.05;
+
+/** 跟踪地图缩放级别（缩放过程中实时更新），供当前位置箭头按屏幕像素定尺寸 */
+export function useCityWalkMapZoom(initialZoom: number) {
+  const [zoom, setZoom] = useState(initialZoom);
+  const onCameraChange = useCallback((event: NativeSyntheticEvent<CameraEvent>) => {
+    const next = event.nativeEvent.cameraPosition.zoom;
+    if (next === undefined || !Number.isFinite(next)) {
+      return;
+    }
+    setZoom((prev) => (Math.abs(prev - next) < ZOOM_UPDATE_EPSILON ? prev : next));
+  }, []);
+  return { zoom, onCameraChange };
 }
 
 export function useCityWalkRoutePoints(plan: CityWalkPlan) {
@@ -139,11 +168,13 @@ export function CityWalkRouteOverlays({
   routePoints,
   walkedPoints,
   userLocation,
+  zoom,
 }: {
   plan: CityWalkPlan;
   routePoints: { latitude: number; longitude: number }[];
   walkedPoints: { latitude: number; longitude: number }[];
-  userLocation: { latitude: number; longitude: number } | null;
+  userLocation: CityWalkUserLocation | null;
+  zoom: number;
 }) {
   const { t } = useI18n();
 
@@ -155,20 +186,7 @@ export function CityWalkRouteOverlays({
       {walkedPoints.length >= 2 ? (
         <Polyline points={walkedPoints} strokeWidth={5} strokeColor={WALKED_TRACK_COLOR} />
       ) : null}
-      {userLocation ? (
-        <Marker
-          position={userLocation}
-          anchor={{ x: 0.5, y: 0.5 }}
-          centerOffset={{ x: 0, y: 0 }}
-          cacheKey="city-walk-user-location"
-        >
-          <View style={styles.userMarkerHalo}>
-            <View style={styles.userMarkerRing}>
-              <View style={styles.userMarkerDot} />
-            </View>
-          </View>
-        </Marker>
-      ) : null}
+      {userLocation ? <CityWalkUserMarker location={userLocation} zoom={zoom} /> : null}
       <Marker
         position={{ latitude: plan.origin.latitude, longitude: plan.origin.longitude }}
         icon={ORIGIN_MARKER_ICON}
@@ -186,8 +204,10 @@ export function CityWalkRouteOverlays({
           centerOffset={{ x: 0, y: 0 }}
           cacheKey={`city-walk-stop-${stop.order}`}
         >
-          <View style={styles.stopMarker}>
-            <Text style={styles.stopMarkerText}>{stop.order}</Text>
+          <View style={styles.stopHalo}>
+            <View style={styles.stopMarker}>
+              <Text style={styles.stopMarkerText}>{stop.order}</Text>
+            </View>
           </View>
         </Marker>
       ))}
@@ -223,6 +243,7 @@ export function CityWalkMap({ plan, walkedTrack, onOpenFullscreen }: Props) {
   const walkedPoints = useCityWalkWalkedPoints(walkedTrack);
   const camera = useCityWalkCamera(plan, routePoints);
   const userLocation = useCityWalkUserLocation();
+  const mapZoom = useCityWalkMapZoom(camera.zoom);
 
   const mapRef = useRef<MapViewRef | null>(null);
   const lastFollowAtRef = useRef(0);
@@ -277,12 +298,15 @@ export function CityWalkMap({ plan, walkedTrack, onOpenFullscreen }: Props) {
         rotateGesturesEnabled={false}
         tiltGesturesEnabled={false}
         initialCameraPosition={{ target: camera.center, zoom: camera.zoom }}
+        onCameraMove={mapZoom.onCameraChange}
+        onCameraIdle={mapZoom.onCameraChange}
       >
         <CityWalkRouteOverlays
           plan={plan}
           routePoints={routePoints}
           walkedPoints={walkedPoints}
           userLocation={userLocation}
+          zoom={mapZoom.zoom}
         />
       </MapView>
 
@@ -357,47 +381,34 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
   },
-  userMarkerHalo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(23,107,88,0.18)',
+  stopHalo: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(23,107,88,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  userMarkerRing: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.18,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  userMarkerDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#176b58',
   },
   stopMarker: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#176b58',
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
   stopMarkerText: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
+    includeFontPadding: false,
   },
   mapLegend: {
     position: 'absolute',

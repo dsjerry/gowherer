@@ -8,6 +8,7 @@ import { MapView, type MapViewRef } from 'expo-gaode-map';
 import {
   CityWalkRouteOverlays,
   useCityWalkCamera,
+  useCityWalkMapZoom,
   useCityWalkRoutePoints,
   useCityWalkUserLocation,
   useCityWalkWalkedPoints,
@@ -35,6 +36,7 @@ export default function WalkMapScreen() {
   const walkedPoints = useCityWalkWalkedPoints(walkedTrack);
   const camera = useCityWalkCamera(plan ?? EMPTY_PLAN, routePoints);
   const userLocation = useCityWalkUserLocation(Boolean(plan));
+  const mapZoom = useCityWalkMapZoom(camera.zoom);
 
   const mapRef = useRef<MapViewRef | null>(null);
   const lastFollowAtRef = useRef(0);
@@ -100,12 +102,15 @@ export default function WalkMapScreen() {
         rotateGesturesEnabled={false}
         tiltGesturesEnabled={false}
         initialCameraPosition={{ target: camera.center, zoom: camera.zoom }}
+        onCameraMove={mapZoom.onCameraChange}
+        onCameraIdle={mapZoom.onCameraChange}
       >
         <CityWalkRouteOverlays
           plan={plan}
           routePoints={routePoints}
           walkedPoints={walkedPoints}
           userLocation={userLocation}
+          zoom={mapZoom.zoom}
         />
       </MapView>
 
