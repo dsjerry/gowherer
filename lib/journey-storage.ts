@@ -5,11 +5,12 @@ import {
   ensureLegacyRecovered,
   getJourneyDb,
   loadJourneysFromDb,
+  loadTrackLocationsFromDb,
   saveJourneysToDb,
 } from '@/lib/journey-db';
 import { normalizeJourneyList } from '@/lib/journey-normalize';
 import { JOURNEY_STORAGE_KEY } from '@/lib/storage-keys';
-import { Journey } from '@/types/journey';
+import { Journey, TimelineLocation } from '@/types/journey';
 
 export async function loadJourneys(): Promise<Journey[]> {
   if (Platform.OS === 'web') {
@@ -31,6 +32,18 @@ export async function saveJourneys(journeys: Journey[]): Promise<void> {
   await ensureLegacyRecovered();
   const db = await getJourneyDb();
   await saveJourneysToDb(db, journeys);
+}
+
+/** 只读取一条旅程的轨迹点（实时轨迹展示用，避免整库加载）。 */
+export async function loadJourneyTrackLocations(journeyId: string): Promise<TimelineLocation[]> {
+  if (Platform.OS === 'web') {
+    const journeys = await loadJourneysFromAsyncStorage();
+    return journeys.find((journey) => journey.id === journeyId)?.trackLocations ?? [];
+  }
+
+  await ensureLegacyRecovered();
+  const db = await getJourneyDb();
+  return loadTrackLocationsFromDb(db, journeyId);
 }
 
 async function loadJourneysFromAsyncStorage(): Promise<Journey[]> {

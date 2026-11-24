@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   AudioModule,
   RecordingPresets,
@@ -23,24 +23,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActiveJourneyCard } from '@/components/active-journey-card';
 import { CityWalkEntryCard } from '@/components/city-walk-entry-card';
+import { CityWalkJourneyMap } from '@/components/city-walk-journey-map';
 import { DataLoadError } from '@/components/data-load-error';
 import { JourneyCreateCard } from '@/components/journey-create-card';
 import { MediaPreviewModal } from '@/components/media-preview-modal';
 import { TemplateModal } from '@/components/template-modal';
 import { TimelineList } from '@/components/timeline-list';
+import { useCityWalkTrack } from '@/hooks/use-city-walk-track';
 import { useI18n } from '@/hooks/locale-preference';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useJourneys } from '@/hooks/use-journeys';
 import { useLocationTracking } from '@/hooks/use-location-tracking';
 import { stopLocationTracking, syncBufferedTrackLocations } from '@/lib/background-location';
+import { findCityWalkPlanForJourney } from '@/lib/city-walk-storage';
 import { getLocalLogFileUri, logLocalError, logLocalInfo } from '@/lib/local-log';
 import { persistTimelineMedia } from '@/lib/media-storage';
 import { consumePendingLocation } from '@/lib/pending-location';
+import { setPendingWalkMapPlan } from '@/lib/pending-walk-map';
 import {
   getDefaultEntryTemplateConfig,
   loadEntryTemplateConfig,
   saveEntryTemplateConfig,
 } from '@/lib/template-storage-i18n';
+import { CityWalkPlan } from '@/types/city-walk';
 import {
   EntryCost,
   JourneyCostMode,
@@ -130,6 +135,37 @@ export default function JourneyScreen() {
     activeJourney,
     refreshJourneys,
   );
+
+  // ---- City Walk route on the active journey ------------------------------
+  const isFocused = useIsFocused();
+  const [activeWalkPlan, setActiveWalkPlan] = useState<CityWalkPlan | null>(null);
+  // 只读取当前旅程的轨迹，5 秒刷新一次，边走边更新
+  const walkedTrack = useCityWalkTrack(activeJourney?.id, Boolean(activeWalkPlan));
+
+  // AMap 同时存在多个地图实例会黑屏：离开本页时卸载地图，交给其他页面的地图
+  const showWalkMap = isFocused && Boolean(activeWalkPlan);
+
+  useEffect(() => {
+    let active = true;
+    const journeyId = activeJourney?.id;
+    if (!journeyId) {
+      setActiveWalkPlan(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const plan = await findCityWalkPlanForJourney(journeyId);
+        if (active) {
+          setActiveWalkPlan(plan ?? null);
+        }
+      } catch (error) {
+        void logLocalError('JourneyScreen', 'failed to load city walk plan', error);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [activeJourney?.id]);
 
   // ---- Draft entry state --------------------------------------------------
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
@@ -557,8 +593,22 @@ export default function JourneyScreen() {
           </Text>
         </View>
 
-        {/* City Walk entry */}
-        <CityWalkEntryCard onPress={() => router.push('/city-walk')} />
+        {/* City Walk route for the active walk, otherwise the City Walk entry */}
+        {showWalkMap && activeWalkPlan ? (
+          <CityWalkJourneyMap
+            plan={activeWalkPlan}
+            walkedTrack={walkedTrack}
+            onOpenMap={() => {
+              setPendingWalkMapPlan(activeWalkPlan);
+              router.push('/walk-map');
+            }}
+            onOpenPlan={() =>
+              router.push({ pathname: '/city-walk', params: { planId: activeWalkPlan.id } })
+            }
+          />
+        ) : (
+          <CityWalkEntryCard onPress={() => router.push('/city-walk')} />
+        )}
 
         {/* Create or Active journey card */}
         {!activeJourney ? (

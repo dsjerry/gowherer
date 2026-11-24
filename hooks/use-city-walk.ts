@@ -507,6 +507,7 @@ export function useCityWalk() {
     locating,
     savedPlans,
     isSaved,
+    linkedJourneyId,
     setDuration,
     setPace,
     setRouteShape,
